@@ -55,3 +55,11 @@ Assets/Plugins/Editor/JetBrains*
 Assets/AddressableAssetsData/*/*.bin*
 Assets/StreamingAssets/aa.meta
 Assets/StreamingAssets/aa/*
+
+# Cross-platform noise
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# New Visual Studio solution format
+*.slnx
