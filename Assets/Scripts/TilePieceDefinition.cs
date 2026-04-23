@@ -4,6 +4,12 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public class TilePieceDefinition : MonoBehaviour
 {
+    public enum PlacementLayer
+    {
+        Tile,
+        Window
+    }
+
     [System.Serializable]
     public class ShopData
     {
@@ -24,6 +30,10 @@ public class TilePieceDefinition : MonoBehaviour
 
     [Header("Shop")]
     public ShopData shopData = new ShopData();
+
+    [Header("Placement")]
+    [Tooltip("当前只作为分类标签使用；放置规则由 TilePlacementGrid 统一决定。")]
+    public PlacementLayer placementLayer = PlacementLayer.Tile;
 
     [Header("Scene Registration")]
     [Tooltip("场景里已经摆好的地图块，游戏开始时是否自动注册到网格中。")]

@@ -18,7 +18,8 @@ public class CameraDragPan : MonoBehaviour
     public Vector2 maxPosition = new Vector2(10f, 10f);
 
     private bool isDragging;
-    private Vector3 lastWorldPoint;
+    private Vector3 dragStartMousePosition;
+    private Vector3 dragStartCameraPosition;
 
     void Awake()
     {
@@ -40,7 +41,8 @@ public class CameraDragPan : MonoBehaviour
                 return;
 
             isDragging = true;
-            lastWorldPoint = GetMouseWorldPoint();
+            dragStartMousePosition = Input.mousePosition;
+            dragStartCameraPosition = targetCamera.transform.position;
         }
 
         if (Input.GetMouseButtonUp(mouseButton))
@@ -51,13 +53,13 @@ public class CameraDragPan : MonoBehaviour
         if (!isDragging)
             return;
 
-        Vector3 currentWorldPoint = GetMouseWorldPoint();
-        Vector3 delta = lastWorldPoint - currentWorldPoint;
+        Vector3 mouseDelta = Input.mousePosition - dragStartMousePosition;
+        Vector3 worldDelta = ScreenDeltaToWorldDelta(mouseDelta);
 
         if (invertDrag)
-            delta = -delta;
+            worldDelta = -worldDelta;
 
-        Vector3 nextPosition = targetCamera.transform.position + new Vector3(delta.x, delta.y, 0f);
+        Vector3 nextPosition = dragStartCameraPosition - new Vector3(worldDelta.x, worldDelta.y, 0f);
 
         if (clampPosition)
         {
@@ -66,16 +68,27 @@ public class CameraDragPan : MonoBehaviour
         }
 
         targetCamera.transform.position = nextPosition;
-        lastWorldPoint = GetMouseWorldPoint();
     }
 
-    private Vector3 GetMouseWorldPoint()
+    private Vector3 ScreenDeltaToWorldDelta(Vector3 screenDelta)
     {
-        Vector3 mousePosition = Input.mousePosition;
-        mousePosition.z = Mathf.Abs(targetCamera.transform.position.z);
+        if (targetCamera.orthographic)
+        {
+            float worldHeight = targetCamera.orthographicSize * 2f;
+            float worldWidth = worldHeight * targetCamera.aspect;
+            return new Vector3(
+                screenDelta.x / Screen.width * worldWidth,
+                screenDelta.y / Screen.height * worldHeight,
+                0f
+            );
+        }
 
-        Vector3 worldPoint = targetCamera.ScreenToWorldPoint(mousePosition);
-        worldPoint.z = targetCamera.transform.position.z;
-        return worldPoint;
+        Vector3 startScreen = dragStartMousePosition;
+        startScreen.z = Mathf.Abs(targetCamera.transform.position.z);
+
+        Vector3 endScreen = dragStartMousePosition + screenDelta;
+        endScreen.z = startScreen.z;
+
+        return targetCamera.ScreenToWorldPoint(endScreen) - targetCamera.ScreenToWorldPoint(startScreen);
     }
 }

@@ -7,8 +7,6 @@ using UnityEngine.UI;
 public class SanitySystem : MonoBehaviour
 {
     [Header("References")]
-    public StageCycleController stageController;
-    public HoverScrollColorLerp2D[] watchedObjects;
     public Renderer[] warningRenderers;
     public GameObject alternateWarningPanel;
     public TimeCounterUI currencySource;
@@ -19,17 +17,22 @@ public class SanitySystem : MonoBehaviour
     [Header("Sanity")]
     public float maxSanity = 20f;
     public float startSanity = 20f;
-    public float losePerSecondAtNight = 1f;
 
-    [Header("Warning")]
-    [Tooltip("sanity 下降时，一秒内完成一次开关循环")]
-    public float warningBlinkInterval = 1f;
+    [Header("Slider Blink")]
+    [Min(0.01f)]
+    public float sliderBlinkSpeed = 6f;
+    [Range(0f, 1f)]
+    public float sliderBlinkMinAlpha = 0.35f;
+    [Range(0f, 1f)]
+    public float sliderBlinkMaxAlpha = 1f;
 
     [Header("Fail State")]
     public string sceneToLoadWhenDepleted;
 
     private float currentSanity;
     private bool hasTriggeredSceneLoad;
+    private Graphic[] sanitySliderGraphics = System.Array.Empty<Graphic>();
+    private bool sliderShouldBlinkThisFrame;
 
     public float CurrentSanity => currentSanity;
 
@@ -40,6 +43,8 @@ public class SanitySystem : MonoBehaviour
         RefreshUI();
         SetWarningRenderersEnabled(true);
         SetAlternateWarningVisible(false);
+        CacheSliderGraphics();
+        SetSliderBlinkAlpha(1f);
     }
 
     void Update()
@@ -47,46 +52,10 @@ public class SanitySystem : MonoBehaviour
         if (hasTriggeredSceneLoad)
             return;
 
-        bool shouldLoseSanity = ShouldLoseSanityAtNight();
-
-        if (shouldLoseSanity)
-        {
-            currentSanity = Mathf.Max(0f, currentSanity - losePerSecondAtNight * Time.deltaTime);
-            SetWarningRenderersEnabled(true);
-            UpdateAlternateWarningBlink();
-        }
-        else
-        {
-            SetWarningRenderersEnabled(true);
-            SetAlternateWarningVisible(false);
-        }
-
         RefreshUI();
+        UpdateSliderBlink();
         HandleSanityDepleted();
-    }
-
-    bool ShouldLoseSanityAtNight()
-    {
-        if (stageController == null)
-            return false;
-
-        if (stageController.CurrentStageId != "Night")
-            return false;
-
-        if (nightEventController != null && nightEventController.HasEventTonight)
-            return false;
-
-        if (watchedObjects == null || watchedObjects.Length == 0)
-            return false;
-
-        for (int i = 0; i < watchedObjects.Length; i++)
-        {
-            HoverScrollColorLerp2D watchedObject = watchedObjects[i];
-            if (watchedObject != null && !watchedObject.IsAtColorA)
-                return true;
-        }
-
-        return false;
+        sliderShouldBlinkThisFrame = false;
     }
 
     void RefreshUI()
@@ -117,13 +86,6 @@ public class SanitySystem : MonoBehaviour
         }
     }
 
-    void UpdateAlternateWarningBlink()
-    {
-        float interval = Mathf.Max(0.01f, warningBlinkInterval);
-        bool visible = Mathf.Repeat(Time.time, interval) < interval * 0.5f;
-        SetAlternateWarningVisible(visible);
-    }
-
     void SetAlternateWarningVisible(bool visible)
     {
         if (alternateWarningPanel == null)
@@ -140,16 +102,6 @@ public class SanitySystem : MonoBehaviour
         if (currentSanity > 0f)
             return;
 
-        if (currencySource != null && currencySource.CurrentValue >= 1f)
-        {
-            float currencyPenalty = currencySource.CurrentValue * 0.5f;
-            currencySource.AddValue(-currencyPenalty);
-            currentSanity = Mathf.Clamp(startSanity, 0f, maxSanity);
-            RefreshUI();
-            SetAlternateWarningVisible(false);
-            return;
-        }
-
         if (string.IsNullOrWhiteSpace(sceneToLoadWhenDepleted))
             return;
 
@@ -160,12 +112,68 @@ public class SanitySystem : MonoBehaviour
     public void AddSanity(float amount)
     {
         currentSanity = Mathf.Clamp(currentSanity + amount, 0f, maxSanity);
+
+        if (amount < 0f)
+            sliderShouldBlinkThisFrame = true;
+
         RefreshUI();
     }
 
     public void ApplyHalfSanityPenalty()
     {
         currentSanity = Mathf.Clamp(currentSanity * 0.5f, 0f, maxSanity);
+        sliderShouldBlinkThisFrame = true;
         RefreshUI();
+    }
+
+    public void DrainSanity(float amount)
+    {
+        if (amount <= 0f)
+            return;
+
+        AddSanity(-amount);
+    }
+
+    void CacheSliderGraphics()
+    {
+        if (sanitySlider == null)
+            return;
+
+        sanitySliderGraphics = sanitySlider.GetComponentsInChildren<Graphic>(true);
+    }
+
+    void UpdateSliderBlink()
+    {
+        if (sanitySlider == null)
+            return;
+
+        if (sanitySliderGraphics == null || sanitySliderGraphics.Length == 0)
+            CacheSliderGraphics();
+
+        if (!sliderShouldBlinkThisFrame)
+        {
+            SetSliderBlinkAlpha(1f);
+            return;
+        }
+
+        float t = (Mathf.Sin(Time.unscaledTime * sliderBlinkSpeed * Mathf.PI * 2f) + 1f) * 0.5f;
+        SetSliderBlinkAlpha(Mathf.Lerp(sliderBlinkMinAlpha, sliderBlinkMaxAlpha, t));
+    }
+
+    void SetSliderBlinkAlpha(float alpha)
+    {
+        if (sanitySliderGraphics == null)
+            return;
+
+        for (int i = 0; i < sanitySliderGraphics.Length; i++)
+        {
+            Graphic graphic = sanitySliderGraphics[i];
+            if (graphic == null)
+                continue;
+
+            Color color = graphic.color;
+            color.a = alpha;
+            graphic.color = color;
+        }
     }
 }

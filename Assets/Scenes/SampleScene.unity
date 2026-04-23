@@ -1623,7 +1623,6 @@ GameObject:
   m_Component:
   - component: {fileID: 350688149}
   - component: {fileID: 350688148}
-  - component: {fileID: 350688147}
   - component: {fileID: 350688146}
   m_Layer: 0
   m_Name: Triangle (1)
@@ -1678,19 +1677,6 @@ BoxCollider2D:
   m_AutoTiling: 0
   m_Size: {x: 1, y: 1}
   m_EdgeRadius: 0
---- !u!114 &350688147
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 350688145}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d17016a6000bf6d40a9078a05c377d54, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  message: Cursor is over this object
 --- !u!212 &350688148
 SpriteRenderer:
   serializedVersion: 2
@@ -2649,7 +2635,6 @@ GameObject:
   - component: {fileID: 519420031}
   - component: {fileID: 519420029}
   - component: {fileID: 519420030}
-  - component: {fileID: 519420034}
   - component: {fileID: 519420033}
   m_Layer: 0
   m_Name: Main Camera
@@ -2761,25 +2746,6 @@ Camera:
   m_OcclusionCulling: 0
   m_StereoConvergence: 10
   m_StereoSeparation: 0.022
---- !u!114 &519420034
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 519420028}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fb2b149089adc0d4ba723f4b0ae5e24d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  targetCamera: {fileID: 0}
-  mouseButton: 0
-  ignoreWhenPointerOverUI: 1
-  invertDrag: 0
-  clampPosition: 0
-  minPosition: {x: -10, y: -10}
-  maxPosition: {x: 10, y: 10}
 --- !u!4 &519420032
 Transform:
   m_ObjectHideFlags: 0
@@ -5529,7 +5495,6 @@ GameObject:
   - component: {fileID: 1101936693}
   - component: {fileID: 1101936692}
   - component: {fileID: 1101936691}
-  - component: {fileID: 1101936695}
   m_Layer: 0
   m_Name: Triangle
   m_TagString: Untagged
@@ -5583,19 +5548,6 @@ BoxCollider2D:
   m_AutoTiling: 0
   m_Size: {x: 1, y: 1}
   m_EdgeRadius: 0
---- !u!114 &1101936692
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1101936690}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d17016a6000bf6d40a9078a05c377d54, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  message: Cursor is over this object
 --- !u!212 &1101936693
 SpriteRenderer:
   serializedVersion: 2
@@ -5673,24 +5625,6 @@ Transform:
   - {fileID: 1342423118}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1101936695
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1101936690}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d16cbff9ce1776343ab9b6c5a8916fda, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  targetCamera: {fileID: 519420031}
-  sanitySystem: {fileID: 1697662058}
-  targetCollider: {fileID: 1101936691}
-  sanityDrainPerSecond: 1
-  shakeStrength: 0.12
-  shakeSpeed: 30
 --- !u!1 &1111066906
 GameObject:
   m_ObjectHideFlags: 0
@@ -7104,7 +7038,6 @@ GameObject:
   m_Component:
   - component: {fileID: 1339682367}
   - component: {fileID: 1339682370}
-  - component: {fileID: 1339682369}
   - component: {fileID: 1339682368}
   m_Layer: 0
   m_Name: Triangle (2)
@@ -7174,19 +7107,6 @@ BoxCollider2D:
   m_AutoTiling: 0
   m_Size: {x: 1, y: 1}
   m_EdgeRadius: 0
---- !u!114 &1339682369
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1339682366}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d17016a6000bf6d40a9078a05c377d54, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  message: Cursor is over this object
 --- !u!212 &1339682370
 SpriteRenderer:
   serializedVersion: 2
@@ -7256,7 +7176,6 @@ GameObject:
   m_Component:
   - component: {fileID: 1342423118}
   - component: {fileID: 1342423121}
-  - component: {fileID: 1342423120}
   - component: {fileID: 1342423119}
   m_Layer: 0
   m_Name: Triangle (3)
@@ -7326,19 +7245,6 @@ BoxCollider2D:
   m_AutoTiling: 0
   m_Size: {x: 1, y: 1}
   m_EdgeRadius: 0
---- !u!114 &1342423120
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1342423117}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d17016a6000bf6d40a9078a05c377d54, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  message: Cursor is over this object
 --- !u!212 &1342423121
 SpriteRenderer:
   serializedVersion: 2

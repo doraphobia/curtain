@@ -94,7 +94,11 @@ public class TilePlacementManager : MonoBehaviour
 
     private void ConfirmPlacement()
     {
-        GameObject placedInstance = Instantiate(pendingDefinition.gameObject, placementGrid.CellToWorld(previewAnchorCell), Quaternion.identity);
+        GameObject placedInstance = Instantiate(
+            pendingDefinition.gameObject,
+            placementGrid.CellToWorld(previewAnchorCell),
+            pendingDefinition.transform.rotation
+        );
         placedInstance.name = pendingDefinition.gameObject.name;
 
         TilePieceDefinition placedDefinition = placedInstance.GetComponent<TilePieceDefinition>();
@@ -105,6 +109,7 @@ public class TilePlacementManager : MonoBehaviour
         placedDefinition.cells = new List<Vector2Int>(pendingDefinition.cells);
         placedDefinition.shopData.displayName = pendingDefinition.shopData.displayName;
         placedDefinition.shopData.price = pendingDefinition.shopData.price;
+        placedDefinition.placementLayer = pendingDefinition.placementLayer;
 
         placementGrid.RegisterPiece(placedDefinition, previewAnchorCell);
         BeginConstructionIfPresent(placedInstance);

@@ -38,17 +38,25 @@ public class TilePlacementGrid : MonoBehaviour
         if (definition == null || definition.Cells == null || definition.Cells.Count == 0)
             return false;
 
-        bool overlapsExisting = occupiedCells.Count == 0;
-
+        HashSet<Vector2Int> candidateCells = new HashSet<Vector2Int>();
         for (int i = 0; i < definition.Cells.Count; i++)
         {
-            Vector2Int cell = anchorCell + definition.Cells[i];
-
-            if (!overlapsExisting && occupiedCells.Contains(cell))
-                overlapsExisting = true;
+            candidateCells.Add(anchorCell + definition.Cells[i]);
         }
 
-        return overlapsExisting;
+        if (occupiedCells.Count == 0)
+            return true;
+
+        foreach (Vector2Int cell in candidateCells)
+        {
+            if (occupiedCells.Contains(cell))
+                return true;
+
+            if (TouchesOtherOccupiedCell(cell, candidateCells))
+                return true;
+        }
+
+        return false;
     }
 
     public bool TryPlace(TilePieceDefinition definition, Vector2Int anchorCell)
@@ -66,15 +74,14 @@ public class TilePlacementGrid : MonoBehaviour
             return;
 
         for (int i = 0; i < definition.Cells.Count; i++)
-        {
             occupiedCells.Add(anchorCell + definition.Cells[i]);
-        }
     }
 
     public int OccupiedCount()
     {
         return occupiedCells.Count;
     }
+
     private void RegisterExistingTiles()
     {
         TilePieceDefinition[] definitions = FindObjectsByType<TilePieceDefinition>(FindObjectsSortMode.None);
@@ -87,5 +94,26 @@ public class TilePlacementGrid : MonoBehaviour
             Vector2Int anchorCell = WorldToCell(definition.transform.position);
             RegisterPiece(definition, anchorCell);
         }
+    }
+
+    private bool TouchesOtherOccupiedCell(Vector2Int cell, HashSet<Vector2Int> candidateCells)
+    {
+        for (int x = -1; x <= 1; x++)
+        {
+            for (int y = -1; y <= 1; y++)
+            {
+                if (x == 0 && y == 0)
+                    continue;
+
+                Vector2Int neighbor = new Vector2Int(cell.x + x, cell.y + y);
+                if (candidateCells.Contains(neighbor))
+                    continue;
+
+                if (occupiedCells.Contains(neighbor))
+                    return true;
+            }
+        }
+
+        return false;
     }
 }

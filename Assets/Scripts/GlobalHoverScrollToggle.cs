@@ -1,12 +1,26 @@
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 
 [DisallowMultipleComponent]
 public class GlobalHoverScrollToggle : MonoBehaviour
 {
+    [Header("In-game mode indicator (optional)")]
+    [Tooltip("Shown while global scroll mode is ON (wheel affects all curtains).")]
+    public TextMeshProUGUI indicatorGlobalOn;
+    [Tooltip("Shown while global scroll mode is OFF (hover per curtain).")]
+    public TextMeshProUGUI indicatorGlobalOff;
+
     private readonly Dictionary<HoverScrollColorLerp2D, float> originalProgress = new Dictionary<HoverScrollColorLerp2D, float>();
     private HoverScrollColorLerp2D[] cachedTargets = System.Array.Empty<HoverScrollColorLerp2D>();
     private bool isGlobalModeActive;
+
+    public bool IsGlobalModeActive => isGlobalModeActive;
+
+    void Start()
+    {
+        RefreshModeIndicator();
+    }
 
     void Update()
     {
@@ -52,6 +66,7 @@ public class GlobalHoverScrollToggle : MonoBehaviour
         }
 
         isGlobalModeActive = true;
+        RefreshModeIndicator();
     }
 
     public void DisableGlobalModeAndRestore()
@@ -74,5 +89,14 @@ public class GlobalHoverScrollToggle : MonoBehaviour
         originalProgress.Clear();
         cachedTargets = System.Array.Empty<HoverScrollColorLerp2D>();
         isGlobalModeActive = false;
+        RefreshModeIndicator();
+    }
+
+    void RefreshModeIndicator()
+    {
+        if (indicatorGlobalOn != null)
+            indicatorGlobalOn.gameObject.SetActive(isGlobalModeActive);
+        if (indicatorGlobalOff != null)
+            indicatorGlobalOff.gameObject.SetActive(!isGlobalModeActive);
     }
 }
