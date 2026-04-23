@@ -704,8 +704,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 50dc9f753243a9f4382e47e7d692e22c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  colorA: {r: 1, g: 0.20994267, b: 0, a: 1}
-  colorB: {r: 0.0082166195, g: 1, b: 0, a: 1}
+  colorA: {r: 0.31132078, g: 0.06592676, b: 0, a: 1}
+  colorB: {r: 0.0022197221, g: 0.2830189, b: 0, a: 1}
   sideType: 2
   stageController: {fileID: 0}
   currencyTarget: {fileID: 0}
@@ -825,7 +825,7 @@ SpriteRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_Sprite: {fileID: 7482667652216324306, guid: 75f5f34dc1b5347e0b8351032682f224, type: 3}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 0.7830189, g: 0.7830189, b: 0.7830189, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 [DisallowMultipleComponent]
@@ -31,6 +32,8 @@ public class TileShopPanelUI : MonoBehaviour
     [Header("References")]
     public TimeCounterUI currencySource;
     public TilePlacementManager placementManager;
+    public GameObject shopPanelRoot;
+    public RectTransform[] ignoreOutsideClickTargets;
     public List<ShopSlot> slots = new List<ShopSlot>();
 
     void Start()
@@ -46,6 +49,21 @@ public class TileShopPanelUI : MonoBehaviour
     {
         if (currencySource != null)
             currencySource.ValueChanged -= HandleCurrencyChanged;
+    }
+
+    void Update()
+    {
+        if (!Input.GetMouseButtonDown(0))
+            return;
+
+        GameObject target = GetShopPanelTarget();
+        if (target == null || !target.activeInHierarchy)
+            return;
+
+        if (IsPointerInsidePanel(target) || IsPointerInsideIgnoredTarget())
+            return;
+
+        HideShopPanel();
     }
 
     public void Refresh()
@@ -96,7 +114,10 @@ public class TileShopPanelUI : MonoBehaviour
                     return;
 
                 if (placementManager.TryBeginPlacement(slot.tilePrefab))
+                {
+                    HideShopPanel();
                     Refresh();
+                }
                 break;
 
             case ShopItemType.DirectPurchase:
@@ -134,5 +155,56 @@ public class TileShopPanelUI : MonoBehaviour
             return slot.tilePrefab.shopData.price;
 
         return Mathf.Max(0, slot.itemPrice);
+    }
+
+    private void HideShopPanel()
+    {
+        GameObject target = GetShopPanelTarget();
+        if (target == null)
+            return;
+
+        target.SetActive(false);
+    }
+
+    private GameObject GetShopPanelTarget()
+    {
+        return shopPanelRoot != null ? shopPanelRoot : gameObject;
+    }
+
+    private bool IsPointerInsidePanel(GameObject target)
+    {
+        RectTransform rectTransform = target.GetComponent<RectTransform>();
+        if (rectTransform == null)
+            return false;
+
+        Canvas canvas = target.GetComponentInParent<Canvas>();
+        Camera eventCamera = null;
+        if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+            eventCamera = canvas.worldCamera;
+
+        return RectTransformUtility.RectangleContainsScreenPoint(rectTransform, Input.mousePosition, eventCamera);
+    }
+
+    private bool IsPointerInsideIgnoredTarget()
+    {
+        if (ignoreOutsideClickTargets == null || ignoreOutsideClickTargets.Length == 0)
+            return false;
+
+        for (int i = 0; i < ignoreOutsideClickTargets.Length; i++)
+        {
+            RectTransform target = ignoreOutsideClickTargets[i];
+            if (target == null || !target.gameObject.activeInHierarchy)
+                continue;
+
+            Canvas canvas = target.GetComponentInParent<Canvas>();
+            Camera eventCamera = null;
+            if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+                eventCamera = canvas.worldCamera;
+
+            if (RectTransformUtility.RectangleContainsScreenPoint(target, Input.mousePosition, eventCamera))
+                return true;
+        }
+
+        return false;
     }
 }
