@@ -5,16 +5,29 @@ using UnityEngine.UI;
 [DisallowMultipleComponent]
 public class FollowWorldButtonRewardUI : MonoBehaviour
 {
+    private enum RewardCycleState
+    {
+        WaitingForConstruction,
+        ReadyToStart,
+        CoolingDown,
+        ReadyToCollect
+    }
+
     [Header("References")]
     public Camera targetCamera;
     public Canvas targetCanvas;
     public GameObject buttonPrefab;
     public TimeCounterUI currencySource;
+    public RoomConstructionController constructionController;
 
     [Header("Reward")]
     [Min(1f)]
     public float waitSeconds = 60f;
     public int rewardAmount = 10;
+
+    [Header("Text")]
+    public string startButtonText = "Start";
+    public string collectButtonText = "Collect";
 
     [Header("Follow")]
     public Vector2 screenOffset;
@@ -24,7 +37,7 @@ public class FollowWorldButtonRewardUI : MonoBehaviour
     private Button rewardButton;
     private TMP_Text countdownText;
     private float cooldownRemaining;
-    private bool isCoolingDown;
+    private RewardCycleState currentState = RewardCycleState.WaitingForConstruction;
 
     void Awake()
     {
@@ -36,13 +49,16 @@ public class FollowWorldButtonRewardUI : MonoBehaviour
 
         if (currencySource == null)
             currencySource = FindFirstObjectByType<TimeCounterUI>();
+
+        if (constructionController == null)
+            constructionController = GetComponent<RoomConstructionController>();
     }
 
     void OnEnable()
     {
         EnsureButtonInstance();
-        RefreshButtonInteractable();
-        RefreshCountdownLabel();
+        InitializeState();
+        RefreshButtonVisualState();
         UpdateButtonPosition();
     }
 
@@ -54,41 +70,43 @@ public class FollowWorldButtonRewardUI : MonoBehaviour
 
     void Update()
     {
-        UpdateButtonPosition();
+        UpdateConstructionState();
         UpdateCooldown();
+        UpdateButtonPosition();
+        RefreshButtonVisualState();
     }
 
     private void HandleRewardButtonClicked()
     {
-        if (isCoolingDown)
-            return;
+        switch (currentState)
+        {
+            case RewardCycleState.ReadyToStart:
+                currentState = RewardCycleState.CoolingDown;
+                cooldownRemaining = waitSeconds;
+                break;
 
-        isCoolingDown = true;
-        cooldownRemaining = waitSeconds;
-        RefreshButtonInteractable();
-        RefreshCountdownLabel();
+            case RewardCycleState.ReadyToCollect:
+                if (currencySource != null)
+                    currencySource.AddValue(rewardAmount);
+
+                currentState = RewardCycleState.ReadyToStart;
+                break;
+        }
+
+        RefreshButtonVisualState();
     }
 
     private void UpdateCooldown()
     {
-        if (!isCoolingDown)
+        if (currentState != RewardCycleState.CoolingDown)
             return;
 
         cooldownRemaining -= Time.deltaTime;
         if (cooldownRemaining > 0f)
-        {
-            RefreshCountdownLabel();
             return;
-        }
 
         cooldownRemaining = 0f;
-        isCoolingDown = false;
-
-        if (currencySource != null)
-            currencySource.AddValue(rewardAmount);
-
-        RefreshButtonInteractable();
-        RefreshCountdownLabel();
+        currentState = RewardCycleState.ReadyToCollect;
     }
 
     private void UpdateButtonPosition()
@@ -100,6 +118,15 @@ public class FollowWorldButtonRewardUI : MonoBehaviour
         bool isVisible = screenPoint.z > 0f &&
                          screenPoint.x >= 0f && screenPoint.x <= Screen.width &&
                          screenPoint.y >= 0f && screenPoint.y <= Screen.height;
+
+        bool shouldShowButton = currentState != RewardCycleState.WaitingForConstruction;
+
+        if (!shouldShowButton)
+        {
+            if (buttonRect.gameObject.activeSelf)
+                buttonRect.gameObject.SetActive(false);
+            return;
+        }
 
         if (hideWhenTargetOffScreen && !isVisible)
         {
@@ -150,6 +177,39 @@ public class FollowWorldButtonRewardUI : MonoBehaviour
         }
     }
 
+    private void InitializeState()
+    {
+        if (constructionController != null && constructionController.IsConstructing)
+        {
+            currentState = RewardCycleState.WaitingForConstruction;
+            cooldownRemaining = 0f;
+            return;
+        }
+
+        if (currentState == RewardCycleState.WaitingForConstruction)
+            currentState = RewardCycleState.ReadyToStart;
+    }
+
+    private void UpdateConstructionState()
+    {
+        if (constructionController == null)
+        {
+            if (currentState == RewardCycleState.WaitingForConstruction)
+                currentState = RewardCycleState.ReadyToStart;
+            return;
+        }
+
+        if (constructionController.IsConstructing)
+        {
+            currentState = RewardCycleState.WaitingForConstruction;
+            cooldownRemaining = 0f;
+            return;
+        }
+
+        if (currentState == RewardCycleState.WaitingForConstruction)
+            currentState = RewardCycleState.ReadyToStart;
+    }
+
     private Camera ResolveCanvasCamera()
     {
         if (targetCanvas == null)
@@ -161,23 +221,31 @@ public class FollowWorldButtonRewardUI : MonoBehaviour
         return targetCanvas.worldCamera != null ? targetCanvas.worldCamera : targetCamera;
     }
 
-    private void RefreshButtonInteractable()
+    private void RefreshButtonVisualState()
     {
         if (rewardButton != null)
-            rewardButton.interactable = !isCoolingDown;
-    }
+            rewardButton.interactable = currentState == RewardCycleState.ReadyToStart || currentState == RewardCycleState.ReadyToCollect;
 
-    private void RefreshCountdownLabel()
-    {
         if (countdownText == null)
             return;
 
-        if (!isCoolingDown)
+        switch (currentState)
         {
-            countdownText.text = string.Empty;
-            return;
-        }
+            case RewardCycleState.ReadyToStart:
+                countdownText.text = startButtonText;
+                break;
 
-        countdownText.text = Mathf.CeilToInt(cooldownRemaining).ToString();
+            case RewardCycleState.ReadyToCollect:
+                countdownText.text = collectButtonText;
+                break;
+
+            case RewardCycleState.CoolingDown:
+                countdownText.text = Mathf.CeilToInt(cooldownRemaining).ToString();
+                break;
+
+            default:
+                countdownText.text = string.Empty;
+                break;
+        }
     }
 }

@@ -10,8 +10,26 @@ public class OrbitAroundPoint2D : MonoBehaviour
         OrbitAndSelfRotate
     }
 
+    public enum StageProgressSource
+    {
+        [Tooltip("当前阶段内：StageTimer / CurrentStageDuration，0→1 对应一个阶段")]
+        CurrentStageNormalized,
+        [Tooltip("整轮循环：已流逝时间 / 各阶段 duration 之和，0→1 对应从当前轮起点回到起点")]
+        FullCycleNormalized
+    }
+
     [Header("Mode")]
     public MotionMode motionMode = MotionMode.OrbitAroundPoint;
+
+    [Header("Stage progress (optional)")]
+    [Tooltip("若赋值且 useStageProgress 为真，则角度由阶段进度驱动；否则仍用下方「每秒角度」累计")]
+    public StageCycleController stageController;
+    public bool useStageProgress = true;
+    public StageProgressSource stageProgressSource = StageProgressSource.FullCycleNormalized;
+    [Tooltip("进度从 0→1 时，轨道角走过的总度数（例如 360 = 每单位进度转一圈）")]
+    public float orbitDegreesPerProgressUnit = 360f;
+    [Tooltip("进度从 0→1 时，自转角走过的总度数（仅 SelfRotate / OrbitAndSelfRotate）")]
+    public float selfRotationDegreesPerProgressUnit = 360f;
 
     [Header("Orbit Center")]
     public Transform centerPoint;
@@ -34,6 +52,9 @@ public class OrbitAroundPoint2D : MonoBehaviour
 
     void Start()
     {
+        if (stageController == null)
+            stageController = FindFirstObjectByType<StageCycleController>();
+
         currentAngleDegrees = startAngleDegrees;
         currentSelfRotationDegrees = startAngleDegrees;
         ApplyMotion();
@@ -41,9 +62,67 @@ public class OrbitAroundPoint2D : MonoBehaviour
 
     void Update()
     {
-        currentAngleDegrees += degreesPerSecond * Time.deltaTime;
-        currentSelfRotationDegrees += selfRotationDegreesPerSecond * Time.deltaTime;
+        if (useStageProgress && stageController != null)
+        {
+            float t = GetStageProgress01Clamped();
+            currentAngleDegrees = startAngleDegrees + t * orbitDegreesPerProgressUnit;
+            currentSelfRotationDegrees = startAngleDegrees + t * selfRotationDegreesPerProgressUnit;
+        }
+        else
+        {
+            currentAngleDegrees += degreesPerSecond * Time.deltaTime;
+            currentSelfRotationDegrees += selfRotationDegreesPerSecond * Time.deltaTime;
+        }
+
         ApplyMotion();
+    }
+
+    private float GetStageProgress01Clamped()
+    {
+        if (stageController == null)
+            return 0f;
+
+        switch (stageProgressSource)
+        {
+            case StageProgressSource.CurrentStageNormalized:
+            {
+                float d = stageController.CurrentStageDuration;
+                if (d <= 0f)
+                    return 0f;
+                return Mathf.Clamp01(stageController.StageTimer / d);
+            }
+
+            case StageProgressSource.FullCycleNormalized:
+            default:
+                return GetFullCycleProgress01(stageController);
+        }
+    }
+
+    private static float GetFullCycleProgress01(StageCycleController ctrl)
+    {
+        if (ctrl.stages == null || ctrl.stages.Count == 0)
+            return 0f;
+
+        float total = 0f;
+        for (int i = 0; i < ctrl.stages.Count; i++)
+        {
+            if (ctrl.stages[i] != null)
+                total += Mathf.Max(0.01f, ctrl.stages[i].duration);
+        }
+
+        if (total <= 0f)
+            return 0f;
+
+        int idx = ctrl.GetCurrentStageIndex();
+        float elapsed = 0f;
+        for (int i = 0; i < idx && i < ctrl.stages.Count; i++)
+        {
+            if (ctrl.stages[i] != null)
+                elapsed += Mathf.Max(0.01f, ctrl.stages[i].duration);
+        }
+
+        elapsed += ctrl.StageTimer;
+        return Mathf.Clamp01(elapsed / total);
     }
 
     private void ApplyMotion()
@@ -82,7 +161,8 @@ public class OrbitAroundPoint2D : MonoBehaviour
         }
         else if (rotateToMovementDirection)
         {
-            Vector2 tangent = new Vector2(-Mathf.Sin(radians), Mathf.Cos(radians)) * Mathf.Sign(degreesPerSecond);
+            float orbitSign = GetOrbitTangentSign();
+            Vector2 tangent = new Vector2(-Mathf.Sin(radians), Mathf.Cos(radians)) * orbitSign;
             if (tangent.sqrMagnitude > 0.0001f)
             {
                 float angle = Mathf.Atan2(tangent.y, tangent.x) * Mathf.Rad2Deg + spriteForwardOffset;
@@ -104,5 +184,19 @@ public class OrbitAroundPoint2D : MonoBehaviour
             return centerPoint.position;
 
         return centerPosition;
+    }
+
+    private float GetOrbitTangentSign()
+    {
+        if (useStageProgress && stageController != null)
+        {
+            if (Mathf.Abs(orbitDegreesPerProgressUnit) > 0.0001f)
+                return Mathf.Sign(orbitDegreesPerProgressUnit);
+            return 1f;
+        }
+
+        if (Mathf.Abs(degreesPerSecond) > 0.0001f)
+            return Mathf.Sign(degreesPerSecond);
+        return 1f;
     }
 }

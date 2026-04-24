@@ -187,6 +187,17 @@ public class TileShopPanelUI : MonoBehaviour
 
     private bool IsPointerInsideIgnoredTarget()
     {
+        for (int i = 0; i < slots.Count; i++)
+        {
+            ShopSlot slot = slots[i];
+            if (slot == null || slot.button == null)
+                continue;
+
+            RectTransform buttonRect = slot.button.transform as RectTransform;
+            if (buttonRect != null && IsPointerInsideRect(buttonRect))
+                return true;
+        }
+
         if (ignoreOutsideClickTargets == null || ignoreOutsideClickTargets.Length == 0)
             return false;
 
@@ -196,15 +207,23 @@ public class TileShopPanelUI : MonoBehaviour
             if (target == null || !target.gameObject.activeInHierarchy)
                 continue;
 
-            Canvas canvas = target.GetComponentInParent<Canvas>();
-            Camera eventCamera = null;
-            if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
-                eventCamera = canvas.worldCamera;
-
-            if (RectTransformUtility.RectangleContainsScreenPoint(target, Input.mousePosition, eventCamera))
+            if (IsPointerInsideRect(target))
                 return true;
         }
 
         return false;
+    }
+
+    private bool IsPointerInsideRect(RectTransform target)
+    {
+        if (target == null || !target.gameObject.activeInHierarchy)
+            return false;
+
+        Canvas canvas = target.GetComponentInParent<Canvas>();
+        Camera eventCamera = null;
+        if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+            eventCamera = canvas.worldCamera;
+
+        return RectTransformUtility.RectangleContainsScreenPoint(target, Input.mousePosition, eventCamera);
     }
 }

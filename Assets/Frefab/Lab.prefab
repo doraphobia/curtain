@@ -319,7 +319,7 @@ SpriteRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8436388621305472134}
-  m_Enabled: 0
+  m_Enabled: 1
   m_CastShadows: 0
   m_ReceiveShadows: 0
   m_DynamicOccludee: 1
@@ -361,7 +361,7 @@ SpriteRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_Sprite: {fileID: 7482667652216324306, guid: 311925a002f4447b3a28927169b83ea6, type: 3}
-  m_Color: {r: 0.4716981, g: 0.4716981, b: 0.4716981, a: 1}
+  m_Color: {r: 0.73135453, g: 0.8962264, b: 0.8897042, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -388,7 +388,7 @@ MonoBehaviour:
   childCellSize: {x: 1, y: 1}
   includeRootCell: 1
   shopData:
-    displayName: Tile3
+    displayName: Lab to extract sunlight
     price: 60
   placementLayer: 0
   registerOnStart: 1
@@ -473,8 +473,11 @@ MonoBehaviour:
   targetCanvas: {fileID: 0}
   buttonPrefab: {fileID: 8688829454921447090, guid: 5bebb7244c91fdb498291748259c2f43, type: 3}
   currencySource: {fileID: 0}
+  constructionController: {fileID: 0}
   waitSeconds: 60
-  rewardAmount: 10
+  rewardAmount: 40
+  startButtonText: Extract Vitamin D
+  collectButtonText: Collect
   screenOffset: {x: 0, y: 0}
   hideWhenTargetOffScreen: 1
 --- !u!1001 &7129505201958588641
