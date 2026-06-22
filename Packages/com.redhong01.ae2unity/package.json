@@ -1,0 +1,26 @@
+{
+  "name": "com.redhong01.ae2unity",
+  "version": "0.5.1",
+  "displayName": "AE2Unity",
+  "description": "Imports After Effects metadata, vector-only shape compositions, or baked composition frames and generates playable Unity 6 assets for 2D motion graphics.",
+  "unity": "6000.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RedHong01/AE2Unity.git"
+  },
+  "author": {
+    "name": "AE2Unity"
+  },
+  "dependencies": {
+    "com.unity.render-pipelines.universal": "17.0.0",
+    "com.unity.ugui": "2.0.0"
+  },
+  "samples": [
+    {
+      "displayName": "Basic Curtain Export",
+      "description": "A tiny .ae2shader sample for validating importer and shader generation.",
+      "path": "Samples~/BasicCurtain"
+    }
+  ]
+}

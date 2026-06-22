@@ -1,0 +1,19 @@
+{
+  "name": "AE2Unity.Editor",
+  "rootNamespace": "AE2Unity.Editor",
+  "references": [
+    "AE2Unity.Runtime",
+    "UnityEngine.UI"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

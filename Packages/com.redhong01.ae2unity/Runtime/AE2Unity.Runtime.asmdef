@@ -1,0 +1,16 @@
+{
+  "name": "AE2Unity.Runtime",
+  "rootNamespace": "AE2Unity",
+  "references": [
+    "UnityEngine.UI"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

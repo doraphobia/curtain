@@ -1,0 +1,278 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://duocurtain.local/schemas/ae2shader-0.1.0.schema.json",
+  "title": "AE2Unity Export",
+  "type": "object",
+  "required": ["schemaVersion", "comp", "layers"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "0.1.0"
+    },
+    "exporter": {
+      "type": "string"
+    },
+    "exportedAt": {
+      "type": "string"
+    },
+    "comp": {
+      "type": "object",
+      "required": ["name", "width", "height", "frameRate", "duration"],
+      "properties": {
+        "name": { "type": "string" },
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 },
+        "frameRate": { "type": "number", "exclusiveMinimum": 0 },
+        "duration": { "type": "number", "minimum": 0 },
+        "workAreaStart": { "type": "number" },
+        "workAreaDuration": { "type": "number", "minimum": 0 },
+        "colorSpace": { "type": "string" },
+        "bitDepth": { "type": "integer", "enum": [8, 16, 32] }
+      }
+    },
+    "layers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "index", "name", "type", "transform"],
+        "properties": {
+          "id": { "type": "string" },
+          "index": { "type": "integer" },
+          "name": { "type": "string" },
+          "type": { "type": "string" },
+          "enabled": { "type": "boolean" },
+          "threeDLayer": { "type": "boolean" },
+          "startTime": { "type": "number" },
+          "inPoint": { "type": "number" },
+          "outPoint": { "type": "number" },
+          "parentId": { "type": "string" },
+          "blendMode": { "type": "string" },
+          "matteMode": { "type": "string" },
+          "sourceAssetId": { "type": "string" },
+          "transform": { "$ref": "#/$defs/transform" },
+          "effects": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/effect" }
+          },
+          "masks": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/mask" }
+          },
+          "expressions": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "assets": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/asset" }
+    },
+    "vectorAnimation": {
+      "$ref": "#/$defs/vectorAnimation"
+    },
+    "bakedFrames": {
+      "$ref": "#/$defs/bakedFrames"
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "string" },
+          "message": { "type": "string" },
+          "layerId": { "type": "string" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "transform": {
+      "type": "object",
+      "properties": {
+        "anchorPoint": { "$ref": "#/$defs/animatedVector3" },
+        "position": { "$ref": "#/$defs/animatedVector3" },
+        "scale": { "$ref": "#/$defs/animatedVector3" },
+        "rotation": { "$ref": "#/$defs/animatedFloat" },
+        "opacity": { "$ref": "#/$defs/animatedFloat" }
+      }
+    },
+    "animatedFloat": {
+      "type": "object",
+      "properties": {
+        "value": { "type": "number" },
+        "expression": { "type": "string" },
+        "keys": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["time", "value"],
+            "properties": {
+              "time": { "type": "number" },
+              "value": { "type": "number" }
+            }
+          }
+        }
+      }
+    },
+    "animatedVector3": {
+      "type": "object",
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "z": { "type": "number" },
+        "expression": { "type": "string" },
+        "keys": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["time", "x", "y", "z"],
+            "properties": {
+              "time": { "type": "number" },
+              "x": { "type": "number" },
+              "y": { "type": "number" },
+              "z": { "type": "number" }
+            }
+          }
+        }
+      }
+    },
+    "effect": {
+      "type": "object",
+      "properties": {
+        "matchName": { "type": "string" },
+        "displayName": { "type": "string" },
+        "enabled": { "type": "boolean" },
+        "parameters": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "matchName": { "type": "string" },
+              "valueType": { "type": "string" },
+              "value": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "mask": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "mode": { "type": "string" },
+        "inverted": { "type": "boolean" },
+        "opacity": { "type": "number" },
+        "expansion": { "type": "number" },
+        "featherX": { "type": "number" },
+        "featherY": { "type": "number" }
+      }
+    },
+    "asset": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "path": { "type": "string" },
+        "width": { "type": "integer" },
+        "height": { "type": "integer" },
+        "frameRate": { "type": "number" },
+        "duration": { "type": "number" }
+      }
+    },
+    "bakedFrames": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "relativePath": { "type": "string" },
+        "filePrefix": { "type": "string" },
+        "fileExtension": { "type": "string" },
+        "frameCount": { "type": "integer", "minimum": 0 },
+        "width": { "type": "integer", "minimum": 0 },
+        "height": { "type": "integer", "minimum": 0 },
+        "frameRate": { "type": "number", "exclusiveMinimum": 0 },
+        "duration": { "type": "number", "minimum": 0 },
+        "startTime": { "type": "number" },
+        "hasAlpha": { "type": "boolean" }
+      }
+    },
+    "vectorAnimation": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "vectorOnly": { "type": "boolean" },
+        "frameCount": { "type": "integer", "minimum": 0 },
+        "frameRate": { "type": "number", "exclusiveMinimum": 0 },
+        "duration": { "type": "number", "minimum": 0 },
+        "primitives": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/vectorPrimitive" }
+        }
+      }
+    },
+    "vectorPrimitive": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["rect", "path"] },
+        "order": { "type": "integer" },
+        "frames": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/vectorFrame" }
+        }
+      }
+    },
+    "vectorFrame": {
+      "type": "object",
+      "properties": {
+        "frameIndex": { "type": "integer", "minimum": 0 },
+        "visible": { "type": "boolean" },
+        "m00": { "type": "number" },
+        "m01": { "type": "number" },
+        "m02": { "type": "number" },
+        "m10": { "type": "number" },
+        "m11": { "type": "number" },
+        "m12": { "type": "number" },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "width": { "type": "number" },
+        "height": { "type": "number" },
+        "roundness": { "type": "number" },
+        "fillEnabled": { "type": "boolean" },
+        "fillR": { "type": "number" },
+        "fillG": { "type": "number" },
+        "fillB": { "type": "number" },
+        "fillA": { "type": "number" },
+        "strokeEnabled": { "type": "boolean" },
+        "strokeR": { "type": "number" },
+        "strokeG": { "type": "number" },
+        "strokeB": { "type": "number" },
+        "strokeA": { "type": "number" },
+        "strokeWidth": { "type": "number" },
+        "dash": { "type": "number" },
+        "gap": { "type": "number" },
+        "dashOffset": { "type": "number" },
+        "closed": { "type": "boolean" },
+        "path": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/vectorPathPoint" }
+        }
+      }
+    },
+    "vectorPathPoint": {
+      "type": "object",
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "inX": { "type": "number" },
+        "inY": { "type": "number" },
+        "outX": { "type": "number" },
+        "outY": { "type": "number" }
+      }
+    }
+  }
+}

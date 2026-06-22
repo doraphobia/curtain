@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "0.1.0",
+  "exporter": "AE2Unity exporter sample",
+  "exportedAt": "Thu, 28 May 2026 00:00:00 GMT",
+  "comp": {
+    "name": "BasicCurtain",
+    "width": 1920,
+    "height": 1080,
+    "frameRate": 24,
+    "duration": 2,
+    "workAreaStart": 0,
+    "workAreaDuration": 2,
+    "colorSpace": "sRGB",
+    "bitDepth": 8
+  },
+  "layers": [
+    {
+      "id": "layer-1",
+      "index": 1,
+      "name": "Curtain_Fade",
+      "type": "shape",
+      "enabled": true,
+      "threeDLayer": false,
+      "startTime": 0,
+      "inPoint": 0,
+      "outPoint": 2,
+      "parentId": "",
+      "blendMode": "NORMAL",
+      "matteMode": "NO_TRACK_MATTE",
+      "sourceAssetId": "",
+      "transform": {
+        "anchorPoint": { "x": 960, "y": 540, "z": 0, "expression": "", "keys": [] },
+        "position": { "x": 960, "y": 540, "z": 0, "expression": "", "keys": [] },
+        "scale": { "x": 100, "y": 100, "z": 100, "expression": "", "keys": [] },
+        "rotation": { "value": 0, "expression": "", "keys": [] },
+        "opacity": {
+          "value": 100,
+          "expression": "",
+          "keys": [
+            { "time": 0, "value": 0 },
+            { "time": 1, "value": 100 },
+            { "time": 2, "value": 65 }
+          ]
+        }
+      },
+      "effects": [],
+      "masks": [],
+      "expressions": []
+    }
+  ],
+  "assets": [],
+  "warnings": []
+}

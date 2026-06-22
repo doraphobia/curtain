@@ -1,5 +1,14 @@
 {
   "dependencies": {
+    "com.redhong01.ae2unity": {
+      "version": "file:com.redhong01.ae2unity",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.unity.render-pipelines.universal": "17.0.0",
+        "com.unity.ugui": "2.0.0"
+      }
+    },
     "com.unity.2d.animation": {
       "version": "13.0.4",
       "depth": 1,

@@ -47,6 +47,7 @@ sysinfo.txt
 *.unitypackage
 *.unitypackage.meta
 crashlytics-build.properties
+.ae2unitybridge/
 
 # Rider / JetBrains
 Assets/Plugins/Editor/JetBrains*
