@@ -1,0 +1,28 @@
+{
+  "name": "com.redhong01.figma_to_unity_importer",
+  "version": "0.2.1",
+  "displayName": "Figma To Unity Importer",
+  "description": "Original Figma importer by ManakhovN, extended by RedHong01 with event-flow improvements and macOS package workflow optimizations.",
+  "unity": "6000.0",
+  "documentationUrl": "https://github.com/RedHong01/Figma-Importer/tree/main/Documentation~",
+  "changelogUrl": "https://github.com/RedHong01/Figma-Importer/blob/main/CHANGELOG.md",
+  "licensesUrl": "https://github.com/RedHong01/Figma-Importer/blob/main/LICENSE.md",
+  "license": "MIT",
+  "keywords": [
+    "figma",
+    "importer",
+    "ui",
+    "tmp",
+    "autolayout"
+  ],
+  "author": {
+    "name": "RedHong01 (based on ManakhovN's original importer)",
+    "url": "https://github.com/RedHong01"
+  },
+  "dependencies": {
+    "com.unity.nuget.newtonsoft-json": "3.2.2",
+    "com.unity.textmeshpro": "2.1.4",
+    "com.unity.ugui": "2.0.0",
+    "com.unity.vectorgraphics": "2.0.0-preview.25"
+  }
+}
