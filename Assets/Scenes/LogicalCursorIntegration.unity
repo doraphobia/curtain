@@ -12324,10 +12324,29 @@ MonoBehaviour:
   clampCursorToRoom: 1
   freezeWorldCursorWhenPointerOverUI: 1
   showUICursorAtSystemPointerOverUI: 1
+  movementMode: 1
+  maxCursorMoveSpeed: 16
+  cursorInputDeadZonePixels: 18
+  cursorInputFullSpeedPixels: 0
+  cursorInputResponsePower: 1
+  normalizePointerOffsetByScreenSize: 1
+  cursorVisualMode: 0
+  cursorSprite: {fileID: 0}
+  cursorAnimatorController: {fileID: 0}
+  driveAnimatorParameters: 1
+  movingAnimatorBool: IsMoving
+  speedAnimatorFloat: MoveSpeed
   driveCameraFromCursorOffset: 1
   maxCameraPanSpeed: 12
   panDeadZonePixels: 24
   useUnscaledTime: 0
+  playFootstepSounds: 1
+  footstepAudioSource: {fileID: 0}
+  footstepClips: []
+  worldDistancePerFootstep: 1.2
+  minSecondsBetweenFootsteps: 0.08
+  footstepVolume: 1
+  footstepPitchRange: {x: 0.95, y: 1.05}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

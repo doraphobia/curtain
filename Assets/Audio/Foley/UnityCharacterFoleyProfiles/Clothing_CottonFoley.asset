@@ -1,0 +1,67 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7b02d0b5b8cd4e7a87b437fb22d8a121, type: 3}
+  m_Name: Clothing_CottonFoley
+  m_EditorClassIdentifier: 
+  defaultSurfaceId: Low
+  outputMixerGroup: {fileID: 0}
+  spatialBlend: 0
+  masterVolume: 1
+  masterPitchRange: {x: 0.96, y: 1.04}
+  minSecondsBetweenPlays: 0.025
+  useNuisanceVolume: 1
+  nuisanceMinimumVolume: 0.55
+  nuisanceVolumeDropPerPlay: 0.025
+  resetNuisanceOnSurfaceChange: 1
+  surfaceBanks:
+  - surfaceId: Low
+    layers:
+    - name: Low
+      clips:
+      - {fileID: 8300000, guid: fa546dae24403ea49b5f887d99acb985, type: 3}
+      - {fileID: 8300000, guid: 1ce0522939a472e4782669c326208507, type: 3}
+      - {fileID: 8300000, guid: b612a74a28aaba94ab3b4a9030ddf2ea, type: 3}
+      - {fileID: 8300000, guid: fad367ded16d9ab49925a6431712efd9, type: 3}
+      - {fileID: 8300000, guid: ffa8bedbb4d57634c8f3bb847f30e41b, type: 3}
+      - {fileID: 8300000, guid: 915691011e4d88d4eb254d08fe3ae3a1, type: 3}
+      - {fileID: 8300000, guid: 74a51097c16d52146a28ab519a6c79ba, type: 3}
+      - {fileID: 8300000, guid: fc29f0103db0c1d4fae1b1a8077370aa, type: 3}
+      - {fileID: 8300000, guid: b4cd99a5df1ead248bba68f86a70a0a9, type: 3}
+      - {fileID: 8300000, guid: 9d511f15d4b286844970e91bcb2c9414, type: 3}
+      volume: 0.65
+      pitchRange: {x: 0.96, y: 1.04}
+      delayRange: {x: 0, y: 0}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+  - surfaceId: Upper
+    layers:
+    - name: Upper
+      clips:
+      - {fileID: 8300000, guid: b480b6ba35e05f54ebdcd717ed4f8ad2, type: 3}
+      - {fileID: 8300000, guid: c5186c3df905d7a44b081c830ec1281e, type: 3}
+      - {fileID: 8300000, guid: b2f95adef452fc4479d3ec5c89f70b2a, type: 3}
+      - {fileID: 8300000, guid: 27a97446525f08a4b85d91f425e97842, type: 3}
+      - {fileID: 8300000, guid: f0bc6e8e26ef6ae4a81a28b2841653b5, type: 3}
+      - {fileID: 8300000, guid: 9f830eef1406a21439dadeef82adbd2a, type: 3}
+      - {fileID: 8300000, guid: 665a394b796b9ad44a7c203ed201b7cf, type: 3}
+      - {fileID: 8300000, guid: 9543caf35ba80324bbcc0b36ebd1b01b, type: 3}
+      - {fileID: 8300000, guid: 78bedc817a5020646abd58a5ef3b2636, type: 3}
+      - {fileID: 8300000, guid: 63239bd6e95fd78429000c3fabcc73c1, type: 3}
+      volume: 0.55
+      pitchRange: {x: 0.96, y: 1.04}
+      delayRange: {x: 0, y: 0}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0

@@ -1,0 +1,1037 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7b02d0b5b8cd4e7a87b437fb22d8a121, type: 3}
+  m_Name: DefaultFootstepFoley
+  m_EditorClassIdentifier: 
+  defaultSurfaceId: Concrete
+  outputMixerGroup: {fileID: 0}
+  spatialBlend: 0
+  masterVolume: 1
+  masterPitchRange: {x: 0.96, y: 1.04}
+  minSecondsBetweenPlays: 0.04
+  useNuisanceVolume: 1
+  nuisanceMinimumVolume: 0.72
+  nuisanceVolumeDropPerPlay: 0.018
+  resetNuisanceOnSurfaceChange: 1
+  surfaceBanks:
+  - surfaceId: Default
+    layers:
+    - name: Heel
+      clips:
+      - {fileID: 8300000, guid: 278afbcf43ad442498a2b727e0c9d443, type: 3}
+      - {fileID: 8300000, guid: dbb328607f6480744b866f616a36fdbd, type: 3}
+      - {fileID: 8300000, guid: 83c86a375b4c5324cb75faac7c42438a, type: 3}
+      - {fileID: 8300000, guid: cc08061e359526143bd5436419934219, type: 3}
+      - {fileID: 8300000, guid: 5b15e30c901114d42b617d625c87b5f8, type: 3}
+      - {fileID: 8300000, guid: 6dea5b5e98981b1429065efee1f2ce44, type: 3}
+      - {fileID: 8300000, guid: b915fc4bc5d7d8c42999fe5de72b1e40, type: 3}
+      - {fileID: 8300000, guid: c582b0776e5ac7c4dadcdfe1f239b075, type: 3}
+      - {fileID: 8300000, guid: abbb9047f6173c34c9425bcd8c6555ef, type: 3}
+      - {fileID: 8300000, guid: 0443746ae82f61247b5f5315b66e4e37, type: 3}
+      - {fileID: 8300000, guid: c86420c1067896e43a59f9bfc314ecde, type: 3}
+      - {fileID: 8300000, guid: 2dfa0e65a01b9c747b8cd08a32887607, type: 3}
+      - {fileID: 8300000, guid: 5d59e16b0398dd444a32d0c6bcaffaa9, type: 3}
+      - {fileID: 8300000, guid: f2eacfc1f50d17f4cb61200fffaa7fa6, type: 3}
+      volume: 1
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0, y: 0}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+    - name: Toe
+      clips:
+      - {fileID: 8300000, guid: b8ae1e74daba1b14fac362259334106d, type: 3}
+      - {fileID: 8300000, guid: 4e291eafd3d736e4a9eb51fdbcfc035d, type: 3}
+      - {fileID: 8300000, guid: 11a9104026ac62f44b8ac8f74557cb3b, type: 3}
+      - {fileID: 8300000, guid: dc3c5876c6fc2424cbab4ebb9895f4f9, type: 3}
+      - {fileID: 8300000, guid: f2e61031f7746c849927504a7f8a1e39, type: 3}
+      - {fileID: 8300000, guid: 9697a394c5a1fbd4ba59e77c1e5fb511, type: 3}
+      - {fileID: 8300000, guid: 711763b0a66a029429212b97353bad4d, type: 3}
+      - {fileID: 8300000, guid: ca4c652a250d8ea468ace66442204344, type: 3}
+      - {fileID: 8300000, guid: 171230bc039b03246af2b1f24320c639, type: 3}
+      - {fileID: 8300000, guid: 80b0a7a19f10c7d4e9c8b17ccebea599, type: 3}
+      - {fileID: 8300000, guid: c04ea8baf5e901543a5ddca5d8f549eb, type: 3}
+      - {fileID: 8300000, guid: 3da5f13ebd7474e4abbb6f6e71ebd3b0, type: 3}
+      - {fileID: 8300000, guid: 084184f51a1767a469649552b0a6f8c6, type: 3}
+      - {fileID: 8300000, guid: a6c37b58f7a8a5740be44035c04e3adc, type: 3}
+      volume: 0.88
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0.045, y: 0.14}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+  - surfaceId: Concrete
+    layers:
+    - name: Heel
+      clips:
+      - {fileID: 8300000, guid: 278afbcf43ad442498a2b727e0c9d443, type: 3}
+      - {fileID: 8300000, guid: dbb328607f6480744b866f616a36fdbd, type: 3}
+      - {fileID: 8300000, guid: 83c86a375b4c5324cb75faac7c42438a, type: 3}
+      - {fileID: 8300000, guid: cc08061e359526143bd5436419934219, type: 3}
+      - {fileID: 8300000, guid: 5b15e30c901114d42b617d625c87b5f8, type: 3}
+      - {fileID: 8300000, guid: 6dea5b5e98981b1429065efee1f2ce44, type: 3}
+      - {fileID: 8300000, guid: b915fc4bc5d7d8c42999fe5de72b1e40, type: 3}
+      - {fileID: 8300000, guid: c582b0776e5ac7c4dadcdfe1f239b075, type: 3}
+      - {fileID: 8300000, guid: abbb9047f6173c34c9425bcd8c6555ef, type: 3}
+      - {fileID: 8300000, guid: 0443746ae82f61247b5f5315b66e4e37, type: 3}
+      - {fileID: 8300000, guid: c86420c1067896e43a59f9bfc314ecde, type: 3}
+      - {fileID: 8300000, guid: 2dfa0e65a01b9c747b8cd08a32887607, type: 3}
+      - {fileID: 8300000, guid: 5d59e16b0398dd444a32d0c6bcaffaa9, type: 3}
+      - {fileID: 8300000, guid: f2eacfc1f50d17f4cb61200fffaa7fa6, type: 3}
+      volume: 1
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0, y: 0}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+    - name: Toe
+      clips:
+      - {fileID: 8300000, guid: b8ae1e74daba1b14fac362259334106d, type: 3}
+      - {fileID: 8300000, guid: 4e291eafd3d736e4a9eb51fdbcfc035d, type: 3}
+      - {fileID: 8300000, guid: 11a9104026ac62f44b8ac8f74557cb3b, type: 3}
+      - {fileID: 8300000, guid: dc3c5876c6fc2424cbab4ebb9895f4f9, type: 3}
+      - {fileID: 8300000, guid: f2e61031f7746c849927504a7f8a1e39, type: 3}
+      - {fileID: 8300000, guid: 9697a394c5a1fbd4ba59e77c1e5fb511, type: 3}
+      - {fileID: 8300000, guid: 711763b0a66a029429212b97353bad4d, type: 3}
+      - {fileID: 8300000, guid: ca4c652a250d8ea468ace66442204344, type: 3}
+      - {fileID: 8300000, guid: 171230bc039b03246af2b1f24320c639, type: 3}
+      - {fileID: 8300000, guid: 80b0a7a19f10c7d4e9c8b17ccebea599, type: 3}
+      - {fileID: 8300000, guid: c04ea8baf5e901543a5ddca5d8f549eb, type: 3}
+      - {fileID: 8300000, guid: 3da5f13ebd7474e4abbb6f6e71ebd3b0, type: 3}
+      - {fileID: 8300000, guid: 084184f51a1767a469649552b0a6f8c6, type: 3}
+      - {fileID: 8300000, guid: a6c37b58f7a8a5740be44035c04e3adc, type: 3}
+      volume: 0.88
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0.045, y: 0.14}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+  - surfaceId: Wood
+    layers:
+    - name: Heel
+      clips:
+      - {fileID: 8300000, guid: b908b685d1b3f2b49bc279a250748052, type: 3}
+      - {fileID: 8300000, guid: 0a41e12527858b54f93c59cc97cdb5db, type: 3}
+      - {fileID: 8300000, guid: 3ec901dd380d1c44c9430ec1458e66f8, type: 3}
+      - {fileID: 8300000, guid: ec9dc18e98f96a3478ea401cda1b371b, type: 3}
+      - {fileID: 8300000, guid: b3b7ad83ccb2a734b9a837365ab40090, type: 3}
+      - {fileID: 8300000, guid: 099761a1e618e35429ec9120405610eb, type: 3}
+      - {fileID: 8300000, guid: a980aa211ef0245438649ff40b20ce33, type: 3}
+      - {fileID: 8300000, guid: ef312d214455d8c479c876fcc04ed091, type: 3}
+      - {fileID: 8300000, guid: 3657d6ccb2b18a34e972e3333e21021e, type: 3}
+      - {fileID: 8300000, guid: 5db1e0444e2b16648ad2d0efed757513, type: 3}
+      - {fileID: 8300000, guid: 92c77cd9afed8044c99413140a9f1a8b, type: 3}
+      - {fileID: 8300000, guid: 8ffb3cd130e9bf040b2d82786fb1db89, type: 3}
+      volume: 1
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0, y: 0}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+    - name: Toe
+      clips:
+      - {fileID: 8300000, guid: 9e9075b334984a3499773a0edeffb36e, type: 3}
+      - {fileID: 8300000, guid: ad0bc1de203255b4faf3de8dd44948da, type: 3}
+      - {fileID: 8300000, guid: 014f94c6cd018994bbc8faf62d475861, type: 3}
+      - {fileID: 8300000, guid: 5514b7c5138f00b42a3427ac897f6dbb, type: 3}
+      - {fileID: 8300000, guid: ecaa369d68827324f802cb6157daf7d2, type: 3}
+      - {fileID: 8300000, guid: d953864f6d2f376469f7031551d9f6d0, type: 3}
+      - {fileID: 8300000, guid: 1b376ae213c561f449b3d49afd0955fd, type: 3}
+      - {fileID: 8300000, guid: f6c3de64395386546b00ac3476ac293a, type: 3}
+      - {fileID: 8300000, guid: e3209acbc4aa0d04aab6d6cf8a53df09, type: 3}
+      - {fileID: 8300000, guid: b674110e6d508ec428ae083f62536a80, type: 3}
+      - {fileID: 8300000, guid: 7d8887d4a9bad184a9df9a881d989f8c, type: 3}
+      - {fileID: 8300000, guid: a836f58f9b7c5804e9210f5ec9c8220d, type: 3}
+      volume: 0.88
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0.045, y: 0.14}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+  - surfaceId: Carpet
+    layers:
+    - name: Heel
+      clips:
+      - {fileID: 8300000, guid: 1311dcfa8444acf4eb07aebfc21be5f3, type: 3}
+      - {fileID: 8300000, guid: c1f868e684811404f88d6743bdd16c22, type: 3}
+      - {fileID: 8300000, guid: fc386f09c249ffd4093217e89a1fed2f, type: 3}
+      - {fileID: 8300000, guid: 6bf6f7f727d16b54487d0e8a8cd6a8a7, type: 3}
+      - {fileID: 8300000, guid: 648a19f69bdf1c34e82343ee5a48a95a, type: 3}
+      - {fileID: 8300000, guid: 949aa2cd225b19d4a9f4c8ee5eb32710, type: 3}
+      - {fileID: 8300000, guid: b9f0e7cf0af92234d88a3aef48f34b04, type: 3}
+      - {fileID: 8300000, guid: b64b762fa91bea5418fdebde93343ede, type: 3}
+      - {fileID: 8300000, guid: b5e1ee83a8e16ed459c8c45c8440c2df, type: 3}
+      - {fileID: 8300000, guid: 85de3befd973d3143becc040ecb720bf, type: 3}
+      volume: 1
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0, y: 0}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+    - name: Toe
+      clips:
+      - {fileID: 8300000, guid: 9417e9708e3df3c40a453453bf079c1a, type: 3}
+      - {fileID: 8300000, guid: e8bd694d065755d4eb889927d7ef2350, type: 3}
+      - {fileID: 8300000, guid: 7cc073aa7b4e5ee47a34806fe65c5d00, type: 3}
+      - {fileID: 8300000, guid: 975b5c81d1eef0b4084de5dd9961c32c, type: 3}
+      - {fileID: 8300000, guid: b00e70665fb2d454ebd8ae921ccf02bc, type: 3}
+      - {fileID: 8300000, guid: 063adfac3ecdeb844ac694172c924911, type: 3}
+      - {fileID: 8300000, guid: 0f5e5d8beea1f6543b2c61a33515a111, type: 3}
+      - {fileID: 8300000, guid: 8943e0da7e1772946ba9e37de85d5d69, type: 3}
+      - {fileID: 8300000, guid: 7a0ccf65525848544a47a74ac3c8a303, type: 3}
+      - {fileID: 8300000, guid: 05fa3536f4e66514cbafc352a2db9a54, type: 3}
+      volume: 0.88
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0.045, y: 0.14}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+  - surfaceId: Dirt
+    layers:
+    - name: Heel
+      clips:
+      - {fileID: 8300000, guid: 2ca2e90c11c687d489de1cf9fe2587a7, type: 3}
+      - {fileID: 8300000, guid: 41f20ee236012b241854bed1fbc96e29, type: 3}
+      - {fileID: 8300000, guid: 6e307e3e488fde84aa1a019ca71b7bd5, type: 3}
+      - {fileID: 8300000, guid: e71c28c68c7398b43b533b1ab9d786d7, type: 3}
+      - {fileID: 8300000, guid: 9b95221fa273b41468ac50b9561e658f, type: 3}
+      - {fileID: 8300000, guid: aba76247d9e74d843977ce68fece7e2e, type: 3}
+      - {fileID: 8300000, guid: c4bb3e54694ddcd4cb1b0eb4e03555c1, type: 3}
+      - {fileID: 8300000, guid: 8844fcfd1778ff24dae884c157121ef6, type: 3}
+      - {fileID: 8300000, guid: 82c717f33d1733e49ae60e3e15366f62, type: 3}
+      - {fileID: 8300000, guid: 2ba7b9d55343c3643b3097e76d233e90, type: 3}
+      - {fileID: 8300000, guid: ff81c0e3a7136ba46a70bb4a2337134a, type: 3}
+      - {fileID: 8300000, guid: a0901b5be7c3a1743812c8c95c567c11, type: 3}
+      - {fileID: 8300000, guid: 56ba95d9ac210464d841119b735b47fa, type: 3}
+      - {fileID: 8300000, guid: 2a42f4a03a4f1d949865a15966912512, type: 3}
+      volume: 1
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0, y: 0}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+    - name: Toe
+      clips:
+      - {fileID: 8300000, guid: 272da724036617e45878d94ded271793, type: 3}
+      - {fileID: 8300000, guid: 75ec426f1ec37294fa7347f5af597b5c, type: 3}
+      - {fileID: 8300000, guid: 8da190c74af62ba428baaa67394038a4, type: 3}
+      - {fileID: 8300000, guid: 5d5fac728fd1d084ca27c5ab1b1e17a4, type: 3}
+      - {fileID: 8300000, guid: 462434457c69e59418a49a9a5ad50819, type: 3}
+      - {fileID: 8300000, guid: 17e0adb95a7b6634fb35dd037f0686fc, type: 3}
+      - {fileID: 8300000, guid: 49681419e46ed54429e6e81d87dd30be, type: 3}
+      - {fileID: 8300000, guid: 8e95d69edd4f546448ad351e32160abe, type: 3}
+      - {fileID: 8300000, guid: 1effa83d613b138488414d0b4431d2a2, type: 3}
+      - {fileID: 8300000, guid: c6452e1a2c809114d87078004e5b1752, type: 3}
+      - {fileID: 8300000, guid: 291897be4493a434e9fce8aa1a45a974, type: 3}
+      - {fileID: 8300000, guid: f51fe531c2c91604db3ca06b6bf016f0, type: 3}
+      - {fileID: 8300000, guid: c66c27adec156d84cbc50b9dd7271564, type: 3}
+      - {fileID: 8300000, guid: 8079c997de6e8e142b742b2b74a989b8, type: 3}
+      volume: 0.88
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0.045, y: 0.14}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+  - surfaceId: Grass
+    layers:
+    - name: Heel
+      clips:
+      - {fileID: 8300000, guid: 954e877cb0a618144adf55ae896dd89c, type: 3}
+      - {fileID: 8300000, guid: d47ed35a3ff9e3549ad568700ffb123e, type: 3}
+      - {fileID: 8300000, guid: 92aabdbb035c16142a67b7aecde2c9a0, type: 3}
+      - {fileID: 8300000, guid: 7e0f6363c85c3bf409ba75b686809fbb, type: 3}
+      - {fileID: 8300000, guid: d39a478ad264e8e4699a599f4732d11e, type: 3}
+      - {fileID: 8300000, guid: 9ccc08d0c8bde774fb8ff6c3c026cbbc, type: 3}
+      - {fileID: 8300000, guid: ea5272e686411ef4c95567300a1a4252, type: 3}
+      - {fileID: 8300000, guid: 3a012f6e9e3f97345a94f0b96739d5ac, type: 3}
+      - {fileID: 8300000, guid: 3c2b2d7c54c12c2468018c1cbf9d35ca, type: 3}
+      - {fileID: 8300000, guid: 6eb0abd6651b4ed45860c040197c96a2, type: 3}
+      volume: 1
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0, y: 0}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+    - name: Toe
+      clips:
+      - {fileID: 8300000, guid: 7750e97e84ef8e4448279b8825f950ed, type: 3}
+      - {fileID: 8300000, guid: 342495237dcb1df41b46102a6c924f11, type: 3}
+      - {fileID: 8300000, guid: aa82d6345a8369045a81f0a7c617883d, type: 3}
+      - {fileID: 8300000, guid: 9248176daab2b524e8dd593b0195df14, type: 3}
+      - {fileID: 8300000, guid: 83ef0dc91a4a6434c908b9d27fc750d5, type: 3}
+      - {fileID: 8300000, guid: 5a02266f009ccfa45855bbeae33aebfc, type: 3}
+      - {fileID: 8300000, guid: 08e2ca4e244554449867e7b0fff30a60, type: 3}
+      - {fileID: 8300000, guid: c258ec34f8993f540a6281db956c25d3, type: 3}
+      - {fileID: 8300000, guid: 565f5d17305cce6419d02cba021290f9, type: 3}
+      - {fileID: 8300000, guid: 7fed2fca88e150e489b3b1922cb31204, type: 3}
+      volume: 0.88
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0.045, y: 0.14}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+  - surfaceId: GravelBright
+    layers:
+    - name: Heel
+      clips:
+      - {fileID: 8300000, guid: 1c561cf502478ed4eb0d58193935ed31, type: 3}
+      - {fileID: 8300000, guid: 3232ea2e1c063cd449b38a8934faa3cf, type: 3}
+      - {fileID: 8300000, guid: 1c7a422be04d71f45900a5a5a94aac3c, type: 3}
+      - {fileID: 8300000, guid: 47008bea81681934e98cf819ff2a973a, type: 3}
+      - {fileID: 8300000, guid: 16c30993a3f283141b1cbd579d2671d7, type: 3}
+      - {fileID: 8300000, guid: 1af8977f7d06ca54ea0f45eee2e14a3f, type: 3}
+      - {fileID: 8300000, guid: e1c7b14440cfe034280d53e4e47afda1, type: 3}
+      - {fileID: 8300000, guid: 96c361cfe1a502f4dab81544e3cca258, type: 3}
+      - {fileID: 8300000, guid: 575a306f213e65743b2b7cd6cf4906a7, type: 3}
+      - {fileID: 8300000, guid: 5d8a04e2717f001429a53743dddb6960, type: 3}
+      volume: 1
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0, y: 0}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+    - name: Toe
+      clips:
+      - {fileID: 8300000, guid: 2920bfa0ac3264c419c4b4a5e1cdbda8, type: 3}
+      - {fileID: 8300000, guid: 4fe529324bfc5024c9d6153fd19f60da, type: 3}
+      - {fileID: 8300000, guid: c3dd3c538719a4c4f94c2b3b7c1493a7, type: 3}
+      - {fileID: 8300000, guid: 516f6b5a7e51d7049a45a311a6347789, type: 3}
+      - {fileID: 8300000, guid: 9788d3c85285e0b449c98089f4aea5b0, type: 3}
+      - {fileID: 8300000, guid: cc6f8428c062a0341bde6d447813057d, type: 3}
+      - {fileID: 8300000, guid: 026e4b815ff7ab0458888ad13559ab63, type: 3}
+      - {fileID: 8300000, guid: 2324c1ac84ee4144db7dab169889209c, type: 3}
+      - {fileID: 8300000, guid: 47a1ad682193c8f4ba0432909d7a7d9d, type: 3}
+      - {fileID: 8300000, guid: a893ea47e9698ef4e9fd41791a15d947, type: 3}
+      volume: 0.88
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0.045, y: 0.14}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+  - surfaceId: GravelDark
+    layers:
+    - name: Heel
+      clips:
+      - {fileID: 8300000, guid: 0c1b0560b58e2aa4e9bab3883a47316c, type: 3}
+      - {fileID: 8300000, guid: ac0970c89673fa043a68fb9fddb14583, type: 3}
+      - {fileID: 8300000, guid: 19751bfe16a50f549a8a59f0d74d316f, type: 3}
+      - {fileID: 8300000, guid: 56d9b6df39189554cac87e66b6b41c94, type: 3}
+      - {fileID: 8300000, guid: 47e0855354cbe1a478c80114733d7738, type: 3}
+      - {fileID: 8300000, guid: ab9bcfa27961dfe468907e0d77387d26, type: 3}
+      - {fileID: 8300000, guid: cb8c2a9cef380704ca6ac5c199e1ae1f, type: 3}
+      - {fileID: 8300000, guid: c19b803921fe31f41b67809a618c35b8, type: 3}
+      - {fileID: 8300000, guid: 71bd1a4ee9c4dcc4b86babcebe863f44, type: 3}
+      - {fileID: 8300000, guid: 648ebc5a11037f944878afac8cd75e8b, type: 3}
+      - {fileID: 8300000, guid: 3fcff12ccc728fe40aad6a2e06fa224f, type: 3}
+      - {fileID: 8300000, guid: d900ecbc3bede3b4887aabefbeb42058, type: 3}
+      volume: 1
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0, y: 0}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+    - name: Toe
+      clips:
+      - {fileID: 8300000, guid: 4f3b2b1783e556143ac9090f926607c7, type: 3}
+      - {fileID: 8300000, guid: 48cff975cecf6714da60dd794415362c, type: 3}
+      - {fileID: 8300000, guid: c01fe7d961eca3a47b4fd3db8f1e58a8, type: 3}
+      - {fileID: 8300000, guid: d8a1ff86a63c7ee45ad51bb3f57a4186, type: 3}
+      - {fileID: 8300000, guid: ebd3f34a0f68b5a48ac6f6601424f337, type: 3}
+      - {fileID: 8300000, guid: cf573955f52e98c438caeb2b799b12e7, type: 3}
+      - {fileID: 8300000, guid: d295f4325e37b504a95d5f3170760dbf, type: 3}
+      - {fileID: 8300000, guid: 11b8db127f9710b48b801e52f32ac2f9, type: 3}
+      - {fileID: 8300000, guid: 8f02536535b5b2442af027b07e1c658e, type: 3}
+      - {fileID: 8300000, guid: e069236fdd6a00d40bbccd81959e6ef8, type: 3}
+      - {fileID: 8300000, guid: 6ada5e8af49ef1c4cb753dfa1c796fb5, type: 3}
+      - {fileID: 8300000, guid: da828ee718889644c9d0945fc8b51a31, type: 3}
+      volume: 0.88
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0.045, y: 0.14}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+  - surfaceId: Ice
+    layers:
+    - name: Heel
+      clips:
+      - {fileID: 8300000, guid: 35cff9e1b07396e4b8f2f9ef44910ddd, type: 3}
+      - {fileID: 8300000, guid: 280e0b2cff0675940b696d1ea33f9655, type: 3}
+      - {fileID: 8300000, guid: e25ac6b1983d9974e8968cb2471aa513, type: 3}
+      - {fileID: 8300000, guid: a3fb18ea1a6d7f14ebe7b16faded18e1, type: 3}
+      - {fileID: 8300000, guid: e44e4154d11fa064ea3ec2bd96164588, type: 3}
+      - {fileID: 8300000, guid: 4a91355fe9100ab43a016e4a1b0f555a, type: 3}
+      - {fileID: 8300000, guid: 51b6365ec11660d4b84fce7758389b6d, type: 3}
+      - {fileID: 8300000, guid: dc8228855a3a0a944aa3af5ca2b4cf1c, type: 3}
+      - {fileID: 8300000, guid: 5a96a61993b28c442975c4829d9e07c7, type: 3}
+      - {fileID: 8300000, guid: 7ba5784becd6a5943beffc39345ccd27, type: 3}
+      - {fileID: 8300000, guid: d3864f5202aed2c45a22a8055783828b, type: 3}
+      - {fileID: 8300000, guid: ab266bdf0280fd44ca51432ef0cfb56d, type: 3}
+      - {fileID: 8300000, guid: 6ba792a6a169b8342ae8380f588ae1f5, type: 3}
+      - {fileID: 8300000, guid: e1c73e41a383d904bbef2018aa23b502, type: 3}
+      - {fileID: 8300000, guid: f0393cf8e10d9a84aa5dae47a0a68a0a, type: 3}
+      - {fileID: 8300000, guid: 2673f5715e6b34146bd785c2d672be2a, type: 3}
+      volume: 1
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0, y: 0}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+    - name: Toe
+      clips:
+      - {fileID: 8300000, guid: 7af8fb53d5d97e04793465ba8d550ba4, type: 3}
+      - {fileID: 8300000, guid: 997e74f67f3773147a3763bc1c01b9e3, type: 3}
+      - {fileID: 8300000, guid: edfd2bfce2d296a449615acc0da9daea, type: 3}
+      - {fileID: 8300000, guid: bce2d525723d00540a1eb542f4df145d, type: 3}
+      - {fileID: 8300000, guid: ea16eb69009e8dd40bca13d010ad21b9, type: 3}
+      - {fileID: 8300000, guid: f099561be85f231498472e41a7f61cc5, type: 3}
+      - {fileID: 8300000, guid: e62c8bbf3d0d45d42aade2fd29342794, type: 3}
+      - {fileID: 8300000, guid: 5bc720d8905a4b24ba7f4a3943e90755, type: 3}
+      - {fileID: 8300000, guid: 20eb521a123773d438aed29108e39882, type: 3}
+      - {fileID: 8300000, guid: 7cb9472e9b99f8346ac8cba830a1ecce, type: 3}
+      - {fileID: 8300000, guid: 7efd71d7f3d4cba4488eadeb455cf2de, type: 3}
+      - {fileID: 8300000, guid: 133c37d8520c1174d802ef95173d90b2, type: 3}
+      - {fileID: 8300000, guid: 2dcd1b8c837bd7040afd06fb4dd79c83, type: 3}
+      - {fileID: 8300000, guid: fcd2959263e5bab448ffbb9dae31b5d3, type: 3}
+      - {fileID: 8300000, guid: d0d6218d121add94482f6ae9310a8cd1, type: 3}
+      - {fileID: 8300000, guid: cb576f601586f8d479b4932f504fe9f8, type: 3}
+      volume: 0.88
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0.045, y: 0.14}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+  - surfaceId: MetalSoft
+    layers:
+    - name: Heel
+      clips:
+      - {fileID: 8300000, guid: 58383fb0b34340048876913175c3465a, type: 3}
+      - {fileID: 8300000, guid: 53b7895d3b5201942b60b685615fa2d3, type: 3}
+      - {fileID: 8300000, guid: 5bb4596a519cb784a97a0e7eef779712, type: 3}
+      - {fileID: 8300000, guid: 18065b971e0f995489275ec55f0956eb, type: 3}
+      - {fileID: 8300000, guid: 23d6466a3ced46143a3d064c07a0edd5, type: 3}
+      - {fileID: 8300000, guid: 5cdc3324389715e4194fbaf5b120d74b, type: 3}
+      - {fileID: 8300000, guid: 37fe4e5fc6cceb14888ce2f91d5e4eef, type: 3}
+      - {fileID: 8300000, guid: 6d20529894a0f774ea18f99c6c0cc257, type: 3}
+      - {fileID: 8300000, guid: 09b7aff7c5382c649b4ab49aa2b0911f, type: 3}
+      - {fileID: 8300000, guid: 8b9d526709219f24bbb9c0e1fc1224c1, type: 3}
+      - {fileID: 8300000, guid: 610f9e350de17a14aa7f85d1943310a9, type: 3}
+      - {fileID: 8300000, guid: 129e8c74fbfddca4586cf164e38ede5d, type: 3}
+      volume: 1
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0, y: 0}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+    - name: Toe
+      clips:
+      - {fileID: 8300000, guid: a8fde555bced48b44a9c4fdf077323d4, type: 3}
+      - {fileID: 8300000, guid: dff941e0fe566c24395dbb7ac900b874, type: 3}
+      - {fileID: 8300000, guid: 640c0a1fde58c2b4d995c928a0a50c50, type: 3}
+      - {fileID: 8300000, guid: 11a339095e7589b4d82d8a3093ef13dc, type: 3}
+      - {fileID: 8300000, guid: 968d8b416191bec41ba68cdc39db6f2f, type: 3}
+      - {fileID: 8300000, guid: 29d0f10c66c4e334e8bd664b890c55d2, type: 3}
+      - {fileID: 8300000, guid: 3f429e0d995c64b409bf97444fc75d7a, type: 3}
+      - {fileID: 8300000, guid: 27b6a2867a32b5b4c98669fdaf3cc081, type: 3}
+      - {fileID: 8300000, guid: 3d45f64708ae96740ba8ebdd4132ad0a, type: 3}
+      - {fileID: 8300000, guid: 39e812f6461a6a54c81bb4ead3d9f25c, type: 3}
+      - {fileID: 8300000, guid: 1f4e295ef23de064eb03e5b9efa51ecd, type: 3}
+      - {fileID: 8300000, guid: e56a3c79b1a4f554ebaca3ee49ab8e70, type: 3}
+      volume: 0.88
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0.045, y: 0.14}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+  - surfaceId: MetalBright
+    layers:
+    - name: Heel
+      clips:
+      - {fileID: 8300000, guid: b4972486d5c323448abaa1ebe2f4c247, type: 3}
+      - {fileID: 8300000, guid: 59bbbca971f8392488bb652ca439764c, type: 3}
+      - {fileID: 8300000, guid: 6f982c07676e4724c941f28501ed6e91, type: 3}
+      - {fileID: 8300000, guid: b16677f016840554a9c3191c60abdb89, type: 3}
+      - {fileID: 8300000, guid: 2b16c0877cd718a40925b1a08f54dd44, type: 3}
+      - {fileID: 8300000, guid: 23e768d4679bf614d9237702830e3340, type: 3}
+      - {fileID: 8300000, guid: 72b6ce3c3e2631a47bb3493eb29095ca, type: 3}
+      - {fileID: 8300000, guid: 643a578bc68963d4682ee7478171248b, type: 3}
+      - {fileID: 8300000, guid: 56c6543608b539c4e87f25f947f88e13, type: 3}
+      - {fileID: 8300000, guid: 2511508e5d306e645ab4be1382ab2d2e, type: 3}
+      - {fileID: 8300000, guid: 4e93f0c61f904a949bdd5835b5c2be6a, type: 3}
+      - {fileID: 8300000, guid: 52795e4c2aea3d94188490ed1f601a26, type: 3}
+      volume: 1
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0, y: 0}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+    - name: Toe
+      clips:
+      - {fileID: 8300000, guid: 1eeb5ffd3f82f9645aadf48060931cfb, type: 3}
+      - {fileID: 8300000, guid: 2a583d2c22c5e9b458eefd019926ceef, type: 3}
+      - {fileID: 8300000, guid: 7de1dfb3e7e67c744a21c65b477f13ad, type: 3}
+      - {fileID: 8300000, guid: fcd0927650e8e2e41882687dca4433c3, type: 3}
+      - {fileID: 8300000, guid: 0508497962489574794136e03aedf446, type: 3}
+      - {fileID: 8300000, guid: 9cae28a3208f19249b3cd483829d32cd, type: 3}
+      - {fileID: 8300000, guid: 22a2249ffa765164fb7f68a8212bd4f2, type: 3}
+      - {fileID: 8300000, guid: e15f42b5d916d284c9896403704765e0, type: 3}
+      - {fileID: 8300000, guid: a8318eee121588b43a7631d735d4e0cf, type: 3}
+      - {fileID: 8300000, guid: db26154346eb6964382a51faafd7339d, type: 3}
+      - {fileID: 8300000, guid: 7a286b1a3d6c8d34c8b02dbf41dcfe40, type: 3}
+      - {fileID: 8300000, guid: 4e185f990a824e447bb14d7d86e6c7a4, type: 3}
+      volume: 0.88
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0.045, y: 0.14}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+  - surfaceId: MetalDark
+    layers:
+    - name: Heel
+      clips:
+      - {fileID: 8300000, guid: 0223109333ab44646bd16c8fb61a6785, type: 3}
+      - {fileID: 8300000, guid: 463f1344c2158b749b70c70de6d17adb, type: 3}
+      - {fileID: 8300000, guid: 2a33567db1cafa546b42268d3d7a44e5, type: 3}
+      - {fileID: 8300000, guid: 9c1bf0285908ff240aa3d20302f9812c, type: 3}
+      - {fileID: 8300000, guid: 02f2521f3029e2c44bacbbaf55a6778e, type: 3}
+      - {fileID: 8300000, guid: fb590058f764c714c87f76f61dbf99e9, type: 3}
+      - {fileID: 8300000, guid: f06ebe67dd5b3b741a1920e290bfd1f6, type: 3}
+      - {fileID: 8300000, guid: 74e96144a404a804cab3879357c28f6c, type: 3}
+      - {fileID: 8300000, guid: 0e2b74215764ca446b0dfcdaa1aa7966, type: 3}
+      - {fileID: 8300000, guid: b52c5d8ceafa886449d8a3f5918ed359, type: 3}
+      - {fileID: 8300000, guid: cc482a485b28dca46aab085461543a8b, type: 3}
+      - {fileID: 8300000, guid: e0345cd60f72efe47bd4c5f458d19c1f, type: 3}
+      volume: 1
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0, y: 0}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+    - name: Toe
+      clips:
+      - {fileID: 8300000, guid: 93eaddb393e6cb2489220846f95853d9, type: 3}
+      - {fileID: 8300000, guid: 5d6118fffb2761043a1751da663ae399, type: 3}
+      - {fileID: 8300000, guid: ad2c6239f8c2efe428afb1cb5b7ef2cd, type: 3}
+      - {fileID: 8300000, guid: 0e734b2cc35491341b1dd9bc189a4718, type: 3}
+      - {fileID: 8300000, guid: 64384ce7546a5d24a96e341bbfef2355, type: 3}
+      - {fileID: 8300000, guid: be36043163ad74b4ab2cc27b48977524, type: 3}
+      - {fileID: 8300000, guid: 1902b091b83b03f45bb54267cbb8f977, type: 3}
+      - {fileID: 8300000, guid: e22c6f724d958a94990c7e397bf96128, type: 3}
+      - {fileID: 8300000, guid: 849b1b36fd4dc5b43b8c7ae6a8a575f3, type: 3}
+      - {fileID: 8300000, guid: ac504e8ff8a883f49957b573bb4cf2f3, type: 3}
+      - {fileID: 8300000, guid: de8a94f2669d92946b3fb0e2636b8834, type: 3}
+      - {fileID: 8300000, guid: 4d2b6bb4fe59e994f8fdaa6c68fc3ea1, type: 3}
+      volume: 0.88
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0.045, y: 0.14}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+  - surfaceId: Mud
+    layers:
+    - name: Heel
+      clips:
+      - {fileID: 8300000, guid: 069d8bb2b574c104daef2faf038aba39, type: 3}
+      - {fileID: 8300000, guid: 30d0f2e6bb08f434a8f585361fa6739b, type: 3}
+      - {fileID: 8300000, guid: e9f3c4c9a7447ee43a5831c3ba8d157d, type: 3}
+      - {fileID: 8300000, guid: 4f643e0467bb7f84a873dcb68ab2539c, type: 3}
+      - {fileID: 8300000, guid: 31e7f2636028b954c8fe4462f056129e, type: 3}
+      - {fileID: 8300000, guid: c382da1812e9f25419642e588a82a448, type: 3}
+      - {fileID: 8300000, guid: 71115519999590f4991668b2c2937cf3, type: 3}
+      - {fileID: 8300000, guid: 2f96a379c88f26841bc015f3962d1188, type: 3}
+      - {fileID: 8300000, guid: 0d7a0995c7e7f8b459ee401c0bd35967, type: 3}
+      - {fileID: 8300000, guid: dd7c178fe6673f94e92e40cae7764acf, type: 3}
+      - {fileID: 8300000, guid: febb9fd9eda47c7418edbfd9fa7aeb86, type: 3}
+      - {fileID: 8300000, guid: 24dd2e83d31e634469ae3c3f2dcabefd, type: 3}
+      volume: 1
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0, y: 0}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+    - name: Toe
+      clips:
+      - {fileID: 8300000, guid: 8d4e81dd77fd3fc49ae6b5cc7466d4e8, type: 3}
+      - {fileID: 8300000, guid: ecea2bb3b11f1f94b8c7c91b0ed2fed3, type: 3}
+      - {fileID: 8300000, guid: e1d84c84407122747ba3554243a9ff24, type: 3}
+      - {fileID: 8300000, guid: 0852d9c5386ec6e49b69067ae53ea811, type: 3}
+      - {fileID: 8300000, guid: 388b77250022a9845a1f1af26336de0a, type: 3}
+      - {fileID: 8300000, guid: 5962b86578461124d87099c8a12f56a5, type: 3}
+      - {fileID: 8300000, guid: efcafa39a5495194c845b8bcd46845ce, type: 3}
+      - {fileID: 8300000, guid: d92f3155416d9494eac707176d284334, type: 3}
+      - {fileID: 8300000, guid: 3586bdca21acd8e428422a449f534611, type: 3}
+      - {fileID: 8300000, guid: 4a5c557c1a710ed4fbfd2363825a621b, type: 3}
+      - {fileID: 8300000, guid: e429b10948f1ba94f82e0f8adde99073, type: 3}
+      - {fileID: 8300000, guid: 38ac3cb82303e8d4d8e89e28acc41ebc, type: 3}
+      - {fileID: 8300000, guid: 36907fd4533d49e4c91e76c7644b502f, type: 3}
+      - {fileID: 8300000, guid: cf2a30908a136c347b70cd004cd21d5e, type: 3}
+      - {fileID: 8300000, guid: 70400e15652751246b0ebfc99e2a63a8, type: 3}
+      volume: 0.88
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0.045, y: 0.14}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+  - surfaceId: Rock
+    layers:
+    - name: Heel
+      clips:
+      - {fileID: 8300000, guid: 150d69ca7a9adbf4cae2cddc43321ce7, type: 3}
+      - {fileID: 8300000, guid: bee396d2877ef15478a11c6aab782c8c, type: 3}
+      - {fileID: 8300000, guid: fcb913a9f06c65a43aa94d23820f51f2, type: 3}
+      - {fileID: 8300000, guid: 1c54acc6ca21e8048abcc3807044d375, type: 3}
+      - {fileID: 8300000, guid: b24f47700ce67c643b65c212b9e87bf9, type: 3}
+      - {fileID: 8300000, guid: 0eefba4474fd09b4ebd39fb810b7869f, type: 3}
+      - {fileID: 8300000, guid: ca372adb3428bb6428127807a1f309d0, type: 3}
+      - {fileID: 8300000, guid: 14bd092d38543fb4e840698abc475440, type: 3}
+      - {fileID: 8300000, guid: 39cc081ca6b1eb4478c213f809d37e9a, type: 3}
+      - {fileID: 8300000, guid: ae8e58a7e0866504cab855c005d480c3, type: 3}
+      volume: 1
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0, y: 0}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+    - name: Toe
+      clips:
+      - {fileID: 8300000, guid: 72e9220b8aafa8b44a1fd76c8efba989, type: 3}
+      - {fileID: 8300000, guid: 4bcd1a9041818e74ab8a6e6a3b293d2f, type: 3}
+      - {fileID: 8300000, guid: d9f04691a5e67e44b8eb768d26f059c9, type: 3}
+      - {fileID: 8300000, guid: 35ac331252630ab49bc0c70a292cf9bb, type: 3}
+      - {fileID: 8300000, guid: e1faa459779c2e64b9d57f9f1728e1c9, type: 3}
+      - {fileID: 8300000, guid: 10722ba9542ea5b43bad892a5c73c3aa, type: 3}
+      - {fileID: 8300000, guid: 538d31d8add921a4789bcbe8300333be, type: 3}
+      - {fileID: 8300000, guid: 4482c26e65674b8419a4381ced4d9103, type: 3}
+      - {fileID: 8300000, guid: 3d07359315e30544f8941e7e161512af, type: 3}
+      - {fileID: 8300000, guid: 1617f8fe699bbef44a00bb17452305f5, type: 3}
+      volume: 0.88
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0.045, y: 0.14}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+  - surfaceId: SandDryDeep
+    layers:
+    - name: Heel
+      clips:
+      - {fileID: 8300000, guid: e8dfd2e4dcd8ec04a87aab0e1be99dad, type: 3}
+      - {fileID: 8300000, guid: ed3bf64fdd99f1446b84471914d7e624, type: 3}
+      - {fileID: 8300000, guid: 68dc46e4070048747920d709cf8d497a, type: 3}
+      - {fileID: 8300000, guid: 455d2a02d66245a40bdeef1e030b6b10, type: 3}
+      - {fileID: 8300000, guid: 2c63af98354d50e4795b39f6b4f5324f, type: 3}
+      - {fileID: 8300000, guid: fe10d298a88284f4aa1ee59e6f7736ba, type: 3}
+      - {fileID: 8300000, guid: bf8e1d5e1c5100b479198d23dfcb5985, type: 3}
+      - {fileID: 8300000, guid: 051ac1191f740a340b3948fe00bbaac6, type: 3}
+      - {fileID: 8300000, guid: 232af51326cfeaa4c995fef7a40651d5, type: 3}
+      - {fileID: 8300000, guid: c0c86dd9884582e4bbcd8bf60f5bec40, type: 3}
+      - {fileID: 8300000, guid: 7a20a3da6ca6cd645b6a34a5d037e88b, type: 3}
+      - {fileID: 8300000, guid: 9eed89b24e5445248aae36bae5bedb91, type: 3}
+      - {fileID: 8300000, guid: 1b625296968523047970ecce9827d949, type: 3}
+      volume: 1
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0, y: 0}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+    - name: Toe
+      clips:
+      - {fileID: 8300000, guid: c9b23388a7de22442891f346df11cc99, type: 3}
+      - {fileID: 8300000, guid: 426d042b9dd60a740b55d122301bf29e, type: 3}
+      - {fileID: 8300000, guid: 1cf034242281d1848be79ff0e984ed3c, type: 3}
+      - {fileID: 8300000, guid: 4fc445c91b5c8034d85bff33a5dd89ee, type: 3}
+      - {fileID: 8300000, guid: 2f92168b50db44743a6985ae6d04ede7, type: 3}
+      - {fileID: 8300000, guid: 59d22820a44e98245bb426634a4d7da4, type: 3}
+      - {fileID: 8300000, guid: 529e3677489b177458d1f1c5fafe3a4f, type: 3}
+      - {fileID: 8300000, guid: 956f59412447eec4ea04556c52f40947, type: 3}
+      - {fileID: 8300000, guid: 8ee0476d94c637941be419f3cc780268, type: 3}
+      - {fileID: 8300000, guid: cb40b5fc814f64d4c86e3ab6f5d1b63d, type: 3}
+      - {fileID: 8300000, guid: 8e25afb8a365f03409e748837d540655, type: 3}
+      - {fileID: 8300000, guid: 6969f2d50a763564b9c7c08f3c019448, type: 3}
+      - {fileID: 8300000, guid: 7c43e509a0ba9e649947376d12715833, type: 3}
+      volume: 0.88
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0.045, y: 0.14}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+  - surfaceId: SandDryShallow
+    layers:
+    - name: Heel
+      clips:
+      - {fileID: 8300000, guid: f5ed2562a9c303e4ab09948fa65e815f, type: 3}
+      - {fileID: 8300000, guid: ccf3663793dde3541b8642f0011152a7, type: 3}
+      - {fileID: 8300000, guid: f2b6530070b059f4b961a102886383b3, type: 3}
+      - {fileID: 8300000, guid: 52a21c6f6497ab046b71e8fcad791694, type: 3}
+      - {fileID: 8300000, guid: c674b92a6d6ee914cae02e42d5a392af, type: 3}
+      - {fileID: 8300000, guid: 858e5ab4a32e49a45921b5a8af4d7ebf, type: 3}
+      - {fileID: 8300000, guid: ad79a410984cdc846ba4430aa00f8209, type: 3}
+      - {fileID: 8300000, guid: 5baffc89606e42445ab1f429f34dbf4c, type: 3}
+      - {fileID: 8300000, guid: e037cceefa543dc47b0deb6141240bda, type: 3}
+      - {fileID: 8300000, guid: 7e63a740a77782b4b8aa8aff793c22af, type: 3}
+      volume: 1
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0, y: 0}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+    - name: Toe
+      clips:
+      - {fileID: 8300000, guid: a253d91cc2ca17745bd80ed6134f3544, type: 3}
+      - {fileID: 8300000, guid: cd1a12157a1dae84c89128776c420891, type: 3}
+      - {fileID: 8300000, guid: b86ec92093bbf8b4b8710b43d351e556, type: 3}
+      - {fileID: 8300000, guid: 4f81eabe18773c64c913f1b8f9ad881a, type: 3}
+      - {fileID: 8300000, guid: 09375441ac4c8fe4d83dbe6b2b8d701e, type: 3}
+      - {fileID: 8300000, guid: 49d08126b1a4ce049ab25da19851238d, type: 3}
+      - {fileID: 8300000, guid: 9bfe403b965975145a158850a3f6aad7, type: 3}
+      - {fileID: 8300000, guid: 67bef14769735ba44a729f106ee51021, type: 3}
+      - {fileID: 8300000, guid: 5408ebb1c9a45fa438d903103c3ad77a, type: 3}
+      - {fileID: 8300000, guid: cc8bfdf9169d2424b94e0082bfc85deb, type: 3}
+      volume: 0.88
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0.045, y: 0.14}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+  - surfaceId: SandWet
+    layers:
+    - name: Heel
+      clips:
+      - {fileID: 8300000, guid: 707db9fe63877f3429a29704b1f8cef0, type: 3}
+      - {fileID: 8300000, guid: 4a29da604abf9354ca91ffdce665ced8, type: 3}
+      - {fileID: 8300000, guid: 1073b6a4ff62c8848b8b05420b341fa9, type: 3}
+      - {fileID: 8300000, guid: 5f86f3dcd71395c48a9c580118e328ec, type: 3}
+      - {fileID: 8300000, guid: 2807649eb6d4fa04485c1d1b877887dc, type: 3}
+      - {fileID: 8300000, guid: b28ebe8e43b17294fa94fa6832368e41, type: 3}
+      - {fileID: 8300000, guid: 7c9183c8a116c514bbeffe46eb2cfe9d, type: 3}
+      - {fileID: 8300000, guid: 64d73244798c44a4d9280ddf7bc37359, type: 3}
+      - {fileID: 8300000, guid: 76994631882519f4cb2e4e52e8fae178, type: 3}
+      - {fileID: 8300000, guid: 0e09e331837330143b290ee4adac9698, type: 3}
+      - {fileID: 8300000, guid: a7ab0f27ad752d5438529bb2c4266c96, type: 3}
+      - {fileID: 8300000, guid: 0d458df0595de8b45898237c84cc51bb, type: 3}
+      - {fileID: 8300000, guid: c4c9b3431efc62d41a19663e5b051a56, type: 3}
+      - {fileID: 8300000, guid: 5aaa97b0190af4b4b833b9809236256b, type: 3}
+      - {fileID: 8300000, guid: fc5120c5a03d55d4083ee587007093bf, type: 3}
+      - {fileID: 8300000, guid: 2a11e3389ff16194a99c96b3e0880a65, type: 3}
+      - {fileID: 8300000, guid: 1d7b99ddce865d2478ceab00f557b6e3, type: 3}
+      - {fileID: 8300000, guid: 153d8ada7e01c0347bffed1f351a191e, type: 3}
+      - {fileID: 8300000, guid: a3635318cf914b648ae76ec98f837a95, type: 3}
+      - {fileID: 8300000, guid: c9f6c76d055d3f54a8abca40782aeba3, type: 3}
+      volume: 1
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0, y: 0}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+    - name: Toe
+      clips:
+      - {fileID: 8300000, guid: 5594924531ab25e4daf4172f42213b8e, type: 3}
+      - {fileID: 8300000, guid: 93bd101d094cd3b48a3f8d58ad9b0ea2, type: 3}
+      - {fileID: 8300000, guid: cf8d8e7ed4e3c7f4585e8b324bfc6857, type: 3}
+      - {fileID: 8300000, guid: 4f2a0879c4da19544a3233a9f52b94a0, type: 3}
+      - {fileID: 8300000, guid: 33504761ecfaab74f838070be20cabbc, type: 3}
+      - {fileID: 8300000, guid: 7823a564193dbb640997b992d8ad11aa, type: 3}
+      - {fileID: 8300000, guid: 49b9c4659561f6a4982a26ec38f1a083, type: 3}
+      - {fileID: 8300000, guid: 00f7f114e6a9eef408bdb0b8664dbd47, type: 3}
+      - {fileID: 8300000, guid: 51baf759438c0ff4b89e213f076e5f46, type: 3}
+      - {fileID: 8300000, guid: 8f41258f01ef9be4c8d86d399023eaff, type: 3}
+      - {fileID: 8300000, guid: be8a8f602eeabd24fa02732afd7c36ac, type: 3}
+      - {fileID: 8300000, guid: f4f0b2b7eb3a2d94e9c0a1bdbe984ed2, type: 3}
+      - {fileID: 8300000, guid: 4e70b0d60dcb08d4aaef9c8302d7b799, type: 3}
+      - {fileID: 8300000, guid: c38f7af839389e548b07e8bf7cddad90, type: 3}
+      - {fileID: 8300000, guid: a7c5d6683fd03a649a9f20a8e8dfb18c, type: 3}
+      - {fileID: 8300000, guid: 700ef3d85f842384bb8fdd7abbb5bd90, type: 3}
+      - {fileID: 8300000, guid: 1fadef738f58353428af0ab1b6b8ca80, type: 3}
+      - {fileID: 8300000, guid: b2fd4474a3d26f8488aeca4523ad3553, type: 3}
+      - {fileID: 8300000, guid: 04559308e0caada4d977ff01db273cd3, type: 3}
+      - {fileID: 8300000, guid: 0cc379c9a1d1d8d4bbb9c8b8bae14246, type: 3}
+      volume: 0.88
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0.045, y: 0.14}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+  - surfaceId: SnowDeep
+    layers:
+    - name: Heel
+      clips:
+      - {fileID: 8300000, guid: 02451a9ad41d8094e83f0908c3a06526, type: 3}
+      - {fileID: 8300000, guid: 26ffda5eedc8ce246a22380bcbf223c3, type: 3}
+      - {fileID: 8300000, guid: 76e9e91254220c14783324c06e49c994, type: 3}
+      - {fileID: 8300000, guid: c976b53127a14574f86719f71edd7284, type: 3}
+      - {fileID: 8300000, guid: 5801068fcb50dfb45ad9beebda6f19aa, type: 3}
+      - {fileID: 8300000, guid: 38881780bf789fd49a089376c5946525, type: 3}
+      - {fileID: 8300000, guid: 8e07ace6083e69449ba712c1e9831cea, type: 3}
+      - {fileID: 8300000, guid: 299e0605d4db76041af1245b0c98bb87, type: 3}
+      - {fileID: 8300000, guid: e88c059de2bca5f46ac06deb390188a4, type: 3}
+      - {fileID: 8300000, guid: fa9174b861e60e845bcb233dc17b552b, type: 3}
+      - {fileID: 8300000, guid: abdb7e2b76e30c54086e7b004569af13, type: 3}
+      - {fileID: 8300000, guid: a95ebf57be3c2a643a6498338b0ef9bf, type: 3}
+      volume: 1
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0, y: 0}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+    - name: Toe
+      clips:
+      - {fileID: 8300000, guid: b601a6eea0ad4b0409c8c0b9e4bd9d48, type: 3}
+      - {fileID: 8300000, guid: f50e5158b5574d5438742b70504b8e38, type: 3}
+      - {fileID: 8300000, guid: 9c7b8ba8d4d18744d90105a1dc5a3722, type: 3}
+      - {fileID: 8300000, guid: 4223a31e6bcf2ff46b2ddc038c0597b8, type: 3}
+      - {fileID: 8300000, guid: 7f11b88d6f7dab6408aa8c8ed69feef8, type: 3}
+      - {fileID: 8300000, guid: c593a1e391649ec4e923579297c3e4bc, type: 3}
+      - {fileID: 8300000, guid: afc71ce3a4e6cd24facd2d2681dd547d, type: 3}
+      - {fileID: 8300000, guid: 13db30549cdab2e4dac59ecdca37ce77, type: 3}
+      - {fileID: 8300000, guid: c4a606dfa1ad4714b83521c2f4766272, type: 3}
+      - {fileID: 8300000, guid: 85c2158f336414848b79e84fad9e3122, type: 3}
+      - {fileID: 8300000, guid: 542f0bb7eb4e397439d0a8a0b4cbf3e6, type: 3}
+      - {fileID: 8300000, guid: 9aaa685593e253f478145dddb3ebbe89, type: 3}
+      volume: 0.88
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0.045, y: 0.14}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+  - surfaceId: SnowShallow
+    layers:
+    - name: Heel
+      clips:
+      - {fileID: 8300000, guid: 1719b6ac476c12a42894f80c41170f0e, type: 3}
+      - {fileID: 8300000, guid: 8de46c6b2ddf01f42abf169f87399241, type: 3}
+      - {fileID: 8300000, guid: e7400fa24cb354942a28185c48ed83ba, type: 3}
+      - {fileID: 8300000, guid: faf98f2bdea2498409033d9ee3810f0d, type: 3}
+      - {fileID: 8300000, guid: 9ee937ede5809304f9af370b87295f5c, type: 3}
+      - {fileID: 8300000, guid: 79c20b7a8b26c6f44a90b45588f2795e, type: 3}
+      - {fileID: 8300000, guid: c36d891ae725dcc4ea94e2806852ae3c, type: 3}
+      - {fileID: 8300000, guid: e61bb5b7add7746428fd34dc823338b3, type: 3}
+      - {fileID: 8300000, guid: b0aa39bcf231f504383c9773c35d7a70, type: 3}
+      - {fileID: 8300000, guid: ecc9caa0f5948e4478acbe4f0b192d77, type: 3}
+      - {fileID: 8300000, guid: 4ec9da3b14b38bf46b799a3bfb3e17ba, type: 3}
+      - {fileID: 8300000, guid: 9ddbcd236336b5847bf24173c4ce2b4e, type: 3}
+      - {fileID: 8300000, guid: 2d217921fa64c6b4ea155682336c24c2, type: 3}
+      - {fileID: 8300000, guid: f62d95f8d6dfd8a4e9955cfa263f42dc, type: 3}
+      volume: 1
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0, y: 0}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+    - name: Toe
+      clips:
+      - {fileID: 8300000, guid: d5bd0ec714762a74b869c2f86dc6cf95, type: 3}
+      - {fileID: 8300000, guid: 49123930d0a51f745b30f651851269b9, type: 3}
+      - {fileID: 8300000, guid: 93a09942333af5a4ea014d650fb61ffd, type: 3}
+      - {fileID: 8300000, guid: 48f634e78d8275146b2756a603d88804, type: 3}
+      - {fileID: 8300000, guid: 121585bccbc326f41a7d388cf28e0868, type: 3}
+      - {fileID: 8300000, guid: b8100cdb89909504db0ccd4279a17c8e, type: 3}
+      - {fileID: 8300000, guid: efa331e8150b0f04c80dbc937e6f7c38, type: 3}
+      - {fileID: 8300000, guid: 92b0c9073eb490f4a8659349e09549e9, type: 3}
+      - {fileID: 8300000, guid: 77e18c57f8101d74d89b318b3c884e2f, type: 3}
+      - {fileID: 8300000, guid: 2e869a637be7c1e45968bbf576e6d759, type: 3}
+      - {fileID: 8300000, guid: 3b4a7a33eda63e24791db1123e7132f7, type: 3}
+      - {fileID: 8300000, guid: f845691e892172c429d8174a67ce02da, type: 3}
+      - {fileID: 8300000, guid: f19a42a10018a174d9fd7822fea08d43, type: 3}
+      - {fileID: 8300000, guid: d2f7a80fa6a272f439935238f65b556b, type: 3}
+      volume: 0.88
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0.045, y: 0.14}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+  - surfaceId: TileBright
+    layers:
+    - name: Heel
+      clips:
+      - {fileID: 8300000, guid: 9bdf00385d654c04cb1c1f04ef75efa2, type: 3}
+      - {fileID: 8300000, guid: 569f46f78743ab24491a8ca6c947edce, type: 3}
+      - {fileID: 8300000, guid: da613258838c61c4f9f26756f6a8f4f7, type: 3}
+      - {fileID: 8300000, guid: 7c6c8126a50e1a24ab1e7410e6b4951b, type: 3}
+      - {fileID: 8300000, guid: 374a9027e47e6ac4386f28e2a1353772, type: 3}
+      - {fileID: 8300000, guid: cf3027874d1f2b8489c1c54a62355f72, type: 3}
+      - {fileID: 8300000, guid: c96689d55c4ce86408d299ed03cc8641, type: 3}
+      - {fileID: 8300000, guid: 875ddf6eda8af054da694ccf329164b3, type: 3}
+      - {fileID: 8300000, guid: c58bac9275da31140a1026ee3f477fb3, type: 3}
+      - {fileID: 8300000, guid: c888999f4b4ee2f4395fad2d525ec4fd, type: 3}
+      - {fileID: 8300000, guid: b22540f116752d24696635b9fbcbf8b6, type: 3}
+      - {fileID: 8300000, guid: 6dc10f2c48d687f44b31bf13349dc2ff, type: 3}
+      volume: 1
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0, y: 0}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+    - name: Toe
+      clips:
+      - {fileID: 8300000, guid: 75293ca62908f0043a0aa65561069c25, type: 3}
+      - {fileID: 8300000, guid: f331e502916995e468be92ca1f2fe582, type: 3}
+      - {fileID: 8300000, guid: 3d5cc2f2289c910428c70c57cbe90736, type: 3}
+      - {fileID: 8300000, guid: 2464848312540a2489055476d512aee5, type: 3}
+      - {fileID: 8300000, guid: d69cb1ad48a9a0a4faf87a7620dfb901, type: 3}
+      - {fileID: 8300000, guid: 23e46cc880e7f734f96e632a06ef06c2, type: 3}
+      - {fileID: 8300000, guid: c8e1110006244584e9252ddf0b0a3004, type: 3}
+      - {fileID: 8300000, guid: f5314192ff740034f8b36fb8398b5c0d, type: 3}
+      - {fileID: 8300000, guid: 8f232902955fd614c9c5e289bf893b04, type: 3}
+      - {fileID: 8300000, guid: b2ad1448cd3266443874857377752711, type: 3}
+      - {fileID: 8300000, guid: 2c17664914e534e4bb64ab8b3c0870ce, type: 3}
+      - {fileID: 8300000, guid: b9623481b8486444e9ac0c54f8235f9d, type: 3}
+      volume: 0.88
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0.045, y: 0.14}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+  - surfaceId: TileDark
+    layers:
+    - name: Heel
+      clips:
+      - {fileID: 8300000, guid: 4043b4eabc018344a81d0592621c0cba, type: 3}
+      - {fileID: 8300000, guid: 0cae4a8280c79d14da866a6f07b94063, type: 3}
+      - {fileID: 8300000, guid: b574c1fdc751e9549858b3c3c5c40480, type: 3}
+      - {fileID: 8300000, guid: 4862a8861c84ad44daf77ae3883974b0, type: 3}
+      - {fileID: 8300000, guid: e779bd623ce3916468f2045d075ae9d4, type: 3}
+      - {fileID: 8300000, guid: a7d0140c92a72b84cb2ca2b3c74791e1, type: 3}
+      - {fileID: 8300000, guid: d8ddc47ac7e8aa94e88ab855e2bf9967, type: 3}
+      - {fileID: 8300000, guid: 69913de235bbe3f489cb4e61c9454c63, type: 3}
+      - {fileID: 8300000, guid: 8c45162d839cd5743aa7b00ce6fdb41e, type: 3}
+      - {fileID: 8300000, guid: 7998aa1b2485fc9409c0d60135f345c4, type: 3}
+      - {fileID: 8300000, guid: f54199a3d5d1108408350ec65bb0cfc5, type: 3}
+      - {fileID: 8300000, guid: a50c03cb0004eed40b2459665e2fc673, type: 3}
+      - {fileID: 8300000, guid: ae91a98bf41dc554d852c580d4d59db9, type: 3}
+      - {fileID: 8300000, guid: 883f9ef250620ad45be47eb83701830a, type: 3}
+      - {fileID: 8300000, guid: 01138e7fb719d1740a07b37ead35643b, type: 3}
+      - {fileID: 8300000, guid: 341a4f3b031b29240b62f6f82e7bd346, type: 3}
+      volume: 1
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0, y: 0}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+    - name: Toe
+      clips:
+      - {fileID: 8300000, guid: 96dbcd4e6478c5f48a7889b39e277187, type: 3}
+      - {fileID: 8300000, guid: 0f69432cf8e75114c85e94abee8d1b7b, type: 3}
+      - {fileID: 8300000, guid: b65f0ac7123a85f41bf23f729a43aa1b, type: 3}
+      - {fileID: 8300000, guid: 2436358f3d749304fb722973b8c2635f, type: 3}
+      - {fileID: 8300000, guid: b15ce59b65c585c40aea2da9e5b5fc91, type: 3}
+      - {fileID: 8300000, guid: b247a35b98960504c9b052674990390e, type: 3}
+      - {fileID: 8300000, guid: bee58a7839bed854b9c6e7cb10c3f4d8, type: 3}
+      - {fileID: 8300000, guid: 75df7f3d1ee373d4c857b79251a1d48b, type: 3}
+      - {fileID: 8300000, guid: 2584fba1aec551d42a81ad878342dbce, type: 3}
+      - {fileID: 8300000, guid: 0cf7b7c4b706c6747854ce20b21be7cf, type: 3}
+      - {fileID: 8300000, guid: 874e24502de70864fb6b853938e67a44, type: 3}
+      - {fileID: 8300000, guid: d59b2dea87a579545a20a945c43cedb0, type: 3}
+      - {fileID: 8300000, guid: 6fa6ce85cb7be78408d4a45ed87e3ece, type: 3}
+      - {fileID: 8300000, guid: a5dd1de91644e6649b2c078fdab84660, type: 3}
+      - {fileID: 8300000, guid: 7a9f9b99fd39eb44a8c881a59b1bba4f, type: 3}
+      - {fileID: 8300000, guid: 6e32ec7bcfb03a64da494f2dc246566a, type: 3}
+      volume: 0.88
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0.045, y: 0.14}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+  - surfaceId: Water
+    layers:
+    - name: Heel
+      clips:
+      - {fileID: 8300000, guid: 842a3fb9bacf5f946928baf4af8a5219, type: 3}
+      - {fileID: 8300000, guid: e42465f9a2e6c074abe38fec022ff32d, type: 3}
+      - {fileID: 8300000, guid: b86bc9ea23e32954695daa7879e63ab6, type: 3}
+      - {fileID: 8300000, guid: 06eaf074ac1aa4f47abf71c23c32fb46, type: 3}
+      - {fileID: 8300000, guid: daddacd0b87243249a120f438dc7c044, type: 3}
+      - {fileID: 8300000, guid: b78d45cdd99456246b99e4ab6a21a88d, type: 3}
+      - {fileID: 8300000, guid: 0d9f88052aea00a4385a7c2738a7f29e, type: 3}
+      - {fileID: 8300000, guid: 410cdf3500849354aa899930b9aa53ef, type: 3}
+      - {fileID: 8300000, guid: 8052e688dd7d94c4ea23832e1aac79f3, type: 3}
+      - {fileID: 8300000, guid: eaabd21bab55b194aaf242c3b777e93e, type: 3}
+      - {fileID: 8300000, guid: 5fd3608e62c61a6498d94159bad0e6f5, type: 3}
+      - {fileID: 8300000, guid: a34c92022af96c8418089cc2259e37c5, type: 3}
+      - {fileID: 8300000, guid: 4d98de53c26c9f94fb0d786ef2df02f0, type: 3}
+      - {fileID: 8300000, guid: 7038af97f3692d34ebb1466ed703f166, type: 3}
+      - {fileID: 8300000, guid: 4f8f62301c2ab454baa2fd7ef0231648, type: 3}
+      - {fileID: 8300000, guid: aef632865f01b4e44bbfd3b89a338e42, type: 3}
+      - {fileID: 8300000, guid: c51609e76e89a8144879d42bb4e910ec, type: 3}
+      - {fileID: 8300000, guid: 4b6963145428edc4ba81219cd5a32367, type: 3}
+      - {fileID: 8300000, guid: 2940f4dbf06e81842ad50a68959b4fa1, type: 3}
+      volume: 1
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0, y: 0}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+    - name: Toe
+      clips:
+      - {fileID: 8300000, guid: 2168cf63d5792494195a7cd60e509615, type: 3}
+      - {fileID: 8300000, guid: d9089eb9fafaacc4bb4e98c22b02726f, type: 3}
+      - {fileID: 8300000, guid: 5125790acbfb9d440b9262e73d342f4b, type: 3}
+      - {fileID: 8300000, guid: d9616e72409f8614b9d8babf07417aab, type: 3}
+      - {fileID: 8300000, guid: e6000b4082731dc43a6ef7dc35977bbe, type: 3}
+      - {fileID: 8300000, guid: 88663ec758d82b34aab2a6d33925f43e, type: 3}
+      - {fileID: 8300000, guid: 69ae5512d5e45c1469b2a581a83ee790, type: 3}
+      - {fileID: 8300000, guid: 0b8ed0aba53783a41a31f7d084001cdf, type: 3}
+      - {fileID: 8300000, guid: f0b2f24c9baf1a2439dd6b77fe127d03, type: 3}
+      - {fileID: 8300000, guid: bb0184fcb4f95ed4ca7af0b723c0c3bd, type: 3}
+      - {fileID: 8300000, guid: ca4e3059aa6530e419c3c86a425727c2, type: 3}
+      - {fileID: 8300000, guid: 0fd957246216c5b4aa61459b39711be2, type: 3}
+      - {fileID: 8300000, guid: 1fccd349b0a9d2249bb40910a1175c4f, type: 3}
+      - {fileID: 8300000, guid: a8d08eb61eca07e46b34cf2ae23bd364, type: 3}
+      - {fileID: 8300000, guid: 5ac6293627315ab4eb97aff424925e36, type: 3}
+      - {fileID: 8300000, guid: 12653de93b3fe754cae7b88070ba2cf9, type: 3}
+      volume: 0.88
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0.045, y: 0.14}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0

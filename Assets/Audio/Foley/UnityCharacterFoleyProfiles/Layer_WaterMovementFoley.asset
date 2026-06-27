@@ -1,0 +1,57 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7b02d0b5b8cd4e7a87b437fb22d8a121, type: 3}
+  m_Name: Layer_WaterMovementFoley
+  m_EditorClassIdentifier: 
+  defaultSurfaceId: WaterMovement
+  outputMixerGroup: {fileID: 0}
+  spatialBlend: 0
+  masterVolume: 1
+  masterPitchRange: {x: 0.96, y: 1.04}
+  minSecondsBetweenPlays: 0.035
+  useNuisanceVolume: 1
+  nuisanceMinimumVolume: 0.68
+  nuisanceVolumeDropPerPlay: 0.03
+  resetNuisanceOnSurfaceChange: 1
+  surfaceBanks:
+  - surfaceId: WaterMovement
+    layers:
+    - name: WaterMovement
+      clips:
+      - {fileID: 8300000, guid: 2b78d2e6141e231458f0034002dddc1b, type: 3}
+      - {fileID: 8300000, guid: 83161b4275b96a64a88f12c96eb75e86, type: 3}
+      - {fileID: 8300000, guid: 7b4874d8d66e3a14186ec59c85d99305, type: 3}
+      - {fileID: 8300000, guid: 67bdc45e700ec9f49b938212321a4ac5, type: 3}
+      - {fileID: 8300000, guid: 4f3f065d133bb854e816ac63e4f63e16, type: 3}
+      - {fileID: 8300000, guid: 230ebce5eb7f3d2489c2d162bb6d94c1, type: 3}
+      - {fileID: 8300000, guid: 470c40f43f602054c9f402fad02c9b29, type: 3}
+      - {fileID: 8300000, guid: da4fd255d0938f045b1cade4e91cc73b, type: 3}
+      - {fileID: 8300000, guid: 61fc858baf600584ba41c0c03ce9e8eb, type: 3}
+      - {fileID: 8300000, guid: 7ed663f2d5dcad1468a603ba74d046cd, type: 3}
+      - {fileID: 8300000, guid: a204f222d369a7d4abb2359d6695bd14, type: 3}
+      - {fileID: 8300000, guid: 31c078df54134dd4f9bb8fc2be52839b, type: 3}
+      - {fileID: 8300000, guid: 406f25f6f19842c4e84d25634389eced, type: 3}
+      - {fileID: 8300000, guid: 250be88d8c7be1f4d8bd7bab1c441d59, type: 3}
+      - {fileID: 8300000, guid: e4778b470db8c2640bcc1336e792a22a, type: 3}
+      - {fileID: 8300000, guid: 39fc848ec2f9284459d770cad86dd30f, type: 3}
+      - {fileID: 8300000, guid: b34fb7f006f61574b982d802dc8a5e79, type: 3}
+      - {fileID: 8300000, guid: f2471da9af42be8459c85575c87e879f, type: 3}
+      - {fileID: 8300000, guid: e5a5af9e672508f48aeec55199edd2c6, type: 3}
+      - {fileID: 8300000, guid: b26afefcb13cb014d9a550591d1bc096, type: 3}
+      - {fileID: 8300000, guid: 386f3528ee83e87479f257b97189921c, type: 3}
+      volume: 1
+      pitchRange: {x: 0.94, y: 1.06}
+      delayRange: {x: 0, y: 0}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0

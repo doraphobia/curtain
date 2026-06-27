@@ -1,0 +1,56 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7b02d0b5b8cd4e7a87b437fb22d8a121, type: 3}
+  m_Name: Layer_GrassFoliageFoley
+  m_EditorClassIdentifier: 
+  defaultSurfaceId: GrassFoliage
+  outputMixerGroup: {fileID: 0}
+  spatialBlend: 0
+  masterVolume: 1
+  masterPitchRange: {x: 0.96, y: 1.04}
+  minSecondsBetweenPlays: 0.035
+  useNuisanceVolume: 1
+  nuisanceMinimumVolume: 0.68
+  nuisanceVolumeDropPerPlay: 0.03
+  resetNuisanceOnSurfaceChange: 1
+  surfaceBanks:
+  - surfaceId: GrassFoliage
+    layers:
+    - name: GrassFoliage
+      clips:
+      - {fileID: 8300000, guid: aeb7cb58c7b2b5f418a8ef38be735752, type: 3}
+      - {fileID: 8300000, guid: b934a8c88b616ff4fa1786bf83dadf77, type: 3}
+      - {fileID: 8300000, guid: b6a4d8255c142e445b6731cf61934a0b, type: 3}
+      - {fileID: 8300000, guid: 0b6abd3b43f44744497064b3b4937e97, type: 3}
+      - {fileID: 8300000, guid: a582903e1b4537e4c9eb99743138024b, type: 3}
+      - {fileID: 8300000, guid: 1650ce3d4881322449107808e95125cd, type: 3}
+      - {fileID: 8300000, guid: 1b8f537657f99894c952ebfaefcbd0d2, type: 3}
+      - {fileID: 8300000, guid: fea47eb7eff628444ae56a3eb4bc53a7, type: 3}
+      - {fileID: 8300000, guid: d9803b727b448f243a9e08dffacc272c, type: 3}
+      - {fileID: 8300000, guid: cb43f0b675818cd45bec5f629f504942, type: 3}
+      - {fileID: 8300000, guid: 8c0d46863f348e9468e7338c98bcb5b4, type: 3}
+      - {fileID: 8300000, guid: 0bbef40b43834bb49862645905aff9e4, type: 3}
+      - {fileID: 8300000, guid: 0ff8e111f58dad4429cbdd6e3a7fc44a, type: 3}
+      - {fileID: 8300000, guid: 387644cba740ac04ea1c51e4379c5743, type: 3}
+      - {fileID: 8300000, guid: 31b247e76f253204ab54757ef8d33ea1, type: 3}
+      - {fileID: 8300000, guid: 8cdc647d4a681bc4d922ba1c5ff0b2ef, type: 3}
+      - {fileID: 8300000, guid: fa99ef9991626db49a9b2c47400c9ad6, type: 3}
+      - {fileID: 8300000, guid: 9fea9be0765450a42920c54d59a50bc1, type: 3}
+      - {fileID: 8300000, guid: 9880fb859f6773f448582c9d837473ef, type: 3}
+      - {fileID: 8300000, guid: f7d5efd00b522b24f9816f5ab2ca897c, type: 3}
+      volume: 1
+      pitchRange: {x: 0.94, y: 1.06}
+      delayRange: {x: 0, y: 0}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0

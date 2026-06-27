@@ -1,0 +1,56 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7b02d0b5b8cd4e7a87b437fb22d8a121, type: 3}
+  m_Name: Layer_GlassShatteredFoley
+  m_EditorClassIdentifier: 
+  defaultSurfaceId: GlassShattered
+  outputMixerGroup: {fileID: 0}
+  spatialBlend: 0
+  masterVolume: 1
+  masterPitchRange: {x: 0.96, y: 1.04}
+  minSecondsBetweenPlays: 0.035
+  useNuisanceVolume: 1
+  nuisanceMinimumVolume: 0.68
+  nuisanceVolumeDropPerPlay: 0.03
+  resetNuisanceOnSurfaceChange: 1
+  surfaceBanks:
+  - surfaceId: GlassShattered
+    layers:
+    - name: GlassShattered
+      clips:
+      - {fileID: 8300000, guid: 185492fe25624ea4ba31f390dea49d5f, type: 3}
+      - {fileID: 8300000, guid: 7e2fb328865f70b4c8b5f053c7810d29, type: 3}
+      - {fileID: 8300000, guid: 74a12e79f647ec6468f96d91f0faa5b4, type: 3}
+      - {fileID: 8300000, guid: 126104810e13d8049ba9b105675979e6, type: 3}
+      - {fileID: 8300000, guid: 4f7ce3104e735b64eaff5991fe76031c, type: 3}
+      - {fileID: 8300000, guid: 48286276c707ba247a2d116c069f0d05, type: 3}
+      - {fileID: 8300000, guid: 78b9aeaac5a82ae41af00d2ac4dab5e3, type: 3}
+      - {fileID: 8300000, guid: fe2da0d32822f86428694654ba39a5ab, type: 3}
+      - {fileID: 8300000, guid: 7804dadd1c5ecfa4386b23535dd142ec, type: 3}
+      - {fileID: 8300000, guid: 2aca5a9f87448d940984cc129d764ed6, type: 3}
+      - {fileID: 8300000, guid: a707496e7eb462e4c850628b365a9cc3, type: 3}
+      - {fileID: 8300000, guid: d5955f6da2852bf4d8d956e6d31a34c3, type: 3}
+      - {fileID: 8300000, guid: f18f21a1552d278438f057c07c6d842a, type: 3}
+      - {fileID: 8300000, guid: 36f1b32e455942f46a3e3c4f1620b4a6, type: 3}
+      - {fileID: 8300000, guid: b53844736ef554a418bdd354febdcdd4, type: 3}
+      - {fileID: 8300000, guid: f1552df0ea6288d40a8ec1058a1f606c, type: 3}
+      - {fileID: 8300000, guid: 5706eb0ad83555a4eb77956408efb995, type: 3}
+      - {fileID: 8300000, guid: 33cf9e29db307d14bbdde67b8a77277f, type: 3}
+      - {fileID: 8300000, guid: 51cc8f2c1f902ad46a515f76d740d6cf, type: 3}
+      - {fileID: 8300000, guid: 9020a381bf57d7b4f803ab88a0779188, type: 3}
+      volume: 1
+      pitchRange: {x: 0.94, y: 1.06}
+      delayRange: {x: 0, y: 0}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0

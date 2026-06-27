@@ -1,0 +1,70 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7b02d0b5b8cd4e7a87b437fb22d8a121, type: 3}
+  m_Name: Layer_WoodCreekFoley
+  m_EditorClassIdentifier: 
+  defaultSurfaceId: WoodCreek
+  outputMixerGroup: {fileID: 0}
+  spatialBlend: 0
+  masterVolume: 1
+  masterPitchRange: {x: 0.96, y: 1.04}
+  minSecondsBetweenPlays: 0.035
+  useNuisanceVolume: 1
+  nuisanceMinimumVolume: 0.68
+  nuisanceVolumeDropPerPlay: 0.03
+  resetNuisanceOnSurfaceChange: 1
+  surfaceBanks:
+  - surfaceId: WoodCreek
+    layers:
+    - name: WoodCreek
+      clips:
+      - {fileID: 8300000, guid: 5816052f58eedd1489f4a5e65092f7a2, type: 3}
+      - {fileID: 8300000, guid: 566c85d9516781e47bb521f765618d92, type: 3}
+      - {fileID: 8300000, guid: 0d9aaf30401c7ba4f9d10b621287b186, type: 3}
+      - {fileID: 8300000, guid: 39243d607c8156d46b30e9e335460412, type: 3}
+      - {fileID: 8300000, guid: c4271149f4f625c4fb9953656187c318, type: 3}
+      - {fileID: 8300000, guid: e592cccb5cfd94b4aace139a9c544a2d, type: 3}
+      - {fileID: 8300000, guid: c8a0b69d935b9a1498128c62d2288637, type: 3}
+      - {fileID: 8300000, guid: d14e76b7be73d954a9c803beb7095cb9, type: 3}
+      - {fileID: 8300000, guid: 4625d15723cde5945b0c93005edde658, type: 3}
+      - {fileID: 8300000, guid: 336f8068ca2291b4494d7bee6cb10b80, type: 3}
+      - {fileID: 8300000, guid: 8530ff9fe2e5b8c44bdc30fc2c5cf8fa, type: 3}
+      - {fileID: 8300000, guid: 074a9d5c459b2a04fbdc278414083c25, type: 3}
+      - {fileID: 8300000, guid: 93fd1ed0a285b534a8248c368a3e1c3a, type: 3}
+      - {fileID: 8300000, guid: 0c48d7fbe93415945ab13fe979c86d41, type: 3}
+      - {fileID: 8300000, guid: db071b00d28736a4ea0853981ecff145, type: 3}
+      - {fileID: 8300000, guid: 6b0d374b434a9a543b58ab3028b68825, type: 3}
+      - {fileID: 8300000, guid: a4cc6d2dde3935346a27031d6184ce40, type: 3}
+      - {fileID: 8300000, guid: 2d093732453152d4fb7fcab26be69fa6, type: 3}
+      - {fileID: 8300000, guid: 686fc71285edb5440a163a81cd28657a, type: 3}
+      - {fileID: 8300000, guid: 8ab70aeae5c3e994cb9a2eb3d9053030, type: 3}
+      - {fileID: 8300000, guid: 473f148bde5494249886da7b3fca854e, type: 3}
+      - {fileID: 8300000, guid: 3e51833ca5eccd34ab5a186a5ffb0d2d, type: 3}
+      - {fileID: 8300000, guid: cc2e636baef388946ab341ea3fea93ad, type: 3}
+      - {fileID: 8300000, guid: b86b7522120bde245be882b813b896ad, type: 3}
+      - {fileID: 8300000, guid: ba29a1d8e3738974ebd8fbcaa8b302fa, type: 3}
+      - {fileID: 8300000, guid: e3a3141256ee6fb4bbc209703c09b185, type: 3}
+      - {fileID: 8300000, guid: 2b82d0d96d3b94c4ab5bb25f6a0456d6, type: 3}
+      - {fileID: 8300000, guid: a09d0b96a0797404c998c5a14c6f4643, type: 3}
+      - {fileID: 8300000, guid: 770fd383b67d7664a8047d0e5d5b5eaf, type: 3}
+      - {fileID: 8300000, guid: 13c774a8a6a1f094287721d209aa6974, type: 3}
+      - {fileID: 8300000, guid: b9c60fd93e3599642b77d71c6ec62dd9, type: 3}
+      - {fileID: 8300000, guid: 3f83e04fef2566649a56a5d45f80aa82, type: 3}
+      - {fileID: 8300000, guid: 2d834946c41291d488ff1c23dd07fdee, type: 3}
+      - {fileID: 8300000, guid: 2a91b8480d7d8ec4bb3f9c9b4e2ec395, type: 3}
+      volume: 1
+      pitchRange: {x: 0.94, y: 1.06}
+      delayRange: {x: 0, y: 0}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0

@@ -1,0 +1,37 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7b02d0b5b8cd4e7a87b437fb22d8a121, type: 3}
+  m_Name: WindowEventFoley
+  m_EditorClassIdentifier: 
+  defaultSurfaceId: Window
+  outputMixerGroup: {fileID: 0}
+  spatialBlend: 0
+  masterVolume: 1
+  masterPitchRange: {x: 0.96, y: 1.04}
+  minSecondsBetweenPlays: 0.05
+  useNuisanceVolume: 0
+  nuisanceMinimumVolume: 0.6
+  nuisanceVolumeDropPerPlay: 0.035
+  resetNuisanceOnSurfaceChange: 1
+  surfaceBanks:
+  - surfaceId: Window
+    layers:
+    - name: Window Knock
+      clips:
+      - {fileID: 8300000, guid: c92e0c2f61e05134887e1d67a20a3336, type: 3}
+      volume: 1
+      pitchRange: {x: 0.95, y: 1.05}
+      delayRange: {x: 0, y: 0}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0

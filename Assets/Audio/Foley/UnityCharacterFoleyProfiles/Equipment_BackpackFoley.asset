@@ -1,0 +1,53 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7b02d0b5b8cd4e7a87b437fb22d8a121, type: 3}
+  m_Name: Equipment_BackpackFoley
+  m_EditorClassIdentifier: 
+  defaultSurfaceId: Upper
+  outputMixerGroup: {fileID: 0}
+  spatialBlend: 0
+  masterVolume: 1
+  masterPitchRange: {x: 0.96, y: 1.04}
+  minSecondsBetweenPlays: 0.025
+  useNuisanceVolume: 1
+  nuisanceMinimumVolume: 0.55
+  nuisanceVolumeDropPerPlay: 0.025
+  resetNuisanceOnSurfaceChange: 1
+  surfaceBanks:
+  - surfaceId: Upper
+    layers:
+    - name: Upper
+      clips:
+      - {fileID: 8300000, guid: b4f1b0e7e8f88fc4ba1f9f3d5dbf9f95, type: 3}
+      - {fileID: 8300000, guid: 26cad497472e2f541bd76a4981ebc860, type: 3}
+      - {fileID: 8300000, guid: a08d52b380a05e64c8f7024e87cb2ff5, type: 3}
+      - {fileID: 8300000, guid: 26ef8dadcbfc90240b6b8f96646d919d, type: 3}
+      - {fileID: 8300000, guid: 09fc96aa78a62fe43aa40ae2e20d9108, type: 3}
+      - {fileID: 8300000, guid: 8140e0e767ffbc14d84f87984cb212aa, type: 3}
+      - {fileID: 8300000, guid: a5479f9e3de887b45bb803e1d3ed0e13, type: 3}
+      - {fileID: 8300000, guid: 97cfbd30b5f8d6142946368f0be089ed, type: 3}
+      - {fileID: 8300000, guid: 68c312e83f9215247b74f3571391a09d, type: 3}
+      - {fileID: 8300000, guid: 61a877335df409743809e6178a142816, type: 3}
+      - {fileID: 8300000, guid: 8086c0ccb397b2d4f91134836b575ab4, type: 3}
+      - {fileID: 8300000, guid: 02f23537229da7d48819686b9231b0f7, type: 3}
+      - {fileID: 8300000, guid: 7fec02f1eaaf9014b8880f87d10d4d7e, type: 3}
+      - {fileID: 8300000, guid: 158b23a8fef234348b3ffc4adbd4acde, type: 3}
+      - {fileID: 8300000, guid: 0602eec491e37f245b6c003a1d8c5665, type: 3}
+      - {fileID: 8300000, guid: 428d496358acf61428316a8473654b42, type: 3}
+      - {fileID: 8300000, guid: e28cddbc1f5f76046ad9108fc5cc4e6d, type: 3}
+      volume: 0.7
+      pitchRange: {x: 0.94, y: 1.06}
+      delayRange: {x: 0, y: 0}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0

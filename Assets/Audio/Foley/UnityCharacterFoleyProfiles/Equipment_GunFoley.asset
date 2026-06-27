@@ -1,0 +1,71 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7b02d0b5b8cd4e7a87b437fb22d8a121, type: 3}
+  m_Name: Equipment_GunFoley
+  m_EditorClassIdentifier: 
+  defaultSurfaceId: Low
+  outputMixerGroup: {fileID: 0}
+  spatialBlend: 0
+  masterVolume: 1
+  masterPitchRange: {x: 0.96, y: 1.04}
+  minSecondsBetweenPlays: 0.025
+  useNuisanceVolume: 1
+  nuisanceMinimumVolume: 0.55
+  nuisanceVolumeDropPerPlay: 0.025
+  resetNuisanceOnSurfaceChange: 1
+  surfaceBanks:
+  - surfaceId: Low
+    layers:
+    - name: Low
+      clips:
+      - {fileID: 8300000, guid: 82ff7ddc6ed81a84bb103a89a80a003d, type: 3}
+      - {fileID: 8300000, guid: d9164727e470f9e47a2fa4666aae226d, type: 3}
+      - {fileID: 8300000, guid: 2d873900846137b49914c038d64f5ebe, type: 3}
+      - {fileID: 8300000, guid: 1fd1e43699e566042949d035cd785b81, type: 3}
+      - {fileID: 8300000, guid: 722aae0ad5b1ef94fa80bbf0095db421, type: 3}
+      - {fileID: 8300000, guid: f15b77222b5381c4da764fc8bf0155cd, type: 3}
+      - {fileID: 8300000, guid: 5d15b0723f526de4399cb0dade1675ea, type: 3}
+      - {fileID: 8300000, guid: 4bd1159cd1414da47a100e23a79d819c, type: 3}
+      - {fileID: 8300000, guid: 46d592aee7979cc49b38a1272714ff2b, type: 3}
+      - {fileID: 8300000, guid: 9998d543ff6a30f43af1e654e30c0d27, type: 3}
+      - {fileID: 8300000, guid: b82a34821ecbcd049b332e9131855174, type: 3}
+      - {fileID: 8300000, guid: c8086544b86c34845bd6458ab806a5f2, type: 3}
+      volume: 0.75
+      pitchRange: {x: 0.94, y: 1.06}
+      delayRange: {x: 0, y: 0}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+  - surfaceId: Upper
+    layers:
+    - name: Upper
+      clips:
+      - {fileID: 8300000, guid: 2308194051d6a6149bd703d4a3644c35, type: 3}
+      - {fileID: 8300000, guid: d273427259ad71347adbcc329c15df54, type: 3}
+      - {fileID: 8300000, guid: 372a71babac715d4b899cb03122baaff, type: 3}
+      - {fileID: 8300000, guid: 8b153a4729ee12847982dc695cdf5f41, type: 3}
+      - {fileID: 8300000, guid: 821f0df5df138c3479d55577a3d24d82, type: 3}
+      - {fileID: 8300000, guid: a437a5e226f91c24ca5128e89e266b8d, type: 3}
+      - {fileID: 8300000, guid: 01c3124f1c3c52747b82dd0d353a9ca9, type: 3}
+      - {fileID: 8300000, guid: 518ebf6306b7cba46ab614f2fa4f6d00, type: 3}
+      - {fileID: 8300000, guid: 7526ac66d24c24e4d8244820ebba034e, type: 3}
+      - {fileID: 8300000, guid: e1bb58458dd920e4a994c28659023b16, type: 3}
+      - {fileID: 8300000, guid: 8d6c0e63fd156ec4c9eacb89c074db4c, type: 3}
+      - {fileID: 8300000, guid: cb7fd0f5e10ad4a4d8d93974ba1f5f64, type: 3}
+      volume: 0.7
+      pitchRange: {x: 0.94, y: 1.06}
+      delayRange: {x: 0, y: 0}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0

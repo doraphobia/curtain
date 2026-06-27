@@ -43,6 +43,10 @@ public class NightWindowVisitorEventController : MonoBehaviour
     public AudioClip eventTriggerClip;
     [Range(0f, 1f)]
     public float eventTriggerVolume = 1f;
+    public bool useFoleyProfileForEventTrigger = true;
+    public FoleyPlayer eventFoleyPlayer;
+    public FoleyProfile eventFoleyProfile;
+    public string eventFoleySurfaceId = "Window";
 
     [Header("Sentence Library")]
     public List<VisitorSentence> sentenceLibrary = new List<VisitorSentence>();
@@ -311,6 +315,9 @@ public class NightWindowVisitorEventController : MonoBehaviour
 
     private void PlayEventTriggerSound()
     {
+        if (TryPlayEventFoley())
+            return;
+
         if (eventTriggerClip == null)
             return;
 
@@ -322,6 +329,22 @@ public class NightWindowVisitorEventController : MonoBehaviour
 
         Vector3 playPosition = targetCamera != null ? targetCamera.transform.position : transform.position;
         AudioSource.PlayClipAtPoint(eventTriggerClip, playPosition, eventTriggerVolume);
+    }
+
+    private bool TryPlayEventFoley()
+    {
+        if (!useFoleyProfileForEventTrigger || eventFoleyProfile == null)
+            return false;
+
+        if (eventFoleyPlayer == null)
+        {
+            eventFoleyPlayer = GetComponent<FoleyPlayer>();
+            if (eventFoleyPlayer == null)
+                eventFoleyPlayer = gameObject.AddComponent<FoleyPlayer>();
+        }
+
+        string surfaceId = string.IsNullOrWhiteSpace(eventFoleySurfaceId) ? null : eventFoleySurfaceId;
+        return eventFoleyPlayer.Play(eventFoleyProfile, transform.position, eventTriggerVolume, surfaceId);
     }
 
     private void EndEvent()

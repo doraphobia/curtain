@@ -1,0 +1,87 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7b02d0b5b8cd4e7a87b437fb22d8a121, type: 3}
+  m_Name: Clothing_ChainmailFoley
+  m_EditorClassIdentifier: 
+  defaultSurfaceId: Low
+  outputMixerGroup: {fileID: 0}
+  spatialBlend: 0
+  masterVolume: 1
+  masterPitchRange: {x: 0.96, y: 1.04}
+  minSecondsBetweenPlays: 0.025
+  useNuisanceVolume: 1
+  nuisanceMinimumVolume: 0.55
+  nuisanceVolumeDropPerPlay: 0.025
+  resetNuisanceOnSurfaceChange: 1
+  surfaceBanks:
+  - surfaceId: Low
+    layers:
+    - name: Low
+      clips:
+      - {fileID: 8300000, guid: 2e1fcaee3f3127e43be02eccab629a86, type: 3}
+      - {fileID: 8300000, guid: 10f6421c7f474b8458c5898945a5d8c2, type: 3}
+      - {fileID: 8300000, guid: cba647c8b7bfe2a4caca091f4ebe736f, type: 3}
+      - {fileID: 8300000, guid: 1f2cedd0697534341bb9c629597a3d07, type: 3}
+      - {fileID: 8300000, guid: 8e10435f915c55c47b08c4dee3a0862f, type: 3}
+      - {fileID: 8300000, guid: e0116739b4d1c054db5eb22ac63d2dd8, type: 3}
+      - {fileID: 8300000, guid: 7754954ff105242469635cf56eb003e8, type: 3}
+      - {fileID: 8300000, guid: 4e9d7b0ed42f4fe4b8ad27dfcaea4953, type: 3}
+      - {fileID: 8300000, guid: 4698d125c6fcade4d8fc2a44a5e3ff9c, type: 3}
+      - {fileID: 8300000, guid: de6db081abbb6134e9b7d82a1896905e, type: 3}
+      - {fileID: 8300000, guid: 39b6ef04b24b1484992e671705b2cb25, type: 3}
+      - {fileID: 8300000, guid: bf6b9dc8932882e4ab238f1dce0366f3, type: 3}
+      - {fileID: 8300000, guid: 956fa8743140c4c479027d7d6605d94f, type: 3}
+      - {fileID: 8300000, guid: 7da10ac9e3e974e45b27e8e5ee879d1b, type: 3}
+      - {fileID: 8300000, guid: bad0afe619a4d4f43b158583a146f796, type: 3}
+      - {fileID: 8300000, guid: 8f40611b124039148a4af215c24c9bcb, type: 3}
+      - {fileID: 8300000, guid: 150f0d8ad28cab841a7f07c6d4722b22, type: 3}
+      - {fileID: 8300000, guid: e12e835481177804c9a43baf31de142b, type: 3}
+      - {fileID: 8300000, guid: 52938410a1904174389e94ef098f25bc, type: 3}
+      - {fileID: 8300000, guid: b08b4a33b632ada449c1283a57b9b970, type: 3}
+      volume: 0.65
+      pitchRange: {x: 0.96, y: 1.04}
+      delayRange: {x: 0, y: 0}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0
+  - surfaceId: Upper
+    layers:
+    - name: Upper
+      clips:
+      - {fileID: 8300000, guid: 0499785f0927a38409c45e9b0ce84283, type: 3}
+      - {fileID: 8300000, guid: a1812ea17f3241149bbe3ef4134e92df, type: 3}
+      - {fileID: 8300000, guid: 7e6617b8eb69df14e88346ca3efadd45, type: 3}
+      - {fileID: 8300000, guid: c2dec29af01c1fb42847dd752f5e0018, type: 3}
+      - {fileID: 8300000, guid: b5c9496a4215e1b48b8cf56855515a1a, type: 3}
+      - {fileID: 8300000, guid: 266f7c597e5a18442a87b670487e39a0, type: 3}
+      - {fileID: 8300000, guid: 82cb8832af51e144387299011b5575c5, type: 3}
+      - {fileID: 8300000, guid: f5a1063af109f9540a968ab991e55448, type: 3}
+      - {fileID: 8300000, guid: e2d1ed2012f6f114cbbbe06d787d30da, type: 3}
+      - {fileID: 8300000, guid: 47fb2bee4c81d3f4882c9ef2284e0b2a, type: 3}
+      - {fileID: 8300000, guid: 04b1a4038f0da174c80194c4ffcd19fe, type: 3}
+      - {fileID: 8300000, guid: 71d8061de93e9f94184303d8b3c46111, type: 3}
+      - {fileID: 8300000, guid: ef873fbb9ea297b478870bdcf6d0c21c, type: 3}
+      - {fileID: 8300000, guid: 968f54e80fbad414694f9e88627fc288, type: 3}
+      - {fileID: 8300000, guid: 43547da804de65b4b8dca5f69cb35440, type: 3}
+      - {fileID: 8300000, guid: e85c7adafa594e0469dc12e2885b92a3, type: 3}
+      - {fileID: 8300000, guid: 91d2602330f048b4292150b7c2ff1f55, type: 3}
+      - {fileID: 8300000, guid: 3372daec725e6a24abc78c9fea045f67, type: 3}
+      - {fileID: 8300000, guid: 0c6f4bd3af1115247a96493477426b64, type: 3}
+      - {fileID: 8300000, guid: c1f0f72bea45f814e80309411824b01d, type: 3}
+      volume: 0.55
+      pitchRange: {x: 0.96, y: 1.04}
+      delayRange: {x: 0, y: 0}
+      preventImmediateRepeat: 1
+      outputMixerGroup: {fileID: 0}
+      overrideSpatialBlend: 0
+      spatialBlend: 0

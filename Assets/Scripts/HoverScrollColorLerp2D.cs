@@ -45,6 +45,10 @@ public class HoverScrollColorLerp2D : MonoBehaviour
     public AudioClip scrollClip;
     [Range(0f, 1f)]
     public float scrollVolume = 1f;
+    public bool useFoleyProfileForScroll = true;
+    public FoleyPlayer scrollFoleyPlayer;
+    public FoleyProfile scrollFoleyProfile;
+    public string scrollFoleySurfaceId = "Curtain";
 
     [Header("Visual Sync")]
     public List<Transform> syncedRotationTargets = new List<Transform>();
@@ -242,6 +246,8 @@ public class HoverScrollColorLerp2D : MonoBehaviour
 
     void SetupScrollAudioSource()
     {
+        ResolveScrollFoleyPlayer();
+
         if (scrollAudioSource == null)
             scrollAudioSource = GetComponent<AudioSource>();
 
@@ -254,6 +260,9 @@ public class HoverScrollColorLerp2D : MonoBehaviour
 
     void PlayScrollSound()
     {
+        if (TryPlayScrollFoley())
+            return;
+
         if (scrollClip == null)
             return;
 
@@ -272,6 +281,29 @@ public class HoverScrollColorLerp2D : MonoBehaviour
 
         Vector3 playPosition = Camera.main != null ? Camera.main.transform.position : transform.position;
         AudioSource.PlayClipAtPoint(scrollClip, playPosition, scrollVolume);
+    }
+
+    private void ResolveScrollFoleyPlayer()
+    {
+        if (!useFoleyProfileForScroll || scrollFoleyPlayer != null || scrollFoleyProfile == null)
+            return;
+
+        scrollFoleyPlayer = GetComponent<FoleyPlayer>();
+        if (scrollFoleyPlayer == null)
+            scrollFoleyPlayer = gameObject.AddComponent<FoleyPlayer>();
+    }
+
+    private bool TryPlayScrollFoley()
+    {
+        if (!useFoleyProfileForScroll || scrollFoleyProfile == null)
+            return false;
+
+        ResolveScrollFoleyPlayer();
+        if (scrollFoleyPlayer == null)
+            return false;
+
+        string surfaceId = string.IsNullOrWhiteSpace(scrollFoleySurfaceId) ? null : scrollFoleySurfaceId;
+        return scrollFoleyPlayer.Play(scrollFoleyProfile, transform.position, scrollVolume, surfaceId);
     }
 
     void ApplySyncedRotations()
