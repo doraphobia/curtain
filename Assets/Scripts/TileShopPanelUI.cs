@@ -43,16 +43,22 @@ public class TileShopPanelUI : MonoBehaviour
 
         if (currencySource != null)
             currencySource.ValueChanged += HandleCurrencyChanged;
+
+        DeveloperModeState.Changed += HandleDeveloperModeChanged;
     }
 
     void OnDestroy()
     {
         if (currencySource != null)
             currencySource.ValueChanged -= HandleCurrencyChanged;
+
+        DeveloperModeState.Changed -= HandleDeveloperModeChanged;
     }
 
     void Update()
     {
+        DeveloperModeState.TryHandleHotkey();
+
         if (!Input.GetMouseButtonDown(0))
             return;
 
@@ -131,6 +137,11 @@ public class TileShopPanelUI : MonoBehaviour
     }
 
     private void HandleCurrencyChanged(float _)
+    {
+        Refresh();
+    }
+
+    private void HandleDeveloperModeChanged(bool _)
     {
         Refresh();
     }

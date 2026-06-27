@@ -62,14 +62,14 @@ public class MouseZoneLineDrawer2D : MonoBehaviour
 
     private bool IsMouseInsideZone()
     {
-        Vector3 mouseWorld = targetCamera.ScreenToWorldPoint(Input.mousePosition);
+        Vector3 mouseWorld = GetCursorWorldPoint();
         mouseWorld.z = transform.position.z;
         return targetCollider.OverlapPoint(mouseWorld);
     }
 
     private void AddCurrentMousePoint()
     {
-        Vector3 mouseWorld = targetCamera.ScreenToWorldPoint(Input.mousePosition);
+        Vector3 mouseWorld = GetCursorWorldPoint();
         mouseWorld.z = lineZOffset;
 
         if (points.Count > 0 && Vector3.Distance(points[points.Count - 1], mouseWorld) < minPointDistance)
@@ -78,6 +78,14 @@ public class MouseZoneLineDrawer2D : MonoBehaviour
         points.Add(mouseWorld);
         lineRenderer.positionCount = points.Count;
         lineRenderer.SetPositions(points.ToArray());
+    }
+
+    private Vector3 GetCursorWorldPoint()
+    {
+        if (LogicalCursorController.TryGetWorldPosition(out Vector3 cursorWorld))
+            return cursorWorld;
+
+        return targetCamera.ScreenToWorldPoint(Input.mousePosition);
     }
 
     public void ClearLine()

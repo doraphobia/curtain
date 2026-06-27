@@ -16,6 +16,7 @@ public class CameraDragPan : MonoBehaviour
     public bool clampPosition = false;
     public Vector2 minPosition = new Vector2(-10f, -10f);
     public Vector2 maxPosition = new Vector2(10f, 10f);
+    public bool disableWhenLogicalCursorActive = true;
 
     private bool isDragging;
     private Vector3 dragStartMousePosition;
@@ -33,6 +34,9 @@ public class CameraDragPan : MonoBehaviour
     void Update()
     {
         if (targetCamera == null)
+            return;
+
+        if (disableWhenLogicalCursorActive && LogicalCursorController.IsRunning)
             return;
 
         if (Input.GetMouseButtonDown(mouseButton))

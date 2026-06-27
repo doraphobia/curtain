@@ -27,6 +27,9 @@ public class TilePlacementManager : MonoBehaviour
     {
         if (targetCamera == null)
             targetCamera = Camera.main;
+
+        if (placementGrid == null)
+            placementGrid = FindFirstObjectByType<TilePlacementGrid>();
     }
 
     void Update()
@@ -61,7 +64,7 @@ public class TilePlacementManager : MonoBehaviour
             return false;
 
         pendingDefinition = prefab;
-        pendingPrice = price;
+        pendingPrice = DeveloperModeState.IsEnabled ? 0 : price;
         previewInstance = Instantiate(prefab.gameObject);
         previewInstance.name = prefab.gameObject.name + "_Preview";
 
@@ -118,8 +121,12 @@ public class TilePlacementManager : MonoBehaviour
 
     private void UpdatePreviewPosition()
     {
-        Vector3 mouseWorld = targetCamera.ScreenToWorldPoint(Input.mousePosition);
-        mouseWorld.z = 0f;
+        Vector3 mouseWorld;
+        if (!LogicalCursorController.TryGetWorldPosition(out mouseWorld))
+        {
+            mouseWorld = targetCamera.ScreenToWorldPoint(Input.mousePosition);
+            mouseWorld.z = 0f;
+        }
 
         previewAnchorCell = placementGrid.WorldToCell(mouseWorld);
         previewCanPlace = placementGrid.CanPlace(pendingDefinition, previewAnchorCell);

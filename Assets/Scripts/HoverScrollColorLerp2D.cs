@@ -33,6 +33,7 @@ public class HoverScrollColorLerp2D : MonoBehaviour
 
     [Header("Input")]
     public bool allowLocalHoverInput = true;
+    public bool useLogicalCursorHover = true;
 
     [Header("Cursor")]
     public Texture2D hoverCursorTexture;
@@ -61,6 +62,7 @@ public class HoverScrollColorLerp2D : MonoBehaviour
     public float parentColliderVisibleAlphaThreshold = 0.01f;
 
     private SpriteRenderer sr;
+    private Collider2D targetCollider;
     private float t = 0f; // 0 -> colorA, 1 -> colorB
     private bool isHovering = false;
     private float currencyBuffer = 0f;
@@ -72,6 +74,7 @@ public class HoverScrollColorLerp2D : MonoBehaviour
     void Awake()
     {
         sr = GetComponent<SpriteRenderer>();
+        targetCollider = GetComponent<Collider2D>();
         AutoAssignReferences();
         ApplyColor();
         ApplyParentSpriteAlpha();
@@ -80,6 +83,7 @@ public class HoverScrollColorLerp2D : MonoBehaviour
 
     void Update()
     {
+        UpdateLogicalCursorHover();
         HandleScrollInput();
         GenerateCurrency();
     }
@@ -169,16 +173,18 @@ public class HoverScrollColorLerp2D : MonoBehaviour
 
     void OnMouseEnter()
     {
-        isHovering = true;
+        if (useLogicalCursorHover && LogicalCursorController.HasActive)
+            return;
 
-        if (hoverCursorTexture != null)
-            Cursor.SetCursor(hoverCursorTexture, cursorHotspot, cursorMode);
+        SetHovering(true);
     }
 
     void OnMouseExit()
     {
-        isHovering = false;
-        Cursor.SetCursor(null, Vector2.zero, cursorMode);
+        if (useLogicalCursorHover && LogicalCursorController.HasActive)
+            return;
+
+        SetHovering(false);
     }
 
     void AutoAssignReferences()
@@ -199,6 +205,31 @@ public class HoverScrollColorLerp2D : MonoBehaviour
         float dir = Mathf.Sign(scroll);
         SetProgress(t + dir * stepPerScroll);
         PlayScrollSound();
+    }
+
+    private void UpdateLogicalCursorHover()
+    {
+        if (!useLogicalCursorHover || targetCollider == null)
+            return;
+
+        if (!LogicalCursorController.TryGetWorldPosition(out Vector3 cursorWorld))
+            return;
+
+        cursorWorld.z = transform.position.z;
+        SetHovering(targetCollider.OverlapPoint(cursorWorld));
+    }
+
+    private void SetHovering(bool hovering)
+    {
+        if (isHovering == hovering)
+            return;
+
+        isHovering = hovering;
+
+        if (hoverCursorTexture == null)
+            return;
+
+        Cursor.SetCursor(isHovering ? hoverCursorTexture : null, isHovering ? cursorHotspot : Vector2.zero, cursorMode);
     }
 
     public void SetProgress(float progress)

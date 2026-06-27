@@ -75,11 +75,17 @@ public class TimeCounterUI : MonoBehaviour
 
     public bool CanAfford(int amount)
     {
+        if (DeveloperModeState.IsEnabled)
+            return true;
+
         return amount <= CurrentWholeValue;
     }
 
     public bool TrySpend(int amount)
     {
+        if (DeveloperModeState.IsEnabled)
+            return amount >= 0;
+
         if (amount < 0)
             return false;
 
