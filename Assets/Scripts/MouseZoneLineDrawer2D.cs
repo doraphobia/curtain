@@ -82,7 +82,7 @@ public class MouseZoneLineDrawer2D : MonoBehaviour
 
     private Vector3 GetCursorWorldPoint()
     {
-        if (LogicalCursorController.TryGetWorldPosition(out Vector3 cursorWorld))
+        if (PlayerControl.TryGetPlayerWorldPosition(out Vector3 cursorWorld))
             return cursorWorld;
 
         return targetCamera.ScreenToWorldPoint(Input.mousePosition);

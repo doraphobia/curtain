@@ -36,7 +36,7 @@ public class CameraDragPan : MonoBehaviour
         if (targetCamera == null)
             return;
 
-        if (disableWhenLogicalCursorActive && LogicalCursorController.IsRunning)
+        if (disableWhenLogicalCursorActive && PlayerControl.IsRunning)
             return;
 
         if (Input.GetMouseButtonDown(mouseButton))

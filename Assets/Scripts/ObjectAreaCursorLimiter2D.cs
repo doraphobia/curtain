@@ -22,7 +22,7 @@ public class ObjectAreaCursorLimiter2D : MonoBehaviour
 
     void Update()
     {
-        if (LogicalCursorController.IsRunning)
+        if (PlayerControl.IsRunning)
             return;
 
         bool shouldShowCursor = IsCursorOverValidArea();

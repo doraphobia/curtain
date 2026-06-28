@@ -19,7 +19,7 @@ public class FoleySurfaceLayerTrigger2D : MonoBehaviour
     public float volume = 1f;
 
     private Collider2D targetCollider;
-    private bool logicalCursorInside;
+    private bool playerInside;
     private int lastPlayedStepIndex = -1;
 
     void Awake()
@@ -34,13 +34,13 @@ public class FoleySurfaceLayerTrigger2D : MonoBehaviour
             return;
 
         ResolvePlayer();
-        if (!LogicalCursorController.TryGetWorldPosition(out Vector3 cursorWorld))
+        if (!PlayerControl.TryGetPlayerWorldPosition(out Vector3 cursorWorld))
             return;
 
         cursorWorld.z = transform.position.z;
         bool isInside = targetCollider.OverlapPoint(cursorWorld);
-        bool entered = isInside && !logicalCursorInside;
-        logicalCursorInside = isInside;
+        bool entered = isInside && !playerInside;
+        playerInside = isInside;
 
         if (entered && playOnEnter)
             Play(cursorWorld);

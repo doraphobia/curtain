@@ -75,41 +75,41 @@ public static class DuoCurtainFoleyInstaller
     {
         int connectedObjects = 0;
 
-        LogicalCursorController[] cursors = UnityEngine.Object.FindObjectsByType<LogicalCursorController>(FindObjectsSortMode.None);
-        for (int i = 0; i < cursors.Length; i++)
+        PlayerControl[] playerControls = UnityEngine.Object.FindObjectsByType<PlayerControl>(FindObjectsSortMode.None);
+        for (int i = 0; i < playerControls.Length; i++)
         {
-            LogicalCursorController cursor = cursors[i];
-            if (cursor == null)
+            PlayerControl playerControl = playerControls[i];
+            if (playerControl == null)
                 continue;
 
-            AudioClip[] cursorFootstepClips = CompactClips(cursor.footstepClips);
+            AudioClip[] cursorFootstepClips = CompactClips(playerControl.footstepClips);
             if (!footstepProfile.HasAnyClips() && cursorFootstepClips.Length > 0)
-                ConfigureProfileIfEmpty(footstepProfile, "Default", "Footsteps", cursorFootstepClips, cursor.minSecondsBetweenFootsteps, cursor.footstepVolume, true);
+                ConfigureProfileIfEmpty(footstepProfile, "Default", "Footsteps", cursorFootstepClips, playerControl.minSecondsBetweenFootsteps, playerControl.footstepVolume, true);
 
-            Undo.RecordObject(cursor, "Connect Foley cursor");
-            FoleyPlayer player = GetOrAddComponent<FoleyPlayer>(cursor.gameObject);
-            FoleyStepClock stepClock = GetOrAddComponent<FoleyStepClock>(cursor.gameObject);
-            FoleySurfaceResolver2D resolver = GetOrAddComponent<FoleySurfaceResolver2D>(cursor.gameObject);
-            FoleyCharacterSfxController characterSfx = GetOrAddComponent<FoleyCharacterSfxController>(cursor.gameObject);
-            FoleyAnimationEventBridge animationBridge = GetOrAddComponent<FoleyAnimationEventBridge>(cursor.gameObject);
+            Undo.RecordObject(playerControl, "Connect Foley player control");
+            FoleyPlayer player = GetOrAddComponent<FoleyPlayer>(playerControl.gameObject);
+            FoleyStepClock stepClock = GetOrAddComponent<FoleyStepClock>(playerControl.gameObject);
+            FoleySurfaceResolver2D resolver = GetOrAddComponent<FoleySurfaceResolver2D>(playerControl.gameObject);
+            FoleyCharacterSfxController characterSfx = GetOrAddComponent<FoleyCharacterSfxController>(playerControl.gameObject);
+            FoleyAnimationEventBridge animationBridge = GetOrAddComponent<FoleyAnimationEventBridge>(playerControl.gameObject);
             player.surfaceResolver = resolver;
-            cursor.useUnifiedStepClock = true;
-            cursor.stepClock = stepClock;
-            cursor.syncFootstepSettingsToStepClock = true;
-            cursor.useFoleyProfileForFootsteps = true;
-            cursor.footstepFoleyPlayer = player;
-            cursor.footstepFoleyProfile = footstepProfile;
-            stepClock.distancePerStep = Mathf.Max(0.01f, cursor.worldDistancePerFootstep);
-            stepClock.minSecondsBetweenSteps = Mathf.Max(0f, cursor.minSecondsBetweenFootsteps);
-            stepClock.speedForFullCadence = Mathf.Max(0.01f, cursor.speedForFullFootstepCadence);
-            stepClock.runSpeedThreshold = Mathf.Max(0f, cursor.runSpeedThreshold);
-            ConfigureCharacterSfx(characterSfx, player, stepClock, cursor.transform, defaultClothingProfile, defaultEquipmentProfile, wetClothingProfile);
+            playerControl.useUnifiedStepClock = true;
+            playerControl.stepClock = stepClock;
+            playerControl.syncFootstepSettingsToStepClock = true;
+            playerControl.useFoleyProfileForFootsteps = true;
+            playerControl.footstepFoleyPlayer = player;
+            playerControl.footstepFoleyProfile = footstepProfile;
+            stepClock.distancePerStep = Mathf.Max(0.01f, playerControl.worldDistancePerFootstep);
+            stepClock.minSecondsBetweenSteps = Mathf.Max(0f, playerControl.minSecondsBetweenFootsteps);
+            stepClock.speedForFullCadence = Mathf.Max(0.01f, playerControl.speedForFullFootstepCadence);
+            stepClock.runSpeedThreshold = Mathf.Max(0f, playerControl.runSpeedThreshold);
+            ConfigureCharacterSfx(characterSfx, player, stepClock, playerControl.transform, defaultClothingProfile, defaultEquipmentProfile, wetClothingProfile);
             animationBridge.stepClock = stepClock;
             animationBridge.foleyPlayer = player;
             animationBridge.footstepProfile = footstepProfile;
             animationBridge.characterSfx = characterSfx;
-            animationBridge.eventTransform = cursor.transform;
-            EditorUtility.SetDirty(cursor);
+            animationBridge.eventTransform = playerControl.transform;
+            EditorUtility.SetDirty(playerControl);
             EditorUtility.SetDirty(player);
             EditorUtility.SetDirty(stepClock);
             EditorUtility.SetDirty(resolver);

@@ -62,7 +62,7 @@ public class ScrollTimeScaleController : MonoBehaviour, IPointerEnterHandler, IP
 
     void OnMouseEnter()
     {
-        if (useLogicalCursorForWorldTarget && LogicalCursorController.HasActive)
+        if (useLogicalCursorForWorldTarget && PlayerControl.HasActive)
             return;
 
         isPointerOverWorldTarget = true;
@@ -71,7 +71,7 @@ public class ScrollTimeScaleController : MonoBehaviour, IPointerEnterHandler, IP
 
     void OnMouseExit()
     {
-        if (useLogicalCursorForWorldTarget && LogicalCursorController.HasActive)
+        if (useLogicalCursorForWorldTarget && PlayerControl.HasActive)
             return;
 
         isPointerOverWorldTarget = false;
@@ -80,7 +80,7 @@ public class ScrollTimeScaleController : MonoBehaviour, IPointerEnterHandler, IP
 
     void OnMouseOver()
     {
-        if (useLogicalCursorForWorldTarget && LogicalCursorController.HasActive)
+        if (useLogicalCursorForWorldTarget && PlayerControl.HasActive)
             return;
 
         isPointerOverWorldTarget = true;
@@ -113,7 +113,7 @@ public class ScrollTimeScaleController : MonoBehaviour, IPointerEnterHandler, IP
         if (!useLogicalCursorForWorldTarget)
             return;
 
-        if (!LogicalCursorController.TryGetWorldPosition(out Vector3 cursorWorld))
+        if (!PlayerControl.TryGetPlayerWorldPosition(out Vector3 cursorWorld))
             return;
 
         bool isHovering = false;

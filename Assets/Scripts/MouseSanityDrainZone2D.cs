@@ -71,7 +71,7 @@ public class MouseSanityDrainZone2D : MonoBehaviour
     private bool IsMouseInsideZone()
     {
         Vector3 mouseWorld;
-        if (!LogicalCursorController.TryGetWorldPosition(out mouseWorld))
+        if (!PlayerControl.TryGetPlayerWorldPosition(out mouseWorld))
             mouseWorld = targetCamera.ScreenToWorldPoint(Input.mousePosition);
 
         mouseWorld.z = transform.position.z;

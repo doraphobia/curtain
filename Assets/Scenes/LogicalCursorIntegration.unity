@@ -4445,7 +4445,7 @@ GameObject:
   - component: {fileID: 605045188}
   - component: {fileID: 605045187}
   m_Layer: 5
-  m_Name: drag
+  m_Name: Player
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -12281,7 +12281,7 @@ GameObject:
   - component: {fileID: 2147000001}
   - component: {fileID: 2147000002}
   m_Layer: 0
-  m_Name: Interaction Manager
+  m_Name: Player Control
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -12316,14 +12316,22 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   targetCamera: {fileID: 519420031}
   roomGrid: {fileID: 328419144}
-  uiCursorImage: {fileID: 605045187}
-  uiCursorObjectName: drag
+  playerImage: {fileID: 605045187}
+  playerObjectName: Player
   hideSystemCursor: 1
   confineSystemCursorToWindow: 1
   restoreSystemCursorOnDisable: 1
   clampCursorToRoom: 1
   freezeWorldCursorWhenPointerOverUI: 1
-  showUICursorAtSystemPointerOverUI: 1
+  showPlayerAtHeadingPointOverUI: 0
+  showHeadingPoint: 1
+  createHeadingPointIfMissing: 1
+  headingPointImage: {fileID: 0}
+  headingPointObjectName: Heading Point
+  headingPointSprite: {fileID: 0}
+  headingPointColor: {r: 1, g: 1, b: 1, a: 1}
+  headingPointAlpha: 0.65
+  headingPointSize: 14
   movementMode: 1
   maxCursorMoveSpeed: 16
   cursorInputDeadZonePixels: 18

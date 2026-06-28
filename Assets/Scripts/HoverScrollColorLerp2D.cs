@@ -177,7 +177,7 @@ public class HoverScrollColorLerp2D : MonoBehaviour
 
     void OnMouseEnter()
     {
-        if (useLogicalCursorHover && LogicalCursorController.HasActive)
+        if (useLogicalCursorHover && PlayerControl.HasActive)
             return;
 
         SetHovering(true);
@@ -185,7 +185,7 @@ public class HoverScrollColorLerp2D : MonoBehaviour
 
     void OnMouseExit()
     {
-        if (useLogicalCursorHover && LogicalCursorController.HasActive)
+        if (useLogicalCursorHover && PlayerControl.HasActive)
             return;
 
         SetHovering(false);
@@ -216,7 +216,7 @@ public class HoverScrollColorLerp2D : MonoBehaviour
         if (!useLogicalCursorHover || targetCollider == null)
             return;
 
-        if (!LogicalCursorController.TryGetWorldPosition(out Vector3 cursorWorld))
+        if (!PlayerControl.TryGetPlayerWorldPosition(out Vector3 cursorWorld))
             return;
 
         cursorWorld.z = transform.position.z;
