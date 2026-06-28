@@ -3,6 +3,10 @@ using UnityEngine.EventSystems;
 using UnityEngine.Serialization;
 using UnityEngine.UI;
 
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+
 [DefaultExecutionOrder(-50)]
 [DisallowMultipleComponent]
 public class PlayerControl : MonoBehaviour
@@ -38,6 +42,15 @@ public class PlayerControl : MonoBehaviour
     public bool clampCursorToRoom = true;
     public bool freezeWorldCursorWhenPointerOverUI = true;
     public bool showPlayerAtHeadingPointOverUI = false;
+
+    [Header("Player Collision")]
+    public bool usePlayerCollisionRadius = true;
+    [Min(0f)]
+    public float playerCollisionRadius = 0.35f;
+    public bool drawDebugPlayerIndicator = true;
+    public Color debugPlayerColor = new Color(0.1f, 0.75f, 1f, 1f);
+    public Color debugHeadingColor = new Color(1f, 0.82f, 0.2f, 1f);
+    public Color debugBlockedPlayerColor = new Color(1f, 0.25f, 0.25f, 1f);
 
     [Header("Heading Point")]
     public bool showHeadingPoint = true;
@@ -147,6 +160,7 @@ public class PlayerControl : MonoBehaviour
     public bool HasWorldPosition => hasWorldPosition;
     public bool HasPlayerWorldPosition => hasWorldPosition;
     public bool HasHeadingWorldPosition => hasHeadingWorldPosition;
+    public float PlayerCollisionRadius => usePlayerCollisionRadius ? Mathf.Max(0f, playerCollisionRadius) : 0f;
 
     public static bool IsRunning => Active != null && Active.isActiveAndEnabled;
     public static bool HasActive => IsRunning && Active.hasWorldPosition;
@@ -325,7 +339,7 @@ public class PlayerControl : MonoBehaviour
 
         Vector3 startWorld = ScreenToWorld(Input.mousePosition);
         if (clampCursorToRoom && roomGrid != null && roomGrid.HasRoomCells)
-            startWorld = roomGrid.ClampWorldPoint(startWorld, startWorld);
+            startWorld = roomGrid.ClampPlayerWorldPoint(startWorld, startWorld, PlayerCollisionRadius);
 
         startWorld.z = 0f;
         currentWorldPosition = startWorld;
@@ -367,7 +381,7 @@ public class PlayerControl : MonoBehaviour
         {
             if (roomGrid.HasRoomCells)
             {
-                nextWorld = roomGrid.ClampWorldPoint(desiredWorld, currentWorldPosition);
+                nextWorld = roomGrid.ClampPlayerWorldPoint(desiredWorld, currentWorldPosition, PlayerCollisionRadius);
                 warnedAboutMissingRoomArea = false;
             }
             else if (!warnedAboutMissingRoomArea)
@@ -383,6 +397,15 @@ public class PlayerControl : MonoBehaviour
         float movedDistance = hadWorldPosition ? Vector2.Distance(previousWorldPosition, currentWorldPosition) : 0f;
         currentCursorSpeed = deltaTime > 0f ? movedDistance / deltaTime : 0f;
         return movedDistance;
+    }
+
+    public bool TryGetCurrentBlock(out TilePlacementGrid.TileBlockInfo blockInfo)
+    {
+        if (roomGrid != null && hasWorldPosition)
+            return roomGrid.TryGetBlockInfo(currentWorldPosition, out blockInfo);
+
+        blockInfo = default(TilePlacementGrid.TileBlockInfo);
+        return false;
     }
 
     private Vector3 GetDesiredWorldPosition(float deltaTime)
@@ -987,6 +1010,61 @@ public class PlayerControl : MonoBehaviour
 
         return null;
     }
+
+    void OnDrawGizmos()
+    {
+        if (!drawDebugPlayerIndicator)
+            return;
+
+        Vector3 playerPosition = hasWorldPosition ? currentWorldPosition : transform.position;
+        float radius = Mathf.Max(0.05f, PlayerCollisionRadius);
+        bool playerIsInRoom = roomGrid == null || !roomGrid.HasRoomCells || !hasWorldPosition ||
+                              roomGrid.ContainsWorldPoint(playerPosition, PlayerCollisionRadius);
+
+        Gizmos.color = playerIsInRoom ? debugPlayerColor : debugBlockedPlayerColor;
+        Gizmos.DrawWireSphere(playerPosition, radius);
+        Gizmos.DrawLine(playerPosition + Vector3.left * radius, playerPosition + Vector3.right * radius);
+        Gizmos.DrawLine(playerPosition + Vector3.down * radius, playerPosition + Vector3.up * radius);
+
+        if (hasHeadingWorldPosition)
+        {
+            Gizmos.color = debugHeadingColor;
+            float headingRadius = Mathf.Max(0.05f, PlayerCollisionRadius * 0.35f);
+            Gizmos.DrawWireSphere(headingWorldPosition, headingRadius);
+        }
+
+#if UNITY_EDITOR
+        DrawDebugLabels(playerPosition, radius, playerIsInRoom);
+#endif
+    }
+
+#if UNITY_EDITOR
+    private void DrawDebugLabels(Vector3 playerPosition, float radius, bool playerIsInRoom)
+    {
+        GUIStyle playerStyle = new GUIStyle(EditorStyles.boldLabel)
+        {
+            normal = { textColor = playerIsInRoom ? debugPlayerColor : debugBlockedPlayerColor }
+        };
+
+        string playerLabel = "Player";
+        if (TryGetCurrentBlock(out TilePlacementGrid.TileBlockInfo blockInfo))
+            playerLabel += "\nBlock: " + blockInfo.displayName + " (" + blockInfo.cell.x + "," + blockInfo.cell.y + ")";
+        else
+            playerLabel += "\nBlock: none";
+
+        Handles.Label(playerPosition + Vector3.up * (radius + 0.2f), playerLabel, playerStyle);
+
+        if (!hasHeadingWorldPosition)
+            return;
+
+        GUIStyle headingStyle = new GUIStyle(EditorStyles.miniBoldLabel)
+        {
+            normal = { textColor = debugHeadingColor }
+        };
+
+        Handles.Label(headingWorldPosition + Vector3.up * Mathf.Max(0.15f, radius * 0.45f), "Heading Point", headingStyle);
+    }
+#endif
 
     private Vector3 ScreenToWorld(Vector3 screenPosition)
     {
