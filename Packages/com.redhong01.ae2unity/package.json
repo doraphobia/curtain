@@ -1,8 +1,8 @@
 {
   "name": "com.redhong01.ae2unity",
-  "version": "0.5.1",
+  "version": "0.6.1",
   "displayName": "AE2Unity",
-  "description": "Imports After Effects metadata, vector-only shape compositions, or baked composition frames and generates playable Unity 6 assets for 2D motion graphics.",
+  "description": "Imports After Effects metadata, realtime motion data, vector-only shape compositions, or baked composition frames and generates playable Unity 6 assets for 2D motion graphics.",
   "unity": "6000.0",
   "license": "MIT",
   "repository": {
@@ -21,6 +21,16 @@
       "displayName": "Basic Curtain Export",
       "description": "A tiny .ae2shader sample for validating importer and shader generation.",
       "path": "Samples~/BasicCurtain"
+    },
+    {
+      "displayName": "Procedural Circle Motion",
+      "description": "A .ae2motion sample that drives a procedural circle shader with runtime keyframe evaluation.",
+      "path": "Samples~/ProceduralCircleMotion"
+    },
+    {
+      "displayName": "Procedural Shape Motion",
+      "description": "Rect and stroke .ae2motion samples for runtime procedural shaders.",
+      "path": "Samples~/ProceduralShapeMotion"
     }
   ]
 }

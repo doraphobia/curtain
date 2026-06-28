@@ -1,0 +1,164 @@
+{
+  "schemaVersion": "0.2.1",
+  "exporter": "AE2Unity Motion Exporter Sample",
+  "exportedAt": "2026-06-28T00:00:00Z",
+  "comp": {
+    "name": "ProceduralStroke",
+    "width": 1080,
+    "height": 1080,
+    "frameRate": 60,
+    "duration": 2,
+    "workAreaStart": 0,
+    "workAreaDuration": 2
+  },
+  "motion": {
+    "units": "pixels",
+    "timeMode": "seconds",
+    "coordinateSystem": "AE_TOP_LEFT",
+    "layers": [
+      {
+        "id": "layer-1",
+        "name": "Trimmed Stroke",
+        "index": 1,
+        "type": "shape",
+        "enabled": true,
+        "inPoint": 0,
+        "outPoint": 2,
+        "parentId": "",
+        "blendMode": "NORMAL",
+        "rendererHint": "ProceduralStroke",
+        "shape": {
+          "kind": "path",
+          "center": {
+            "staticValue": { "x": 0, "y": 0 },
+            "expression": "",
+            "keys": []
+          },
+          "size": {
+            "staticValue": { "x": 520, "y": 0 },
+            "expression": "",
+            "keys": []
+          },
+          "radius": {
+            "staticValue": 0,
+            "expression": "",
+            "keys": []
+          },
+          "cornerRadius": {
+            "staticValue": 0,
+            "expression": "",
+            "keys": []
+          },
+          "pathStart": {
+            "staticValue": { "x": -260, "y": 0 },
+            "expression": "",
+            "keys": []
+          },
+          "pathEnd": {
+            "staticValue": { "x": 260, "y": 0 },
+            "expression": "",
+            "keys": []
+          },
+          "fill": {
+            "staticValue": { "r": 0, "g": 0, "b": 0, "a": 0 },
+            "expression": "",
+            "keys": []
+          },
+          "stroke": {
+            "staticValue": { "r": 0.2, "g": 0.92, "b": 0.66, "a": 1 },
+            "expression": "",
+            "keys": []
+          },
+          "strokeWidth": {
+            "staticValue": 28,
+            "expression": "",
+            "keys": []
+          },
+          "trimStart": {
+            "staticValue": 0,
+            "expression": "",
+            "keys": []
+          },
+          "trimEnd": {
+            "staticValue": 100,
+            "expression": "",
+            "keys": [
+              {
+                "time": 0,
+                "value": 0,
+                "inInterpolation": "LINEAR",
+                "outInterpolation": "LINEAR"
+              },
+              {
+                "time": 1.2,
+                "value": 100,
+                "inInterpolation": "LINEAR",
+                "outInterpolation": "LINEAR"
+              },
+              {
+                "time": 2,
+                "value": 100,
+                "inInterpolation": "LINEAR",
+                "outInterpolation": "LINEAR"
+              }
+            ]
+          },
+          "trimOffset": {
+            "staticValue": 0,
+            "expression": "",
+            "keys": []
+          }
+        },
+        "transform": {
+          "anchorPoint": {
+            "staticValue": { "x": 0, "y": 0, "z": 0 },
+            "expression": "",
+            "keys": []
+          },
+          "position": {
+            "staticValue": { "x": 540, "y": 540, "z": 0 },
+            "expression": "",
+            "keys": []
+          },
+          "scale": {
+            "staticValue": { "x": 100, "y": 100, "z": 100 },
+            "expression": "",
+            "keys": []
+          },
+          "rotation": {
+            "staticValue": 0,
+            "expression": "",
+            "keys": [
+              {
+                "time": 0,
+                "value": -20,
+                "inInterpolation": "LINEAR",
+                "outInterpolation": "LINEAR"
+              },
+              {
+                "time": 1,
+                "value": 0,
+                "inInterpolation": "LINEAR",
+                "outInterpolation": "LINEAR"
+              },
+              {
+                "time": 2,
+                "value": 20,
+                "inInterpolation": "LINEAR",
+                "outInterpolation": "LINEAR"
+              }
+            ]
+          },
+          "opacity": {
+            "staticValue": 100,
+            "expression": "",
+            "keys": []
+          }
+        },
+        "expressions": [],
+        "warnings": []
+      }
+    ]
+  },
+  "warnings": []
+}

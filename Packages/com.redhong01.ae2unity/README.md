@@ -2,12 +2,12 @@
 
 ## English
 
-`AE2Unity` is an early automation scaffold for moving constrained Adobe After Effects 2026 compositions into Unity 6 as shader/material assets.
+`AE2Unity` is an early automation scaffold for moving constrained Adobe After Effects 2026 compositions into Unity 6 as shader/material assets and realtime motion-data runtime assets.
 
 The current workflow combines two sides:
 
 - An After Effects ScriptUI panel that exports composition metadata, optional reference frames, optional Media Encoder output, and bridge jobs.
-- A Unity package that receives `.ae2shader` payloads, imports them into the project, and generates Unity shader/material assets.
+- A Unity package that receives `.ae2shader` or `.ae2motion` payloads, imports them into the project, and generates Unity shader/material/runtime prefab assets.
 
 This is not a full one-click replacement for every After Effects feature yet. The package is designed to make supported AE motion graphics reproducible inside Unity, while clearly warning when a comp uses features that should be baked, exported as media, or handled by future compiler passes.
 
@@ -46,7 +46,7 @@ You can also add it directly to `Packages/manifest.json`:
 To pin a release, use a tag:
 
 ```json
-"com.redhong01.ae2unity": "https://github.com/RedHong01/AE2Unity.git#v0.3.0"
+"com.redhong01.ae2unity": "https://github.com/RedHong01/AE2Unity.git#v0.6.1"
 ```
 
 If the repository is private, Unity must have GitHub access through your local Git credentials.
@@ -67,6 +67,23 @@ If the repository is private, Unity must have GitHub access through your local G
 
 Direct export and manual generation are still available through `Direct .ae2shader into Unity Assets`, `Manual folder .ae2shader export`, and `Assets > AE2Unity > Generate Shader From AE2Shader`.
 
+### Motion Runtime Workflow
+
+The `.ae2motion` path treats After Effects as the authoring tool and Unity as the realtime renderer:
+
+```text
+AE Shape Layer + Transform/Trim Keyframes
+-> .ae2motion Motion Data
+-> AE2MotionData asset
+-> AE2MotionPlayer
+-> MaterialPropertyBlock
+-> AE2Unity/Procedural/Circle, Rect, or Stroke Unlit
+```
+
+Use `Bridge: Motion runtime`, `Direct motion to Assets`, or `Manual motion folder` in [Tools/AfterEffects/AE2Unity.jsx](Tools/AfterEffects/AE2Unity.jsx). Unity imports the file with [Editor/Motion/AE2MotionImporter.cs](Editor/Motion/AE2MotionImporter.cs), stores it as [Runtime/Motion/AE2MotionData.cs](Runtime/Motion/AE2MotionData.cs), evaluates keyframes with [Runtime/Motion/AE2MotionEvaluator.cs](Runtime/Motion/AE2MotionEvaluator.cs), and binds values to shader properties through [Runtime/Motion/AE2ShaderPropertyBinder.cs](Runtime/Motion/AE2ShaderPropertyBinder.cs).
+
+The realtime renderer currently supports the first runtime-renderable shape layer in a motion document. Supported renderer hints are procedural circle, procedural rounded rectangle, and procedural open-path stroke with trim start/end. Expressions, effects, masks, complex paths, animated path vertices, and non-shape layers are preserved as data/warnings so future compiler passes can support them without changing the bridge.
+
 ### After Effects Panel
 
 The AE panel reads Unity Hub's local `projects-v1.json` and `projectSortPreferences.json`, so the Unity project dropdown follows the same project names and sorting preference used by Unity Hub. `Choose` remains available as a fallback for projects that are not listed in Unity Hub.
@@ -84,6 +101,9 @@ Standalone windows include `Compact` and `Full Size` buttons. You can also use `
 - `Media Encoder only`: exports media without generating Unity shader/material assets.
 - `Direct .ae2shader into Unity Assets`: writes an `.ae2shader` file directly into the selected Unity project's `Assets` folder.
 - `Manual folder .ae2shader export`: writes an `.ae2shader` file to a user-selected folder.
+- `Bridge: Motion runtime`: sends `.ae2motion` data to Unity and asks Unity to generate runtime material/prefab assets.
+- `Direct motion to Assets`: writes `.ae2motion` directly into the selected Unity project's `Assets` folder.
+- `Manual motion folder`: writes `.ae2motion` to a user-selected folder.
 
 ### Supported MVP Surface
 
@@ -93,6 +113,11 @@ Standalone windows include `Compact` and `Full Size` buttons. You can also use `
 - Source footage path references.
 - Basic effect/mask metadata for capability analysis.
 - Unity material preview through `AE2Unity/Composite Unlit`.
+- `.ae2motion` motion data: composition timing, layer hierarchy, transform keyframes, ellipse/rectangle/open-path shape parameters, rectangle roundness, fill/stroke/trim metadata, renderer hints, and explicit warnings.
+- Runtime playback through [Runtime/Motion/AE2MotionPlayer.cs](Runtime/Motion/AE2MotionPlayer.cs), [Runtime/Motion/AE2MotionEvaluator.cs](Runtime/Motion/AE2MotionEvaluator.cs), and [Runtime/Motion/AE2ShaderPropertyBinder.cs](Runtime/Motion/AE2ShaderPropertyBinder.cs).
+- Procedural runtime shaders: [Runtime/Shaders/Procedural/AE2UnityProceduralCircle.shader](Runtime/Shaders/Procedural/AE2UnityProceduralCircle.shader), [Runtime/Shaders/Procedural/AE2UnityProceduralRect.shader](Runtime/Shaders/Procedural/AE2UnityProceduralRect.shader), and [Runtime/Shaders/Procedural/AE2UnityProceduralStroke.shader](Runtime/Shaders/Procedural/AE2UnityProceduralStroke.shader).
+- Motion schema reference: [Documentation~/ae2motion.schema.json](Documentation~/ae2motion.schema.json).
+- Motion samples: [Samples~/ProceduralCircleMotion/ProceduralCircle.ae2motion](Samples~/ProceduralCircleMotion/ProceduralCircle.ae2motion), [Samples~/ProceduralShapeMotion/ProceduralRect.ae2motion](Samples~/ProceduralShapeMotion/ProceduralRect.ae2motion), and [Samples~/ProceduralShapeMotion/ProceduralStroke.ae2motion](Samples~/ProceduralShapeMotion/ProceduralStroke.ae2motion).
 
 ### Known Fallbacks
 
@@ -115,12 +140,12 @@ This project is released under the MIT License. Community users may use, modify,
 
 ## 中文
 
-`AE2Unity` 是一个早期自动化工具框架，用来把受控范围内的 Adobe After Effects 2026 合成转换到 Unity 6 中，并生成 shader/material 资产。
+`AE2Unity` 是一个早期自动化工具框架，用来把受控范围内的 Adobe After Effects 2026 合成转换到 Unity 6 中，并生成 shader/material 资产和 realtime motion-data runtime 资产。
 
 目前这套工作流由两部分组成：
 
 - After Effects 侧的 ScriptUI 面板，负责导出合成 metadata、可选参考帧、可选 Media Encoder 输出，以及 AEBridge 任务。
-- Unity 侧的 package，负责接收 `.ae2shader` payload，将它导入 Unity 项目，并生成 shader/material 资产。
+- Unity 侧的 package，负责接收 `.ae2shader` 或 `.ae2motion` payload，将它导入 Unity 项目，并生成 shader/material/runtime prefab 资产。
 
 它目前还不是“所有 AE 功能都能一键完整复刻”的最终编译器。它的目标是让支持范围内的 AE motion graphics 可以在 Unity 中复现，同时在遇到复杂功能时明确给出 warning，提示哪些内容需要 bake、导出为媒体文件，或者等待后续 compiler pass 支持。
 
@@ -159,7 +184,7 @@ https://github.com/RedHong01/AE2Unity.git
 如果希望锁定某个 release，可以使用 tag：
 
 ```json
-"com.redhong01.ae2unity": "https://github.com/RedHong01/AE2Unity.git#v0.3.0"
+"com.redhong01.ae2unity": "https://github.com/RedHong01/AE2Unity.git#v0.6.1"
 ```
 
 如果 repo 是 private，Unity 需要能够通过你本地的 Git 凭据访问 GitHub。
@@ -180,6 +205,23 @@ https://github.com/RedHong01/AE2Unity.git
 
 你也仍然可以使用直接导出和手动生成流程：`Direct .ae2shader into Unity Assets`、`Manual folder .ae2shader export`，以及 Unity 中的 `Assets > AE2Unity > Generate Shader From AE2Shader`。
 
+### Motion Runtime 工作流程
+
+`.ae2motion` 路径会把 After Effects 作为 motion authoring tool，把 Unity 作为 realtime renderer：
+
+```text
+AE Shape Layer + Transform/Trim Keyframes
+-> .ae2motion Motion Data
+-> AE2MotionData asset
+-> AE2MotionPlayer
+-> MaterialPropertyBlock
+-> AE2Unity/Procedural/Circle, Rect, or Stroke Unlit
+```
+
+在 [Tools/AfterEffects/AE2Unity.jsx](Tools/AfterEffects/AE2Unity.jsx) 中选择 `Bridge: Motion runtime`、`Direct motion to Assets` 或 `Manual motion folder`。Unity 会用 [Editor/Motion/AE2MotionImporter.cs](Editor/Motion/AE2MotionImporter.cs) 导入文件，保存为 [Runtime/Motion/AE2MotionData.cs](Runtime/Motion/AE2MotionData.cs)，通过 [Runtime/Motion/AE2MotionEvaluator.cs](Runtime/Motion/AE2MotionEvaluator.cs) evaluate keyframes，并由 [Runtime/Motion/AE2ShaderPropertyBinder.cs](Runtime/Motion/AE2ShaderPropertyBinder.cs) 把结果写入 shader properties。
+
+当前 realtime renderer 会渲染 motion document 中第一个可运行时渲染的 shape layer。已经支持 procedural circle、procedural rounded rectangle，以及带 trim start/end 的 procedural open-path stroke。Expressions、effects、masks、复杂 path、animated path vertices 和非 shape layers 会作为数据/warnings 保留下来，方便后续 compiler pass 扩展，而不需要重做 bridge。
+
 ### After Effects 面板
 
 AE 面板会读取 Unity Hub 本地的 `projects-v1.json` 和 `projectSortPreferences.json`，所以 Unity Project 下拉列表会尽量沿用 Unity Hub 中的项目名称和排序。`Choose` 按钮仍然保留，用来选择没有出现在 Unity Hub 列表中的项目。
@@ -197,6 +239,9 @@ AE 面板会读取 Unity Hub 本地的 `projects-v1.json` 和 `projectSortPrefer
 - `Media Encoder only`：只导出媒体文件，不生成 Unity shader/material。
 - `Direct .ae2shader into Unity Assets`：把 `.ae2shader` 直接写入所选 Unity 项目的 `Assets` 文件夹。
 - `Manual folder .ae2shader export`：把 `.ae2shader` 写入用户手动选择的文件夹。
+- `Bridge: Motion runtime`：把 `.ae2motion` 数据发送到 Unity，并让 Unity 生成 runtime material/prefab 资产。
+- `Direct motion to Assets`：把 `.ae2motion` 直接写入所选 Unity 项目的 `Assets` 文件夹。
+- `Manual motion folder`：把 `.ae2motion` 写入用户手动选择的文件夹。
 
 ### 当前 MVP 支持范围
 
@@ -206,6 +251,11 @@ AE 面板会读取 Unity Hub 本地的 `projects-v1.json` 和 `projectSortPrefer
 - Source footage 路径引用。
 - 用于 capability analysis 的基础 effect/mask metadata。
 - 通过 `AE2Unity/Composite Unlit` 进行 Unity material preview。
+- `.ae2motion` motion data：composition timing、layer hierarchy、transform keyframes、ellipse/rectangle/open-path shape parameters、rectangle roundness、fill/stroke/trim metadata、renderer hints 和明确 warnings。
+- 通过 [Runtime/Motion/AE2MotionPlayer.cs](Runtime/Motion/AE2MotionPlayer.cs)、[Runtime/Motion/AE2MotionEvaluator.cs](Runtime/Motion/AE2MotionEvaluator.cs) 和 [Runtime/Motion/AE2ShaderPropertyBinder.cs](Runtime/Motion/AE2ShaderPropertyBinder.cs) 进行 runtime playback。
+- Procedural runtime shaders：[Runtime/Shaders/Procedural/AE2UnityProceduralCircle.shader](Runtime/Shaders/Procedural/AE2UnityProceduralCircle.shader)、[Runtime/Shaders/Procedural/AE2UnityProceduralRect.shader](Runtime/Shaders/Procedural/AE2UnityProceduralRect.shader) 和 [Runtime/Shaders/Procedural/AE2UnityProceduralStroke.shader](Runtime/Shaders/Procedural/AE2UnityProceduralStroke.shader)。
+- Motion schema 参考：[Documentation~/ae2motion.schema.json](Documentation~/ae2motion.schema.json)。
+- Motion samples：[Samples~/ProceduralCircleMotion/ProceduralCircle.ae2motion](Samples~/ProceduralCircleMotion/ProceduralCircle.ae2motion)、[Samples~/ProceduralShapeMotion/ProceduralRect.ae2motion](Samples~/ProceduralShapeMotion/ProceduralRect.ae2motion) 和 [Samples~/ProceduralShapeMotion/ProceduralStroke.ae2motion](Samples~/ProceduralShapeMotion/ProceduralStroke.ae2motion)。
 
 ### 已知 fallback
 

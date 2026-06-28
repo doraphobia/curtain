@@ -1,0 +1,206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://redhong01.github.io/AE2Unity/schemas/ae2motion-0.2.1.schema.json",
+  "title": "AE2Unity Motion Export",
+  "type": "object",
+  "required": ["schemaVersion", "comp", "motion"],
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "0.2.1" },
+    "exporter": { "type": "string" },
+    "exportedAt": { "type": "string" },
+    "comp": {
+      "type": "object",
+      "required": ["name", "width", "height", "frameRate", "duration"],
+      "properties": {
+        "name": { "type": "string" },
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 },
+        "frameRate": { "type": "number", "exclusiveMinimum": 0 },
+        "duration": { "type": "number", "minimum": 0 },
+        "workAreaStart": { "type": "number" },
+        "workAreaDuration": { "type": "number", "minimum": 0 }
+      }
+    },
+    "motion": {
+      "type": "object",
+      "required": ["units", "timeMode", "coordinateSystem", "layers"],
+      "properties": {
+        "units": { "type": "string", "const": "pixels" },
+        "timeMode": { "type": "string", "const": "seconds" },
+        "coordinateSystem": { "type": "string", "const": "AE_TOP_LEFT" },
+        "layers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/layer" }
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/warning" }
+    }
+  },
+  "$defs": {
+    "layer": {
+      "type": "object",
+      "required": ["id", "name", "index", "type", "rendererHint", "shape", "transform"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "index": { "type": "integer" },
+        "type": { "type": "string" },
+        "enabled": { "type": "boolean" },
+        "inPoint": { "type": "number" },
+        "outPoint": { "type": "number" },
+        "parentId": { "type": "string" },
+        "blendMode": { "type": "string" },
+        "rendererHint": {
+          "type": "string",
+          "enum": ["UnsupportedShape", "ProceduralCircle", "ProceduralRect", "ProceduralStroke"]
+        },
+        "shape": { "$ref": "#/$defs/shape" },
+        "transform": { "$ref": "#/$defs/transform" },
+        "expressions": { "type": "array", "items": { "type": "string" } },
+        "warnings": { "type": "array", "items": { "$ref": "#/$defs/warning" } }
+      }
+    },
+    "shape": {
+      "type": "object",
+      "properties": {
+        "kind": { "type": "string" },
+        "center": { "$ref": "#/$defs/animatedVector2" },
+        "size": { "$ref": "#/$defs/animatedVector2" },
+        "radius": { "$ref": "#/$defs/animatedFloat" },
+        "cornerRadius": { "$ref": "#/$defs/animatedFloat" },
+        "pathStart": { "$ref": "#/$defs/animatedVector2" },
+        "pathEnd": { "$ref": "#/$defs/animatedVector2" },
+        "fill": { "$ref": "#/$defs/animatedColor" },
+        "stroke": { "$ref": "#/$defs/animatedColor" },
+        "strokeWidth": { "$ref": "#/$defs/animatedFloat" },
+        "trimStart": { "$ref": "#/$defs/animatedFloat" },
+        "trimEnd": { "$ref": "#/$defs/animatedFloat" },
+        "trimOffset": { "$ref": "#/$defs/animatedFloat" }
+      }
+    },
+    "transform": {
+      "type": "object",
+      "properties": {
+        "anchorPoint": { "$ref": "#/$defs/animatedVector3" },
+        "position": { "$ref": "#/$defs/animatedVector3" },
+        "scale": { "$ref": "#/$defs/animatedVector3" },
+        "rotation": { "$ref": "#/$defs/animatedFloat" },
+        "opacity": { "$ref": "#/$defs/animatedFloat" }
+      }
+    },
+    "animatedFloat": {
+      "type": "object",
+      "required": ["staticValue", "keys"],
+      "properties": {
+        "staticValue": { "type": "number" },
+        "expression": { "type": "string" },
+        "keys": { "type": "array", "items": { "$ref": "#/$defs/floatKey" } }
+      }
+    },
+    "animatedVector2": {
+      "type": "object",
+      "required": ["staticValue", "keys"],
+      "properties": {
+        "staticValue": { "$ref": "#/$defs/vector2" },
+        "expression": { "type": "string" },
+        "keys": { "type": "array", "items": { "$ref": "#/$defs/vector2Key" } }
+      }
+    },
+    "animatedVector3": {
+      "type": "object",
+      "required": ["staticValue", "keys"],
+      "properties": {
+        "staticValue": { "$ref": "#/$defs/vector3" },
+        "expression": { "type": "string" },
+        "keys": { "type": "array", "items": { "$ref": "#/$defs/vector3Key" } }
+      }
+    },
+    "animatedColor": {
+      "type": "object",
+      "required": ["staticValue", "keys"],
+      "properties": {
+        "staticValue": { "$ref": "#/$defs/color" },
+        "expression": { "type": "string" },
+        "keys": { "type": "array", "items": { "$ref": "#/$defs/colorKey" } }
+      }
+    },
+    "floatKey": {
+      "type": "object",
+      "required": ["time", "value"],
+      "properties": {
+        "time": { "type": "number" },
+        "value": { "type": "number" },
+        "inInterpolation": { "type": "string" },
+        "outInterpolation": { "type": "string" }
+      }
+    },
+    "vector2Key": {
+      "type": "object",
+      "required": ["time", "value"],
+      "properties": {
+        "time": { "type": "number" },
+        "value": { "$ref": "#/$defs/vector2" },
+        "inInterpolation": { "type": "string" },
+        "outInterpolation": { "type": "string" }
+      }
+    },
+    "vector3Key": {
+      "type": "object",
+      "required": ["time", "value"],
+      "properties": {
+        "time": { "type": "number" },
+        "value": { "$ref": "#/$defs/vector3" },
+        "inInterpolation": { "type": "string" },
+        "outInterpolation": { "type": "string" }
+      }
+    },
+    "colorKey": {
+      "type": "object",
+      "required": ["time", "value"],
+      "properties": {
+        "time": { "type": "number" },
+        "value": { "$ref": "#/$defs/color" },
+        "inInterpolation": { "type": "string" },
+        "outInterpolation": { "type": "string" }
+      }
+    },
+    "vector2": {
+      "type": "object",
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      }
+    },
+    "vector3": {
+      "type": "object",
+      "required": ["x", "y", "z"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "z": { "type": "number" }
+      }
+    },
+    "color": {
+      "type": "object",
+      "required": ["r", "g", "b", "a"],
+      "properties": {
+        "r": { "type": "number" },
+        "g": { "type": "number" },
+        "b": { "type": "number" },
+        "a": { "type": "number" }
+      }
+    },
+    "warning": {
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "message": { "type": "string" },
+        "layerId": { "type": "string" }
+      }
+    }
+  }
+}

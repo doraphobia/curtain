@@ -1,0 +1,202 @@
+{
+  "schemaVersion": "0.2.1",
+  "exporter": "AE2Unity Motion Exporter Sample",
+  "exportedAt": "2026-06-28T00:00:00Z",
+  "comp": {
+    "name": "ProceduralRect",
+    "width": 1080,
+    "height": 1080,
+    "frameRate": 60,
+    "duration": 2,
+    "workAreaStart": 0,
+    "workAreaDuration": 2
+  },
+  "motion": {
+    "units": "pixels",
+    "timeMode": "seconds",
+    "coordinateSystem": "AE_TOP_LEFT",
+    "layers": [
+      {
+        "id": "layer-1",
+        "name": "Rounded Rectangle",
+        "index": 1,
+        "type": "shape",
+        "enabled": true,
+        "inPoint": 0,
+        "outPoint": 2,
+        "parentId": "",
+        "blendMode": "NORMAL",
+        "rendererHint": "ProceduralRect",
+        "shape": {
+          "kind": "rectangle",
+          "center": {
+            "staticValue": { "x": 0, "y": 0 },
+            "expression": "",
+            "keys": []
+          },
+          "size": {
+            "staticValue": { "x": 360, "y": 220 },
+            "expression": "",
+            "keys": [
+              {
+                "time": 0,
+                "value": { "x": 260, "y": 180 },
+                "inInterpolation": "LINEAR",
+                "outInterpolation": "LINEAR"
+              },
+              {
+                "time": 1,
+                "value": { "x": 440, "y": 260 },
+                "inInterpolation": "LINEAR",
+                "outInterpolation": "LINEAR"
+              },
+              {
+                "time": 2,
+                "value": { "x": 320, "y": 220 },
+                "inInterpolation": "LINEAR",
+                "outInterpolation": "LINEAR"
+              }
+            ]
+          },
+          "radius": {
+            "staticValue": 0,
+            "expression": "",
+            "keys": []
+          },
+          "cornerRadius": {
+            "staticValue": 28,
+            "expression": "",
+            "keys": [
+              {
+                "time": 0,
+                "value": 12,
+                "inInterpolation": "LINEAR",
+                "outInterpolation": "LINEAR"
+              },
+              {
+                "time": 1,
+                "value": 64,
+                "inInterpolation": "LINEAR",
+                "outInterpolation": "LINEAR"
+              },
+              {
+                "time": 2,
+                "value": 28,
+                "inInterpolation": "LINEAR",
+                "outInterpolation": "LINEAR"
+              }
+            ]
+          },
+          "pathStart": {
+            "staticValue": { "x": 0, "y": 0 },
+            "expression": "",
+            "keys": []
+          },
+          "pathEnd": {
+            "staticValue": { "x": 0, "y": 0 },
+            "expression": "",
+            "keys": []
+          },
+          "fill": {
+            "staticValue": { "r": 1, "g": 0.36, "b": 0.18, "a": 1 },
+            "expression": "",
+            "keys": []
+          },
+          "stroke": {
+            "staticValue": { "r": 0, "g": 0, "b": 0, "a": 0 },
+            "expression": "",
+            "keys": []
+          },
+          "strokeWidth": {
+            "staticValue": 0,
+            "expression": "",
+            "keys": []
+          },
+          "trimStart": {
+            "staticValue": 0,
+            "expression": "",
+            "keys": []
+          },
+          "trimEnd": {
+            "staticValue": 100,
+            "expression": "",
+            "keys": []
+          },
+          "trimOffset": {
+            "staticValue": 0,
+            "expression": "",
+            "keys": []
+          }
+        },
+        "transform": {
+          "anchorPoint": {
+            "staticValue": { "x": 0, "y": 0, "z": 0 },
+            "expression": "",
+            "keys": []
+          },
+          "position": {
+            "staticValue": { "x": 540, "y": 540, "z": 0 },
+            "expression": "",
+            "keys": [
+              {
+                "time": 0,
+                "value": { "x": 340, "y": 540, "z": 0 },
+                "inInterpolation": "LINEAR",
+                "outInterpolation": "LINEAR"
+              },
+              {
+                "time": 1,
+                "value": { "x": 540, "y": 400, "z": 0 },
+                "inInterpolation": "LINEAR",
+                "outInterpolation": "LINEAR"
+              },
+              {
+                "time": 2,
+                "value": { "x": 740, "y": 540, "z": 0 },
+                "inInterpolation": "LINEAR",
+                "outInterpolation": "LINEAR"
+              }
+            ]
+          },
+          "scale": {
+            "staticValue": { "x": 100, "y": 100, "z": 100 },
+            "expression": "",
+            "keys": []
+          },
+          "rotation": {
+            "staticValue": 0,
+            "expression": "",
+            "keys": [
+              {
+                "time": 0,
+                "value": -8,
+                "inInterpolation": "LINEAR",
+                "outInterpolation": "LINEAR"
+              },
+              {
+                "time": 1,
+                "value": 16,
+                "inInterpolation": "LINEAR",
+                "outInterpolation": "LINEAR"
+              },
+              {
+                "time": 2,
+                "value": -8,
+                "inInterpolation": "LINEAR",
+                "outInterpolation": "LINEAR"
+              }
+            ]
+          },
+          "opacity": {
+            "staticValue": 100,
+            "expression": "",
+            "keys": []
+          }
+        },
+        "expressions": [],
+        "warnings": []
+      }
+    ]
+  },
+  "warnings": []
+}

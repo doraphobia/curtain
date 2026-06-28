@@ -9,6 +9,7 @@
 (function ae2UnityExporter(thisObj) {
     var SCRIPT_NAME = "AE2Unity";
     var SCHEMA_VERSION = "0.1.0";
+    var MOTION_SCHEMA_VERSION = "0.2.1";
     var SETTINGS_SECTION = "AE2Unity";
     var LEGACY_SETTINGS_SECTIONS = ["ae2unityshader", "DuoCurtainAE2UnityShader"];
     var DEFAULT_UNITY_EXPORT_RELATIVE_PATH = "Assets/AE2Unity/Exports";
@@ -146,12 +147,12 @@
         stretchControl(projectPathText, UI_FIELD_WIDTH, 260);
         setHelpTip(projectPathText, "Absolute path to the Unity project root.");
 
-        var exportPathGroup = createFormRow(panel, ".ae2shader Folder", "Unity Assets-relative folder for .ae2shader exports.");
+        var exportPathGroup = createFormRow(panel, "Export Folder", "Unity Assets-relative folder for .ae2shader or .ae2motion exports.");
         compactHide(exportPathGroup);
         exportPathGroup.ae2unityCompactVisibleHeight = UI_COMPACT_ROW_HEIGHT;
         var relativePathText = exportPathGroup.add("edittext", undefined, loadSetting("UnityExportRelativePath", DEFAULT_UNITY_EXPORT_RELATIVE_PATH));
         stretchControl(relativePathText, UI_FIELD_WIDTH, 260);
-        setHelpTip(relativePathText, "Assets-relative folder where Unity imports .ae2shader files.");
+        setHelpTip(relativePathText, "Assets-relative folder where Unity imports .ae2shader or .ae2motion files.");
 
         var compGroup = createFormRow(panel, "Composition", "Choose the AE composition source for this export.");
         compGroup.ae2unityCompositionGroup = true;
@@ -177,10 +178,13 @@
             "Bridge + video",
             "Video only",
             "Direct to Assets",
-            "Manual folder"
+            "Manual folder",
+            "Bridge: Motion runtime",
+            "Direct motion to Assets",
+            "Manual motion folder"
         ]);
         stretchControl(exportModeDropdown, UI_FIELD_WIDTH, 320);
-        setHelpTip(exportModeDropdown, "Bridge creates the Unity prefab/assets. Video modes use Adobe Media Encoder. Direct/manual save .ae2shader files without the bridge receiver.");
+        setHelpTip(exportModeDropdown, "Choose metadata, media, or realtime motion-data export into Unity.");
         exportModeDropdown.selection = getExportModeSelection(loadSetting("ExportMode", "bridge"));
 
         var mediaFolderGroup = createFormRow(panel, "Media Folder", "Unity Assets-relative folder for rendered media.");
@@ -224,6 +228,35 @@
         setHelpTip(bakeAnimationCheckbox, "Render every composition frame to PNG so complex AE comps play correctly in the generated Unity material.");
         bakeAnimationCheckbox.value = loadSetting("BakeAnimationFrames", "true") !== "false";
 
+        var motionOptionsGroup = createFormRow(panel, "Motion", "Realtime motion-data export options.");
+        compactHide(motionOptionsGroup);
+        motionOptionsGroup.ae2unityCompactVisibleHeight = 170;
+        var motionDataCheckbox = motionOptionsGroup.add("checkbox", undefined, "Motion Data");
+        fixedControl(motionDataCheckbox, 130);
+        setHelpTip(motionDataCheckbox, "Export keyframes, transform curves, and shape parameters as .ae2motion data.");
+        motionDataCheckbox.value = loadSetting("ExportMotionData", "true") !== "false";
+        var proceduralShapesCheckbox = motionOptionsGroup.add("checkbox", undefined, "Procedural Shapes");
+        fixedControl(proceduralShapesCheckbox, 160);
+        setHelpTip(proceduralShapesCheckbox, "Convert supported AE shape layers into procedural renderer hints.");
+        proceduralShapesCheckbox.value = loadSetting("ExportProceduralShapes", "true") !== "false";
+        var bakeUnsupportedCheckbox = motionOptionsGroup.add("checkbox", undefined, "Bake Unsupported");
+        fixedControl(bakeUnsupportedCheckbox, 150);
+        setHelpTip(bakeUnsupportedCheckbox, "Mark unsupported features for baking instead of treating them as procedural runtime data.");
+        bakeUnsupportedCheckbox.value = loadSetting("BakeUnsupportedMotion", "false") === "true";
+        var curveDetailDropdown = motionOptionsGroup.add("dropdownlist", undefined, ["Keys Only", "Keys + Ease", "Sampled Curve"]);
+        fixedControl(curveDetailDropdown, 140);
+        setHelpTip(curveDetailDropdown, "Choose how much keyframe curve detail is written into .ae2motion.");
+        curveDetailDropdown.selection = getDropdownSelectionByText(curveDetailDropdown, loadSetting("MotionCurveDetail", "Keys + Ease"));
+        var defaultMotionSampleRate = loadSetting("MotionSampleRate", "");
+        if (!defaultMotionSampleRate) {
+            defaultMotionSampleRate = String(safeNumber(function () {
+                return app.project && app.project.activeItem instanceof CompItem ? app.project.activeItem.frameRate : 24;
+            }, 24));
+        }
+        var sampleRateText = motionOptionsGroup.add("edittext", undefined, defaultMotionSampleRate);
+        fixedControl(sampleRateText, 80);
+        setHelpTip(sampleRateText, "Sample rate for Sampled Curve mode. Empty uses the comp frame rate.");
+
         var runExportButton = panel.add("button", undefined, "Run Export");
         runExportButton.alignment = ["fill", "top"];
         runExportButton.preferredSize.height = 34;
@@ -264,7 +297,11 @@
             },
             {
                 title: "Paths",
-                controls: [pathGroup, exportPathGroup, optionsGroup]
+                controls: [pathGroup, exportPathGroup]
+            },
+            {
+                title: "Options",
+                controls: [optionsGroup, motionOptionsGroup]
             },
             {
                 title: "Media",
@@ -377,6 +414,28 @@
             saveSetting("BakeAnimationFrames", bakeAnimationCheckbox.value ? "true" : "false");
         };
 
+        motionDataCheckbox.onClick = function () {
+            saveSetting("ExportMotionData", motionDataCheckbox.value ? "true" : "false");
+        };
+
+        proceduralShapesCheckbox.onClick = function () {
+            saveSetting("ExportProceduralShapes", proceduralShapesCheckbox.value ? "true" : "false");
+        };
+
+        bakeUnsupportedCheckbox.onClick = function () {
+            saveSetting("BakeUnsupportedMotion", bakeUnsupportedCheckbox.value ? "true" : "false");
+        };
+
+        curveDetailDropdown.onChange = function () {
+            if (curveDetailDropdown.selection) {
+                saveSetting("MotionCurveDetail", curveDetailDropdown.selection.text);
+            }
+        };
+
+        sampleRateText.onChange = function () {
+            saveSetting("MotionSampleRate", sampleRateText.text);
+        };
+
         function runExportAction() {
             try {
                 showStatusResult(panel, status, "Running export...");
@@ -391,7 +450,12 @@
                     startMediaEncoder: startAmeCheckbox.value,
                     exportReferenceFrames: referenceFramesCheckbox.value,
                     exportBakedFrames: bakeAnimationCheckbox.value,
-                    generateShaderAndMaterial: generateShaderCheckbox.value
+                    generateShaderAndMaterial: generateShaderCheckbox.value,
+                    exportMotionData: motionDataCheckbox.value,
+                    exportProceduralShapes: proceduralShapesCheckbox.value,
+                    bakeUnsupportedMotion: bakeUnsupportedCheckbox.value,
+                    motionCurveDetail: curveDetailDropdown.selection ? curveDetailDropdown.selection.text : "Keys + Ease",
+                    motionSampleRate: sampleRateText.text
                 });
                 showStatusResult(panel, status, exportResult);
             } catch (error) {
@@ -1292,6 +1356,14 @@
             messages.push("Bridge job sent: " + bridgeResult.jobId);
         }
 
+        if (mode === "motionBridge") {
+            var motionBridgeResult = sendMotionToUnityBridge(
+                config.projectPath,
+                config.unityExportPath,
+                config);
+            messages.push("Motion bridge job sent: " + motionBridgeResult.jobId);
+        }
+
         if (mode === "media" || mode === "bridgeMedia") {
             var mediaResult = queueMediaEncoderExport(
                 config.comp,
@@ -1317,6 +1389,14 @@
             messages.push("Exported: " + directResult.fsName);
         }
 
+        if (mode === "motionDirect") {
+            var motionDirectResult = exportMotionToUnityProject(
+                config.projectPath,
+                config.unityExportPath,
+                config);
+            messages.push("Exported motion: " + motionDirectResult.fsName);
+        }
+
         if (mode === "folder") {
             var folderResult = exportActiveCompToChosenFolder({
                 comp: config.comp,
@@ -1324,6 +1404,11 @@
                 exportBakedFrames: config.exportBakedFrames
             });
             messages.push("Exported: " + folderResult.fsName);
+        }
+
+        if (mode === "motionFolder") {
+            var motionFolderResult = exportMotionToChosenFolder(config);
+            messages.push("Exported motion: " + motionFolderResult.fsName);
         }
 
         return messages.join(" | ");
@@ -1341,6 +1426,15 @@
         }
         if (value === "folder") {
             return 4;
+        }
+        if (value === "motionBridge") {
+            return 5;
+        }
+        if (value === "motionDirect") {
+            return 6;
+        }
+        if (value === "motionFolder") {
+            return 7;
         }
 
         return 0;
@@ -1360,6 +1454,12 @@
                 return "direct";
             case 4:
                 return "folder";
+            case 5:
+                return "motionBridge";
+            case 6:
+                return "motionDirect";
+            case 7:
+                return "motionFolder";
             default:
                 return "bridge";
         }
@@ -1846,6 +1946,101 @@
         };
     }
 
+    function exportMotionToChosenFolder(options) {
+        var comp = getCompositionFromOptions(options);
+        var folder = Folder.selectDialog("Choose a folder for the .ae2motion export");
+        if (!folder) {
+            throw new Error("Export cancelled.");
+        }
+
+        var exportFolder = getCompositionOutputFolder(folder, comp);
+        ensureFolderExists(exportFolder);
+        return exportMotionToFolder(comp, exportFolder, options);
+    }
+
+    function exportMotionToUnityProject(projectPath, relativePath, options) {
+        var comp = getCompositionFromOptions(options);
+        var projectFolder = new Folder(projectPath);
+        if (!isUnityProjectFolder(projectFolder)) {
+            throw new Error("Choose a Unity project folder that contains Assets and ProjectSettings.");
+        }
+
+        var normalizedRelativePath = normalizeRelativePath(relativePath || DEFAULT_UNITY_EXPORT_RELATIVE_PATH);
+        if (!(normalizedRelativePath === "Assets" || normalizedRelativePath.indexOf("Assets/") === 0)) {
+            normalizedRelativePath = "Assets/" + normalizedRelativePath;
+        }
+
+        saveSetting("UnityProjectPath", projectFolder.fsName);
+        saveSetting("UnityExportRelativePath", normalizedRelativePath);
+
+        var exportFolder = getCompositionOutputFolder(new Folder(joinPath(projectFolder.fsName, normalizedRelativePath)), comp);
+        ensureFolderExists(exportFolder);
+        return exportMotionToFolder(comp, exportFolder, options);
+    }
+
+    function sendMotionToUnityBridge(projectPath, relativePath, options) {
+        var comp = getCompositionFromOptions(options);
+        var projectFolder = new Folder(projectPath);
+        if (!isUnityProjectFolder(projectFolder)) {
+            throw new Error("Choose a Unity project folder that contains Assets and ProjectSettings.");
+        }
+
+        var normalizedRelativePath = normalizeRelativePath(relativePath || DEFAULT_UNITY_EXPORT_RELATIVE_PATH);
+        if (!(normalizedRelativePath === "Assets" || normalizedRelativePath.indexOf("Assets/") === 0)) {
+            normalizedRelativePath = "Assets/" + normalizedRelativePath;
+        }
+
+        saveSetting("UnityProjectPath", projectFolder.fsName);
+        saveSetting("UnityExportRelativePath", normalizedRelativePath);
+
+        var bridgeRoot = new Folder(projectFolder.fsName + "/" + BRIDGE_FOLDER_NAME);
+        var inboxFolder = new Folder(bridgeRoot.fsName + "/inbox");
+        var payloadsFolder = new Folder(bridgeRoot.fsName + "/payloads");
+        var outboxFolder = new Folder(bridgeRoot.fsName + "/outbox");
+        ensureFolderExists(inboxFolder);
+        ensureFolderExists(payloadsFolder);
+        ensureFolderExists(outboxFolder);
+
+        var jobId = createJobId(comp);
+        var payloadFolder = new Folder(payloadsFolder.fsName + "/" + jobId);
+        ensureFolderExists(payloadFolder);
+
+        var payloadFile = exportMotionToFolder(comp, payloadFolder, options);
+        var job = {
+            protocolVersion: "0.1.0",
+            jobId: jobId,
+            command: "ImportAe2Motion",
+            createdAt: new Date().toUTCString(),
+            sender: "After Effects 2026",
+            compName: comp.name,
+            payloadFile: "payloads/" + jobId + "/" + payloadFile.name,
+            referenceFramesFolder: "",
+            unityOutputPath: normalizedRelativePath,
+            overwriteGeneratedAssets: true,
+            generateShaderAndMaterial: !(options && options.generateShaderAndMaterial === false),
+            generateMotionRuntimeAssets: !(options && options.generateShaderAndMaterial === false),
+            generatePrefab: true,
+            refreshAssetDatabase: true
+        };
+
+        var tempJobFile = new File(inboxFolder.fsName + "/" + jobId + ".tmp");
+        writeTextFile(tempJobFile, toJson(job));
+        if (!tempJobFile.rename(jobId + ".job")) {
+            var jobFile = new File(inboxFolder.fsName + "/" + jobId + ".job");
+            writeTextFile(jobFile, toJson(job));
+            try {
+                tempJobFile.remove();
+            } catch (ignoredRemove) {
+            }
+        }
+
+        saveSetting("LastBridgeJobId", jobId);
+        return {
+            jobId: jobId,
+            payloadFile: payloadFile
+        };
+    }
+
     function queueMediaEncoderExport(comp, projectPath, mediaRelativePath, options) {
         options = options || {};
         var projectFolder = new Folder(projectPath);
@@ -2032,7 +2227,7 @@
 
         var document = {
             schemaVersion: SCHEMA_VERSION,
-            exporter: "AE2Unity exporter 0.5.1",
+            exporter: "AE2Unity exporter 0.6.0",
             exportedAt: new Date().toUTCString(),
             comp: collectComp(comp),
             layers: layers,
@@ -2051,6 +2246,476 @@
         outputFile.write(toJson(document));
         outputFile.close();
         return outputFile;
+    }
+
+    function exportMotionToFolder(comp, folder, options) {
+        options = options || {};
+        ensureFolderExists(folder);
+
+        if (options.exportMotionData === false) {
+            throw new Error("Motion Data must be enabled for .ae2motion export.");
+        }
+
+        var document = collectMotionDocument(comp, options);
+        var outputFile = new File(folder.fsName + "/" + sanitizeFileName(comp.name) + ".ae2motion");
+        writeTextFile(outputFile, toJson(document));
+        return outputFile;
+    }
+
+    function collectMotionDocument(comp, options) {
+        var motionOptions = normalizeMotionOptions(comp, options);
+        var warnings = [];
+        var layers = [];
+
+        if (motionOptions.curveDetail === "Sampled Curve") {
+            warnings.push(createMotionWarning(
+                "SAMPLED_CURVE_TODO",
+                "Sampled Curve mode is reserved for a later evaluator pass. This export writes keyframes and interpolation metadata.",
+                ""));
+        }
+
+        for (var i = 1; i <= comp.numLayers; i++) {
+            layers.push(collectMotionLayer(comp.layer(i), motionOptions, warnings));
+        }
+
+        return {
+            schemaVersion: MOTION_SCHEMA_VERSION,
+            exporter: "AE2Unity Motion Exporter 0.6.1",
+            exportedAt: new Date().toUTCString(),
+            comp: collectComp(comp),
+            motion: {
+                units: "pixels",
+                timeMode: "seconds",
+                coordinateSystem: "AE_TOP_LEFT",
+                layers: layers
+            },
+            warnings: warnings
+        };
+    }
+
+    function normalizeMotionOptions(comp, options) {
+        options = options || {};
+        var sampleRate = Number(options.motionSampleRate);
+        if (!isFinite(sampleRate) || sampleRate <= 0) {
+            sampleRate = comp ? Number(comp.frameRate) : 24;
+        }
+
+        return {
+            exportProceduralShapes: options.exportProceduralShapes !== false,
+            bakeUnsupportedMotion: options.bakeUnsupportedMotion === true,
+            curveDetail: options.motionCurveDetail || "Keys + Ease",
+            sampleRate: sampleRate
+        };
+    }
+
+    function collectMotionLayer(layer, options, documentWarnings) {
+        var layerId = "layer-" + layer.index;
+        var layerWarnings = [];
+        var layerType = getLayerType(layer);
+        var shape = collectShapeLayerGeometry(layer, options, layerWarnings, layerId);
+        var expressions = collectLayerExpressions(layer);
+
+        if (safeBoolean(function () { return layer.threeDLayer; }, false)) {
+            layerWarnings.push(createMotionWarning(
+                "THREE_D_LAYER_UNSUPPORTED",
+                "3D layer transforms are preserved as metadata but the MVP motion runtime evaluates 2D shader parameters only.",
+                layerId));
+        }
+
+        if (expressions.length > 0) {
+            layerWarnings.push(createMotionWarning(
+                "EXPRESSION_METADATA_ONLY",
+                "Expressions are exported as text metadata and are not evaluated by the Unity runtime yet.",
+                layerId));
+        }
+
+        if (layerType !== "shape") {
+            layerWarnings.push(createMotionWarning(
+                "NON_SHAPE_LAYER_UNSUPPORTED",
+                "Only AE shape layers can become procedural motion runtime layers in this MVP.",
+                layerId));
+        }
+
+        var rendererHint = detectRendererHint(layer, shape, options);
+
+        var effects = collectEffects(layer, layerWarnings);
+
+        return {
+            id: layerId,
+            name: layer.name,
+            index: layer.index,
+            type: layerType,
+            enabled: layer.enabled,
+            inPoint: layer.inPoint,
+            outPoint: layer.outPoint,
+            parentId: layer.parent ? "layer-" + layer.parent.index : "",
+            blendMode: enumName(safeValue(function () { return layer.blendingMode; }, "NORMAL")),
+            rendererHint: rendererHint,
+            shape: shape,
+            transform: collectMotionTransform(layer, options),
+            timeRemap: null,
+            masks: collectMasks(layer),
+            effects: effects,
+            expressions: expressions,
+            warnings: layerWarnings
+        };
+    }
+
+    function collectMotionTransform(layer, options) {
+        var transform = layer.property("ADBE Transform Group");
+        return {
+            anchorPoint: collectMotionAnimatedVector3(findProperty(transform, "ADBE Anchor Point"), [0, 0, 0], options),
+            position: collectMotionAnimatedVector3(findProperty(transform, "ADBE Position"), [0, 0, 0], options),
+            scale: collectMotionAnimatedVector3(findProperty(transform, "ADBE Scale"), [100, 100, 100], options),
+            rotation: collectMotionAnimatedFloat(findProperty(transform, "ADBE Rotate Z") || findProperty(transform, "ADBE Rotation"), 0, options),
+            opacity: collectMotionAnimatedFloat(findProperty(transform, "ADBE Opacity"), 100, options)
+        };
+    }
+
+    function collectShapeLayerGeometry(layer, options, warnings, layerId) {
+        var shape = createDefaultMotionShape();
+        if (!(layer instanceof ShapeLayer)) {
+            return shape;
+        }
+
+        if (!options.exportProceduralShapes) {
+            warnings.push(createMotionWarning(
+                "PROCEDURAL_SHAPES_DISABLED",
+                "Procedural shape export is disabled, so this shape layer is metadata only.",
+                layerId));
+            return shape;
+        }
+
+        var rootVectors = layer.property("ADBE Root Vectors Group");
+        if (!rootVectors) {
+            warnings.push(createMotionWarning(
+                "SHAPE_ROOT_MISSING",
+                "Shape layer does not expose an ADBE Root Vectors Group.",
+                layerId));
+            return shape;
+        }
+
+        var state = {
+            shape: shape,
+            hasGeometry: false,
+            hasFill: false,
+            hasStroke: false,
+            hasTrim: false
+        };
+
+        collectShapeLayerGeometryRecursive(rootVectors, state, options, warnings, layerId);
+
+        if (!state.hasGeometry) {
+            warnings.push(createMotionWarning(
+                "SHAPE_GEOMETRY_UNSUPPORTED",
+                "No supported ellipse, rectangle, or simple open path was found in this shape layer.",
+                layerId));
+        }
+
+        return shape;
+    }
+
+    function collectShapeLayerGeometryRecursive(group, state, options, warnings, layerId) {
+        if (!group || !group.numProperties) {
+            return;
+        }
+
+        for (var i = 1; i <= group.numProperties; i++) {
+            var property = group.property(i);
+            if (!property) {
+                continue;
+            }
+
+            if (property.matchName === "ADBE Vector Shape - Ellipse" && !state.hasGeometry) {
+                state.shape.kind = "ellipse";
+                state.shape.center = collectMotionAnimatedVector2(findProperty(property, "ADBE Vector Ellipse Position"), [0, 0], options);
+                state.shape.size = collectMotionAnimatedVector2(findProperty(property, "ADBE Vector Ellipse Size"), [100, 100], options);
+                state.shape.radius = collectMotionAnimatedFloat(null, 0, options);
+                state.hasGeometry = true;
+            } else if (property.matchName === "ADBE Vector Shape - Rect" && !state.hasGeometry) {
+                state.shape.kind = "rectangle";
+                state.shape.center = collectMotionAnimatedVector2(findProperty(property, "ADBE Vector Rect Position"), [0, 0], options);
+                state.shape.size = collectMotionAnimatedVector2(findProperty(property, "ADBE Vector Rect Size"), [100, 100], options);
+                state.shape.radius = collectMotionAnimatedFloat(null, 0, options);
+                state.shape.cornerRadius = collectMotionAnimatedFloat(findProperty(property, "ADBE Vector Rect Roundness"), 0, options);
+                state.hasGeometry = true;
+            } else if (property.matchName === "ADBE Vector Shape - Group" && !state.hasGeometry) {
+                collectMotionPathLineGeometry(property, state, options, warnings, layerId);
+            } else if (property.matchName === "ADBE Vector Graphic - Fill" && !state.hasFill) {
+                state.shape.fill = collectMotionAnimatedColor(findProperty(property, "ADBE Vector Fill Color"), [1, 1, 1, 1], options);
+                applyStaticOpacityToMotionColor(state.shape.fill, findProperty(property, "ADBE Vector Fill Opacity"), warnings, layerId, "FILL_OPACITY_KEYS_UNSUPPORTED");
+                state.hasFill = true;
+            } else if (property.matchName === "ADBE Vector Graphic - Stroke" && !state.hasStroke) {
+                state.shape.stroke = collectMotionAnimatedColor(findProperty(property, "ADBE Vector Stroke Color"), [0, 0, 0, 1], options);
+                applyStaticOpacityToMotionColor(state.shape.stroke, findProperty(property, "ADBE Vector Stroke Opacity"), warnings, layerId, "STROKE_OPACITY_KEYS_UNSUPPORTED");
+                state.shape.strokeWidth = collectMotionAnimatedFloat(findProperty(property, "ADBE Vector Stroke Width"), 0, options);
+                state.hasStroke = true;
+            } else if (property.matchName === "ADBE Vector Filter - Trim" && !state.hasTrim) {
+                state.shape.trimStart = collectMotionAnimatedFloat(findProperty(property, "ADBE Vector Trim Start"), 0, options);
+                state.shape.trimEnd = collectMotionAnimatedFloat(findProperty(property, "ADBE Vector Trim End"), 100, options);
+                state.shape.trimOffset = collectMotionAnimatedFloat(findProperty(property, "ADBE Vector Trim Offset"), 0, options);
+                state.hasTrim = true;
+            } else if (property.matchName && property.matchName.indexOf("ADBE Vector Filter") === 0 && property.matchName !== "ADBE Vector Filter - Trim") {
+                warnings.push(createMotionWarning(
+                    "SHAPE_FILTER_UNSUPPORTED",
+                    "Unsupported shape filter preserved as warning: " + property.name,
+                    layerId));
+            }
+
+            collectShapeLayerGeometryRecursive(property, state, options, warnings, layerId);
+        }
+    }
+
+    function collectMotionPathLineGeometry(pathProperty, state, options, warnings, layerId) {
+        var shapeProperty = findProperty(pathProperty, "ADBE Vector Shape");
+        if (!shapeProperty) {
+            warnings.push(createMotionWarning(
+                "MISSING_SHAPE_PATH",
+                "Shape path has no ADBE Vector Shape property.",
+                layerId));
+            return;
+        }
+
+        var shape = safeValue(function () { return shapeProperty.value; }, null);
+        if (!shape || !shape.vertices || shape.vertices.length < 2) {
+            warnings.push(createMotionWarning(
+                "PATH_VERTEX_COUNT_UNSUPPORTED",
+                "Shape path needs at least two vertices to become a procedural stroke.",
+                layerId));
+            return;
+        }
+
+        var vertices = shape.vertices;
+        var start = vertices[0];
+        var end = vertices[vertices.length - 1];
+        state.shape.kind = "path";
+        state.shape.center = collectMotionAnimatedVector2(null, [0, 0], options);
+        state.shape.size = collectMotionAnimatedVector2(null, [
+            Math.abs(Number(end[0]) - Number(start[0])),
+            Math.abs(Number(end[1]) - Number(start[1]))
+        ], options);
+        state.shape.pathStart = collectMotionAnimatedVector2(null, start, options);
+        state.shape.pathEnd = collectMotionAnimatedVector2(null, end, options);
+        state.hasGeometry = true;
+
+        if (shape.closed === true) {
+            warnings.push(createMotionWarning(
+                "PATH_CLOSED_APPROXIMATED",
+                "Closed shape paths are approximated as a single stroke from first vertex to last vertex.",
+                layerId));
+        }
+
+        if (vertices.length > 2) {
+            warnings.push(createMotionWarning(
+                "PATH_MULTI_VERTEX_APPROXIMATED",
+                "Multi-vertex paths are approximated as one line segment from first vertex to last vertex.",
+                layerId));
+        }
+
+        if (pathHasTangents(shape)) {
+            warnings.push(createMotionWarning(
+                "PATH_CURVE_APPROXIMATED",
+                "Bezier path tangents are not evaluated by the procedural stroke shader yet.",
+                layerId));
+        }
+
+        if (safeNumber(function () { return shapeProperty.numKeys; }, 0) > 0) {
+            warnings.push(createMotionWarning(
+                "PATH_KEYFRAMES_UNSUPPORTED",
+                "Animated path vertices are exported from the current value only in this runtime pass.",
+                layerId));
+        }
+    }
+
+    function pathHasTangents(shape) {
+        return tangentListHasNonZero(shape && shape.inTangents) || tangentListHasNonZero(shape && shape.outTangents);
+    }
+
+    function tangentListHasNonZero(points) {
+        if (!points || !points.length) {
+            return false;
+        }
+
+        for (var i = 0; i < points.length; i++) {
+            var point = points[i];
+            if (point && point.length >= 2 && (Math.abs(Number(point[0])) > 0.001 || Math.abs(Number(point[1])) > 0.001)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    function detectRendererHint(layer, shape, options) {
+        if (!shape || !options.exportProceduralShapes) {
+            return "UnsupportedShape";
+        }
+
+        if (shape.kind === "ellipse") {
+            return "ProceduralCircle";
+        }
+        if (shape.kind === "rectangle") {
+            return "ProceduralRect";
+        }
+        if (shape.kind === "path") {
+            return "ProceduralStroke";
+        }
+
+        return "UnsupportedShape";
+    }
+
+    function createDefaultMotionShape() {
+        return {
+            kind: "unsupported",
+            center: collectMotionAnimatedVector2(null, [0, 0], {}),
+            size: collectMotionAnimatedVector2(null, [0, 0], {}),
+            radius: collectMotionAnimatedFloat(null, 0, {}),
+            cornerRadius: collectMotionAnimatedFloat(null, 0, {}),
+            pathStart: collectMotionAnimatedVector2(null, [0, 0], {}),
+            pathEnd: collectMotionAnimatedVector2(null, [0, 0], {}),
+            fill: collectMotionAnimatedColor(null, [1, 1, 1, 1], {}),
+            stroke: collectMotionAnimatedColor(null, [0, 0, 0, 0], {}),
+            strokeWidth: collectMotionAnimatedFloat(null, 0, {}),
+            trimStart: collectMotionAnimatedFloat(null, 0, {}),
+            trimEnd: collectMotionAnimatedFloat(null, 100, {}),
+            trimOffset: collectMotionAnimatedFloat(null, 0, {})
+        };
+    }
+
+    function collectMotionAnimatedFloat(property, fallback, options) {
+        var result = {
+            staticValue: Number(fallback),
+            expression: "",
+            keys: []
+        };
+
+        if (!property) {
+            return result;
+        }
+
+        var value = safeValue(function () { return property.value; }, fallback);
+        if (value instanceof Array) {
+            value = value.length > 0 ? value[0] : fallback;
+        }
+        result.staticValue = Number(value);
+        result.expression = collectExpression(property);
+
+        for (var i = 1; i <= safeNumber(function () { return property.numKeys; }, 0); i++) {
+            var keyValue = property.keyValue(i);
+            if (keyValue instanceof Array) {
+                keyValue = keyValue.length > 0 ? keyValue[0] : fallback;
+            }
+
+            result.keys.push({
+                time: property.keyTime(i),
+                value: Number(keyValue),
+                inInterpolation: collectMotionKeyInterpolation(property, i, true),
+                outInterpolation: collectMotionKeyInterpolation(property, i, false)
+            });
+        }
+
+        return result;
+    }
+
+    function collectMotionAnimatedVector2(property, fallback, options) {
+        var value = property ? safeValue(function () { return property.value; }, fallback) : fallback;
+        var result = {
+            staticValue: vector2Object(value, fallback),
+            expression: property ? collectExpression(property) : "",
+            keys: []
+        };
+
+        if (!property) {
+            return result;
+        }
+
+        for (var i = 1; i <= safeNumber(function () { return property.numKeys; }, 0); i++) {
+            result.keys.push({
+                time: property.keyTime(i),
+                value: vector2Object(property.keyValue(i), fallback),
+                inInterpolation: collectMotionKeyInterpolation(property, i, true),
+                outInterpolation: collectMotionKeyInterpolation(property, i, false)
+            });
+        }
+
+        return result;
+    }
+
+    function collectMotionAnimatedVector3(property, fallback, options) {
+        var value = property ? safeValue(function () { return property.value; }, fallback) : fallback;
+        var result = {
+            staticValue: vector3Object(value, fallback),
+            expression: property ? collectExpression(property) : "",
+            keys: []
+        };
+
+        if (!property) {
+            return result;
+        }
+
+        for (var i = 1; i <= safeNumber(function () { return property.numKeys; }, 0); i++) {
+            result.keys.push({
+                time: property.keyTime(i),
+                value: vector3Object(property.keyValue(i), fallback),
+                inInterpolation: collectMotionKeyInterpolation(property, i, true),
+                outInterpolation: collectMotionKeyInterpolation(property, i, false)
+            });
+        }
+
+        return result;
+    }
+
+    function collectMotionAnimatedColor(property, fallback, options) {
+        var value = property ? safeValue(function () { return property.value; }, fallback) : fallback;
+        var result = {
+            staticValue: colorObject(value, fallback),
+            expression: property ? collectExpression(property) : "",
+            keys: []
+        };
+
+        if (!property) {
+            return result;
+        }
+
+        for (var i = 1; i <= safeNumber(function () { return property.numKeys; }, 0); i++) {
+            result.keys.push({
+                time: property.keyTime(i),
+                value: colorObject(property.keyValue(i), fallback),
+                inInterpolation: collectMotionKeyInterpolation(property, i, true),
+                outInterpolation: collectMotionKeyInterpolation(property, i, false)
+            });
+        }
+
+        return result;
+    }
+
+    function collectMotionKeyInterpolation(property, index, incoming) {
+        return enumName(safeValue(function () {
+            return incoming ? property.keyInInterpolationType(index) : property.keyOutInterpolationType(index);
+        }, "LINEAR")).toUpperCase();
+    }
+
+    function applyStaticOpacityToMotionColor(colorProperty, opacityProperty, warnings, layerId, warningCode) {
+        if (!colorProperty || !opacityProperty) {
+            return;
+        }
+
+        var opacity = collectMotionAnimatedFloat(opacityProperty, 100, {});
+        colorProperty.staticValue.a *= Math.max(0, Math.min(1, opacity.staticValue / 100));
+        if (opacity.keys.length > 0) {
+            warnings.push(createMotionWarning(
+                warningCode,
+                "Animated shape style opacity is not merged into animated color keys yet.",
+                layerId));
+        }
+    }
+
+    function createMotionWarning(code, message, layerId) {
+        return {
+            code: code,
+            message: message,
+            layerId: layerId || ""
+        };
     }
 
     function getCompositionOutputFolder(baseFolder, comp) {
@@ -3223,6 +3888,24 @@
         };
     }
 
+    function vector2Object(value, fallback) {
+        var source = value instanceof Array ? value : fallback;
+        return {
+            x: Number(source.length > 0 ? source[0] : fallback[0]),
+            y: Number(source.length > 1 ? source[1] : fallback[1])
+        };
+    }
+
+    function colorObject(value, fallback) {
+        var source = value instanceof Array ? value : fallback;
+        return {
+            r: Number(source.length > 0 ? source[0] : fallback[0]),
+            g: Number(source.length > 1 ? source[1] : fallback[1]),
+            b: Number(source.length > 2 ? source[2] : fallback[2]),
+            a: Number(source.length > 3 ? source[3] : fallback[3])
+        };
+    }
+
     function enumName(value) {
         var text = String(value);
         var dot = text.lastIndexOf(".");
@@ -3273,6 +3956,11 @@
         var material = matchJsonString(text, "generatedMaterialPath") || "";
         if (material) {
             return status + ": " + message + " -> " + material;
+        }
+
+        var motionData = matchJsonString(text, "generatedMotionDataPath") || "";
+        if (motionData) {
+            return status + ": " + message + " -> " + motionData;
         }
 
         return status + ": " + message;
@@ -3490,6 +4178,22 @@
                 comp: comp,
                 exportReferenceFrames: true,
                 exportBakedFrames: true,
+                generateShaderAndMaterial: true
+            });
+            return result.jobId;
+        },
+        exportMotionCompositionToBridge: function (compName, projectPath, relativePath) {
+            var comp = findCompositionByName(compName);
+            if (!comp) {
+                throw new Error("Composition not found: " + compName);
+            }
+
+            var result = sendMotionToUnityBridge(projectPath, relativePath, {
+                comp: comp,
+                exportMotionData: true,
+                exportProceduralShapes: true,
+                bakeUnsupportedMotion: false,
+                motionCurveDetail: "Keys + Ease",
                 generateShaderAndMaterial: true
             });
             return result.jobId;

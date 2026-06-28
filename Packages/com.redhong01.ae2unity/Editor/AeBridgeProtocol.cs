@@ -13,6 +13,7 @@ namespace AE2Unity.Editor
         public const string OutboxFolderName = "outbox";
         public const string PayloadsFolderName = "payloads";
         public const string CommandImportAe2Shader = "ImportAe2Shader";
+        public const string CommandImportAe2Motion = "ImportAe2Motion";
     }
 
     [Serializable]
@@ -29,6 +30,8 @@ namespace AE2Unity.Editor
         public string unityOutputPath = "Assets/AE2Unity/Exports";
         public bool overwriteGeneratedAssets = true;
         public bool generateShaderAndMaterial = true;
+        public bool generateMotionRuntimeAssets = true;
+        public bool generatePrefab = true;
         public bool refreshAssetDatabase = true;
     }
 
@@ -45,5 +48,7 @@ namespace AE2Unity.Editor
         public string generatedShaderPath = string.Empty;
         public string generatedMaterialPath = string.Empty;
         public string generatedPrefabPath = string.Empty;
+        public string generatedMotionDataPath = string.Empty;
+        public string[] warnings = Array.Empty<string>();
     }
 }

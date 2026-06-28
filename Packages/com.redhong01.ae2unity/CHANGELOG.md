@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.6.1
+
+- Added procedural rounded rectangle and procedural open-path stroke runtime shaders.
+- Updated `.ae2motion` schema to `0.2.1` with `cornerRadius`, `pathStart`, and `pathEnd` shape fields.
+- Updated the AE Motion exporter to emit rectangle roundness and simple shape-path endpoints for procedural stroke rendering.
+- Updated runtime generation to select circle, rectangle, or stroke shaders from the first renderable `rendererHint`.
+- Added Procedural Shape Motion samples for rectangle and trimmed stroke playback.
+
+## 0.6.0
+
+- Added the `.ae2motion` motion-data schema for AE-authored keyframes, procedural shape parameters, renderer hints, expressions, and warnings.
+- Added AE export modes for Motion runtime bridge, direct Unity Assets export, and manual `.ae2motion` folder export.
+- Added `ImportAe2Motion` to AEBridge while preserving the existing `.ae2shader` bridge workflow.
+- Added `AE2MotionData`, `AE2MotionEvaluator`, `AE2MotionPlayer`, and MaterialPropertyBlock shader binding runtime APIs.
+- Added the URP transparent unlit procedural circle shader `AE2Unity/Procedural/Circle Unlit`.
+- Added `.ae2motion` ScriptedImporter, Inspector preview/debug UI, runtime asset generation, and preview GameObject creation.
+- Added the Procedural Circle Motion sample and [Documentation~/ae2motion.schema.json](Documentation~/ae2motion.schema.json).
+
 ## 0.5.1
 
 - Shortened AE panel export-mode labels so dropdown popups stay within the panel.

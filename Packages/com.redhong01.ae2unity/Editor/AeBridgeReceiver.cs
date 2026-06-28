@@ -91,11 +91,21 @@ namespace AE2Unity.Editor
                 throw new InvalidOperationException("Bridge job JSON could not be parsed.");
             }
 
-            if (!string.Equals(job.command, AeBridgeProtocol.CommandImportAe2Shader, StringComparison.Ordinal))
+            if (string.Equals(job.command, AeBridgeProtocol.CommandImportAe2Shader, StringComparison.Ordinal))
             {
-                throw new InvalidOperationException($"Unsupported bridge command: {job.command}");
+                return ExecuteShaderJob(job);
             }
 
+            if (string.Equals(job.command, AeBridgeProtocol.CommandImportAe2Motion, StringComparison.Ordinal))
+            {
+                return ExecuteMotionJob(job);
+            }
+
+            throw new InvalidOperationException($"Unsupported bridge command: {job.command}");
+        }
+
+        private static AeBridgeResult ExecuteShaderJob(AeBridgeJob job)
+        {
             if (string.IsNullOrWhiteSpace(job.payloadFile))
             {
                 throw new InvalidOperationException("Bridge job is missing payloadFile.");
@@ -180,6 +190,90 @@ namespace AE2Unity.Editor
                 result.generatedShaderPath = generationResult.ShaderAssetPath;
                 result.generatedMaterialPath = generationResult.MaterialAssetPath;
                 result.generatedPrefabPath = generationResult.PrefabAssetPath;
+                return result;
+            }
+            finally
+            {
+                IsProcessingBridgeJob = false;
+            }
+        }
+
+        private static AeBridgeResult ExecuteMotionJob(AeBridgeJob job)
+        {
+            if (string.IsNullOrWhiteSpace(job.payloadFile))
+            {
+                throw new InvalidOperationException("Bridge job is missing payloadFile.");
+            }
+
+            var payloadPath = AeBridgePaths.ResolveBridgeRelativePath(job.payloadFile);
+            if (!File.Exists(payloadPath))
+            {
+                throw new FileNotFoundException("Bridge payload was not found.", payloadPath);
+            }
+
+            var payloadJson = File.ReadAllText(payloadPath);
+            var payloadDocument = JsonUtility.FromJson<AE2MotionDocument>(payloadJson);
+
+            var outputAssetFolder = NormalizeAssetFolder(string.IsNullOrWhiteSpace(job.unityOutputPath)
+                ? Ae2ShaderEditorSettings.instance.DefaultBridgeOutputPath
+                : job.unityOutputPath);
+            outputAssetFolder = AppendCompositionFolder(outputAssetFolder, payloadDocument?.comp?.name ?? job.compName);
+
+            Directory.CreateDirectory(outputAssetFolder);
+            var targetAssetPath = Path.Combine(outputAssetFolder, Path.GetFileName(payloadPath));
+            if (!job.overwriteGeneratedAssets && File.Exists(targetAssetPath))
+            {
+                targetAssetPath = AeBridgePaths.MakeUniqueFilePath(outputAssetFolder, Path.GetFileName(payloadPath));
+            }
+
+            File.Copy(payloadPath, targetAssetPath, true);
+
+            var unityAssetPath = AeBridgePaths.ToAssetPath(targetAssetPath);
+            IsProcessingBridgeJob = true;
+            try
+            {
+                AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+                AssetDatabase.ImportAsset(unityAssetPath, ImportAssetOptions.ForceSynchronousImport);
+
+                var result = new AeBridgeResult
+                {
+                    jobId = job.jobId,
+                    command = job.command,
+                    status = "Imported",
+                    completedAt = DateTime.UtcNow.ToString("o"),
+                    message = "Imported .ae2motion payload.",
+                    importedAssetPath = unityAssetPath,
+                    generatedMotionDataPath = unityAssetPath
+                };
+
+                if (!job.generateMotionRuntimeAssets && !job.generateShaderAndMaterial)
+                {
+                    return result;
+                }
+
+                var motionData = AssetDatabase.LoadAssetAtPath<AE2MotionData>(unityAssetPath);
+                if (motionData == null)
+                {
+                    throw new InvalidOperationException($"Imported payload did not produce an AE2MotionData asset: {unityAssetPath}");
+                }
+
+                var generationResult = AE2MotionAssetGenerator.Generate(
+                    motionData,
+                    unityAssetPath,
+                    job.overwriteGeneratedAssets && Ae2ShaderEditorSettings.instance.OverwriteGeneratedAssets,
+                    job.generatePrefab);
+
+                if (!generationResult.Success)
+                {
+                    throw new InvalidOperationException(generationResult.Message);
+                }
+
+                result.status = "Completed";
+                result.message = "Imported AE motion data and generated runtime assets.";
+                result.generatedShaderPath = generationResult.ShaderAssetPath;
+                result.generatedMaterialPath = generationResult.MaterialAssetPath;
+                result.generatedPrefabPath = generationResult.PrefabAssetPath;
+                result.warnings = motionData.ImportWarnings;
                 return result;
             }
             finally
