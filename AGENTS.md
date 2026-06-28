@@ -5,6 +5,7 @@
 - Preserve an asset's designed proportions when normalizing tile/window sizes; snap width to the nearest multiple of `1` and height to the nearest multiple of `5` rather than forcing every piece to one uniform size.
 - `TilePlacementGrid.cellSize` must remain `1x5`, with its origin snapped to the same grid.
 - Room visuals are generated as connected whole planes from adjacent registered room cells. Do not rebuild a visual-tile-prefab-per-cell system unless explicitly requested.
+- `RuntimeTileMesh` uses generic `1x1` logical tile coordinates internally; project-specific world size is applied through `tileSize` (for current rooms, `1x5`).
 - `TilePieceDefinition.cells` is the source of truth for a tile footprint. Keep cells explicit for production prefabs; do not let decorative children auto-generate gameplay cells.
 - `Player` is the physical cursor/body and owns blocking, footsteps, and current-block checks.
 - `Heading Point` is the interaction pointer. Hover-to-interact systems such as curtains, drawing zones, placement previews, and UI-like world boxes must query Heading Point, not Player.

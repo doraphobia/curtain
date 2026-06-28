@@ -1,5 +1,5 @@
-using System;
 using System.Collections.Generic;
+using DuoCurtain.RuntimeTileMesh;
 using UnityEngine;
 
 #if UNITY_EDITOR
@@ -60,6 +60,9 @@ public class TilePlacementGrid : MonoBehaviour
     public Color connectedPlaneFallbackColor = new Color(0.62f, 0.62f, 0.62f, 1f);
     public string connectedPlaneRootName = "__Connected Room Planes";
     public int connectedPlaneSortingOrder = 0;
+    public RuntimeTileMeshUVMode connectedPlaneUvMode = RuntimeTileMeshUVMode.Bounds;
+    public Vector2 connectedPlaneUvTilingScale = Vector2.one;
+    public Vector2 connectedPlaneUvOffset = Vector2.zero;
 
     [Header("Debug")]
     public bool drawDebugOccupiedCells = true;
@@ -454,21 +457,14 @@ public class TilePlacementGrid : MonoBehaviour
         if (component == null || component.Count == 0)
             return;
 
-        Bounds componentBounds = GetComponentWorldBounds(component);
-        List<Vector3> vertices = new List<Vector3>(component.Count * 4);
-        List<Vector2> uvs = new List<Vector2>(component.Count * 4);
-        List<int> triangles = new List<int>(component.Count * 6);
-
-        for (int i = 0; i < component.Count; i++)
-            AddCellQuad(component[i], componentBounds, vertices, uvs, triangles);
-
-        Mesh mesh = new Mesh();
-        mesh.name = "Connected Room Plane Mesh " + index;
-        mesh.SetVertices(vertices);
-        mesh.SetUVs(0, uvs);
-        mesh.SetTriangles(triangles, 0);
-        mesh.RecalculateNormals();
-        mesh.RecalculateBounds();
+        RuntimeTileMeshSettings settings = CreateConnectedPlaneMeshSettings();
+        RuntimeTileMeshComponentResult result = RuntimeTileMeshBuilder.BuildComponent(component, settings);
+        if (!result.success || result.meshData == null)
+        {
+            for (int i = 0; i < result.warnings.Count; i++)
+                Debug.LogWarning("[TilePlacementGrid] Connected room plane " + index + ": " + result.warnings[i], this);
+            return;
+        }
 
         GameObject planeObject = new GameObject("Connected Room Plane " + index);
         Transform planeTransform = planeObject.transform;
@@ -478,73 +474,40 @@ public class TilePlacementGrid : MonoBehaviour
         planeTransform.localScale = Vector3.one;
 
         MeshFilter filter = planeObject.AddComponent<MeshFilter>();
-        filter.sharedMesh = mesh;
+        filter.sharedMesh = result.meshData.ToMesh("Connected Room Plane Mesh " + index, true);
 
         MeshRenderer renderer = planeObject.AddComponent<MeshRenderer>();
         renderer.sharedMaterial = GetConnectedPlaneMaterial();
         renderer.sortingOrder = connectedPlaneSortingOrder;
 
         if (buildConnectedPlaneCollider)
-            AddConnectedPlaneCollider(planeObject, component);
+            AddConnectedPlaneCollider(planeObject, result.meshData);
     }
 
-    private Bounds GetComponentWorldBounds(List<Vector2Int> component)
+    private RuntimeTileMeshSettings CreateConnectedPlaneMeshSettings()
     {
-        Bounds bounds = GetCellWorldBounds(component[0]);
-        for (int i = 1; i < component.Count; i++)
-            bounds.Encapsulate(GetCellWorldBounds(component[i]));
-
-        return bounds;
-    }
-
-    private void AddCellQuad(
-        Vector2Int cell,
-        Bounds componentBounds,
-        List<Vector3> vertices,
-        List<Vector2> uvs,
-        List<int> triangles)
-    {
-        Bounds bounds = GetCellWorldBounds(cell);
-        Vector3 min = bounds.min;
-        Vector3 max = bounds.max;
-        int start = vertices.Count;
-
-        Vector3 bottomLeft = new Vector3(min.x, min.y, 0f);
-        Vector3 bottomRight = new Vector3(max.x, min.y, 0f);
-        Vector3 topRight = new Vector3(max.x, max.y, 0f);
-        Vector3 topLeft = new Vector3(min.x, max.y, 0f);
-
-        vertices.Add(WorldToConnectedPlaneLocal(bottomLeft));
-        vertices.Add(WorldToConnectedPlaneLocal(bottomRight));
-        vertices.Add(WorldToConnectedPlaneLocal(topRight));
-        vertices.Add(WorldToConnectedPlaneLocal(topLeft));
-
-        uvs.Add(GetConnectedPlaneUv(bottomLeft, componentBounds));
-        uvs.Add(GetConnectedPlaneUv(bottomRight, componentBounds));
-        uvs.Add(GetConnectedPlaneUv(topRight, componentBounds));
-        uvs.Add(GetConnectedPlaneUv(topLeft, componentBounds));
-
-        triangles.Add(start);
-        triangles.Add(start + 1);
-        triangles.Add(start + 2);
-        triangles.Add(start);
-        triangles.Add(start + 2);
-        triangles.Add(start + 3);
-    }
-
-    private Vector3 WorldToConnectedPlaneLocal(Vector3 worldPosition)
-    {
-        return transform.InverseTransformPoint(worldPosition);
-    }
-
-    private Vector2 GetConnectedPlaneUv(Vector3 worldPosition, Bounds componentBounds)
-    {
-        float width = Mathf.Max(0.0001f, componentBounds.size.x);
-        float height = Mathf.Max(0.0001f, componentBounds.size.y);
-        return new Vector2(
-            (worldPosition.x - componentBounds.min.x) / width,
-            (worldPosition.y - componentBounds.min.y) / height
+        RuntimeTileMeshSettings settings = RuntimeTileMeshSettings.Default;
+        Vector3 lowerLeftWorld = new Vector3(
+            origin.x - cellSize.x * 0.5f,
+            origin.y - cellSize.y * 0.5f,
+            0f
         );
+        Vector3 lowerLeftLocal = transform.InverseTransformPoint(lowerLeftWorld);
+        Vector3 localCellX = transform.InverseTransformVector(new Vector3(cellSize.x, 0f, 0f));
+        Vector3 localCellY = transform.InverseTransformVector(new Vector3(0f, cellSize.y, 0f));
+
+        settings.origin = new Vector2(lowerLeftLocal.x, lowerLeftLocal.y);
+        settings.tileSize = new Vector2(
+            Mathf.Abs(localCellX.x) <= 0.0001f ? cellSize.x : localCellX.x,
+            Mathf.Abs(localCellY.y) <= 0.0001f ? cellSize.y : localCellY.y
+        );
+        settings.uvMode = connectedPlaneUvMode;
+        settings.uvTilingScale = connectedPlaneUvTilingScale;
+        settings.uvOffset = connectedPlaneUvOffset;
+        settings.markDynamic = true;
+        settings.removeCollinearPoints = true;
+        settings.collinearEpsilon = 0.0001f;
+        return settings;
     }
 
     private Material GetConnectedPlaneMaterial()
@@ -569,135 +532,17 @@ public class TilePlacementGrid : MonoBehaviour
         return runtimeConnectedPlaneMaterial;
     }
 
-    private void AddConnectedPlaneCollider(GameObject planeObject, List<Vector2Int> component)
+    private void AddConnectedPlaneCollider(GameObject planeObject, RuntimeTileMeshData meshData)
     {
-        List<List<Vector2>> paths = BuildBoundaryPaths(component);
-        if (paths.Count == 0)
+        if (meshData == null || meshData.colliderPaths.Count == 0)
             return;
 
         PolygonCollider2D collider = planeObject.AddComponent<PolygonCollider2D>();
         collider.isTrigger = connectedPlaneColliderIsTrigger;
-        collider.pathCount = paths.Count;
+        collider.pathCount = meshData.colliderPaths.Count;
 
-        for (int i = 0; i < paths.Count; i++)
-            collider.SetPath(i, paths[i].ToArray());
-    }
-
-    private List<List<Vector2>> BuildBoundaryPaths(List<Vector2Int> component)
-    {
-        Dictionary<BoundaryEdge, DirectedBoundaryEdge> boundaryEdges =
-            new Dictionary<BoundaryEdge, DirectedBoundaryEdge>();
-
-        for (int i = 0; i < component.Count; i++)
-        {
-            Vector2Int cell = component[i];
-            GridCorner bottomLeft = GetCellCorner(cell, -1, -1);
-            GridCorner bottomRight = GetCellCorner(cell, 1, -1);
-            GridCorner topRight = GetCellCorner(cell, 1, 1);
-            GridCorner topLeft = GetCellCorner(cell, -1, 1);
-
-            AddBoundaryEdge(boundaryEdges, bottomLeft, bottomRight);
-            AddBoundaryEdge(boundaryEdges, bottomRight, topRight);
-            AddBoundaryEdge(boundaryEdges, topRight, topLeft);
-            AddBoundaryEdge(boundaryEdges, topLeft, bottomLeft);
-        }
-
-        HashSet<BoundaryEdge> remaining = new HashSet<BoundaryEdge>(boundaryEdges.Keys);
-        List<List<Vector2>> paths = new List<List<Vector2>>();
-
-        while (remaining.Count > 0)
-        {
-            DirectedBoundaryEdge startEdge = GetFirstRemainingBoundaryEdge(remaining, boundaryEdges);
-            GridCorner start = startEdge.from;
-            GridCorner current = startEdge.from;
-            GridCorner next = startEdge.to;
-            List<Vector2> path = new List<Vector2>();
-            int guard = boundaryEdges.Count + 4;
-
-            path.Add(CornerToConnectedPlaneLocal(current));
-
-            while (guard-- > 0)
-            {
-                BoundaryEdge consumed = new BoundaryEdge(current, next);
-                remaining.Remove(consumed);
-                current = next;
-                path.Add(CornerToConnectedPlaneLocal(current));
-
-                if (current.Equals(start))
-                    break;
-
-                if (!TryGetNextBoundaryCorner(current, remaining, boundaryEdges, out next))
-                    break;
-            }
-
-            if (path.Count > 1 && Approximately(path[0], path[path.Count - 1]))
-                path.RemoveAt(path.Count - 1);
-
-            if (path.Count >= 3)
-                paths.Add(path);
-        }
-
-        return paths;
-    }
-
-    private void AddBoundaryEdge(
-        Dictionary<BoundaryEdge, DirectedBoundaryEdge> boundaryEdges,
-        GridCorner from,
-        GridCorner to)
-    {
-        BoundaryEdge key = new BoundaryEdge(from, to);
-        if (boundaryEdges.ContainsKey(key))
-        {
-            boundaryEdges.Remove(key);
-            return;
-        }
-
-        boundaryEdges.Add(key, new DirectedBoundaryEdge(from, to));
-    }
-
-    private DirectedBoundaryEdge GetFirstRemainingBoundaryEdge(
-        HashSet<BoundaryEdge> remaining,
-        Dictionary<BoundaryEdge, DirectedBoundaryEdge> boundaryEdges)
-    {
-        foreach (BoundaryEdge key in remaining)
-            return boundaryEdges[key];
-
-        return default(DirectedBoundaryEdge);
-    }
-
-    private bool TryGetNextBoundaryCorner(
-        GridCorner current,
-        HashSet<BoundaryEdge> remaining,
-        Dictionary<BoundaryEdge, DirectedBoundaryEdge> boundaryEdges,
-        out GridCorner next)
-    {
-        foreach (BoundaryEdge key in remaining)
-        {
-            DirectedBoundaryEdge edge = boundaryEdges[key];
-            if (!edge.from.Equals(current))
-                continue;
-
-            next = edge.to;
-            return true;
-        }
-
-        next = default(GridCorner);
-        return false;
-    }
-
-    private Vector2 CornerToConnectedPlaneLocal(GridCorner corner)
-    {
-        Vector3 world = new Vector3(
-            origin.x + corner.x * 0.5f * cellSize.x,
-            origin.y + corner.y * 0.5f * cellSize.y,
-            0f
-        );
-        return WorldToConnectedPlaneLocal(world);
-    }
-
-    private static GridCorner GetCellCorner(Vector2Int cell, int xOffset, int yOffset)
-    {
-        return new GridCorner(cell.x * 2 + xOffset, cell.y * 2 + yOffset);
+        for (int i = 0; i < meshData.colliderPaths.Count; i++)
+            collider.SetPath(i, meshData.colliderPaths[i].ToArray());
     }
 
     private void ApplyRoomPieceVisibilityForConnectedPlanes()
@@ -1102,98 +947,6 @@ public class TilePlacementGrid : MonoBehaviour
             return definition.shopData.displayName;
 
         return definition.gameObject != null ? definition.gameObject.name : "Tile";
-    }
-
-    private struct GridCorner : IEquatable<GridCorner>
-    {
-        public readonly int x;
-        public readonly int y;
-
-        public GridCorner(int x, int y)
-        {
-            this.x = x;
-            this.y = y;
-        }
-
-        public bool Equals(GridCorner other)
-        {
-            return x == other.x && y == other.y;
-        }
-
-        public override bool Equals(object obj)
-        {
-            return obj is GridCorner other && Equals(other);
-        }
-
-        public override int GetHashCode()
-        {
-            unchecked
-            {
-                return (x * 397) ^ y;
-            }
-        }
-    }
-
-    private struct BoundaryEdge : IEquatable<BoundaryEdge>
-    {
-        public readonly GridCorner a;
-        public readonly GridCorner b;
-
-        public BoundaryEdge(GridCorner first, GridCorner second)
-        {
-            if (Compare(first, second) <= 0)
-            {
-                a = first;
-                b = second;
-            }
-            else
-            {
-                a = second;
-                b = first;
-            }
-        }
-
-        public bool Equals(BoundaryEdge other)
-        {
-            return a.Equals(other.a) && b.Equals(other.b);
-        }
-
-        public override bool Equals(object obj)
-        {
-            return obj is BoundaryEdge other && Equals(other);
-        }
-
-        public override int GetHashCode()
-        {
-            unchecked
-            {
-                return (a.GetHashCode() * 397) ^ b.GetHashCode();
-            }
-        }
-
-        private static int Compare(GridCorner first, GridCorner second)
-        {
-            int xCompare = first.x.CompareTo(second.x);
-            return xCompare != 0 ? xCompare : first.y.CompareTo(second.y);
-        }
-    }
-
-    private struct DirectedBoundaryEdge
-    {
-        public readonly GridCorner from;
-        public readonly GridCorner to;
-
-        public DirectedBoundaryEdge(GridCorner from, GridCorner to)
-        {
-            this.from = from;
-            this.to = to;
-        }
-    }
-
-    private static bool Approximately(Vector2 a, Vector2 b)
-    {
-        return Mathf.Abs(a.x - b.x) <= 0.0001f &&
-               Mathf.Abs(a.y - b.y) <= 0.0001f;
     }
 
     private static bool TryGetVisualBounds(GameObject root, out Bounds bounds)
