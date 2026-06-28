@@ -22,6 +22,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             failures += ExpectSuccessfulComponents("DiagonalTouch", RuntimeTileMeshDemo.CreateShape(RuntimeTileMeshDemo.DemoShape.DiagonalTouch), settings, 2);
             failures += ExpectHoleWarning("RingWithHole", RuntimeTileMeshDemo.CreateShape(RuntimeTileMeshDemo.DemoShape.RingWithHole), settings);
             failures += ExpectFusionConnectionRules();
+            failures += ExpectFusionBlockMergeRules();
 
             if (failures == 0)
             {
@@ -140,6 +141,177 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
 
             Debug.LogError("[RuntimeTileMeshSelfTest] " + name + " should report an unsupported-hole warning instead of filling the hole.");
             return 1;
+        }
+
+        private static int ExpectFusionBlockMergeRules()
+        {
+            int failures = 0;
+            GameObject controllerObject = new GameObject("RuntimeTileMeshSelfTest Fusion Controller");
+            RuntimeTileMeshFusionSandbox sandbox = controllerObject.AddComponent<RuntimeTileMeshFusionSandbox>();
+            sandbox.gridSize = 1f;
+            sandbox.gridOrigin = Vector2.zero;
+            sandbox.mergeAfterPlacement = true;
+            sandbox.mergeExistingBlocksOnAwake = false;
+            sandbox.snapExistingBlocksOnAwake = false;
+            sandbox.deactivateAbsorbedBlocksImmediately = true;
+
+            List<GameObject> cleanup = new List<GameObject> { controllerObject };
+            try
+            {
+                failures += ExpectBlockMerge(
+                    sandbox,
+                    cleanup,
+                    "Overlap",
+                    new[] { CreateBlockSpec(Vector2Int.zero) },
+                    new[] { CreateBlockSpec(Vector2Int.zero) },
+                    new HashSet<Vector2Int> { Vector2Int.zero },
+                    expectedAbsorbed: 1,
+                    expectedRemainingBlocks: 1);
+
+                failures += ExpectBlockMerge(
+                    sandbox,
+                    cleanup,
+                    "SharedEdge",
+                    new[] { CreateBlockSpec(Vector2Int.zero) },
+                    new[] { CreateBlockSpec(Vector2Int.right) },
+                    new HashSet<Vector2Int> { Vector2Int.zero, Vector2Int.right },
+                    expectedAbsorbed: 1,
+                    expectedRemainingBlocks: 1);
+
+                failures += ExpectBlockMerge(
+                    sandbox,
+                    cleanup,
+                    "ConnectedChain",
+                    new[] { CreateBlockSpec(Vector2Int.zero) },
+                    new[] { CreateBlockSpec(Vector2Int.right), CreateBlockSpec(new Vector2Int(2, 0)) },
+                    new HashSet<Vector2Int> { Vector2Int.zero, Vector2Int.right, new Vector2Int(2, 0) },
+                    expectedAbsorbed: 2,
+                    expectedRemainingBlocks: 1);
+
+                failures += ExpectBlockMerge(
+                    sandbox,
+                    cleanup,
+                    "DiagonalDoesNotMerge",
+                    new[] { CreateBlockSpec(Vector2Int.zero) },
+                    new[] { CreateBlockSpec(Vector2Int.one) },
+                    new HashSet<Vector2Int> { Vector2Int.zero },
+                    expectedAbsorbed: 0,
+                    expectedRemainingBlocks: 2);
+            }
+            finally
+            {
+                for (int i = cleanup.Count - 1; i >= 0; i--)
+                {
+                    if (cleanup[i] != null)
+                        UnityEngine.Object.DestroyImmediate(cleanup[i]);
+                }
+            }
+
+            return failures;
+        }
+
+        private static int ExpectBlockMerge(
+            RuntimeTileMeshFusionSandbox sandbox,
+            List<GameObject> cleanup,
+            string name,
+            IEnumerable<BlockSpec> survivorSpecs,
+            IEnumerable<BlockSpec> candidateSpecs,
+            HashSet<Vector2Int> expectedSurvivorWorldCells,
+            int expectedAbsorbed,
+            int expectedRemainingBlocks)
+        {
+            RuntimeTileMeshDraggableBlock survivor = CreateSelfTestBlock(name + " Survivor", survivorSpecs, cleanup);
+            List<RuntimeTileMeshDraggableBlock> blocks = new List<RuntimeTileMeshDraggableBlock> { survivor };
+            foreach (BlockSpec spec in candidateSpecs)
+                blocks.Add(CreateSelfTestBlock(name + " Candidate", new[] { spec }, cleanup));
+
+            int absorbed = sandbox.MergeConnectedBlocks(survivor, blocks);
+            int failures = 0;
+
+            if (absorbed != expectedAbsorbed)
+            {
+                Debug.LogError("[RuntimeTileMeshSelfTest] Fusion block merge " + name + " expected " + expectedAbsorbed + " absorbed block(s), got " + absorbed + ".");
+                failures++;
+            }
+
+            if (blocks.Count != expectedRemainingBlocks)
+            {
+                Debug.LogError("[RuntimeTileMeshSelfTest] Fusion block merge " + name + " expected " + expectedRemainingBlocks + " remaining block(s), got " + blocks.Count + ".");
+                failures++;
+            }
+
+            HashSet<Vector2Int> actualCells = survivor.GetWorldCells(sandbox.gridSize, sandbox.gridOrigin);
+            if (!CellSetsEqual(actualCells, expectedSurvivorWorldCells))
+            {
+                Debug.LogError("[RuntimeTileMeshSelfTest] Fusion block merge " + name + " produced wrong survivor cells. Expected " + FormatCells(expectedSurvivorWorldCells) + ", got " + FormatCells(actualCells) + ".");
+                failures++;
+            }
+
+            return failures;
+        }
+
+        private static RuntimeTileMeshDraggableBlock CreateSelfTestBlock(
+            string name,
+            IEnumerable<BlockSpec> specs,
+            List<GameObject> cleanup)
+        {
+            List<BlockSpec> specList = new List<BlockSpec>(specs);
+            Vector2Int rootCell = specList.Count > 0 ? specList[0].worldCell : Vector2Int.zero;
+            List<Vector2Int> localCells = new List<Vector2Int>();
+            for (int i = 0; i < specList.Count; i++)
+                localCells.Add(specList[i].worldCell - rootCell);
+
+            GameObject root = new GameObject(name);
+            root.transform.position = new Vector3(rootCell.x, rootCell.y, 0f);
+            cleanup.Add(root);
+
+            RuntimeTileMeshView view = root.AddComponent<RuntimeTileMeshView>();
+            view.tiles = localCells;
+            view.tileSize = Vector2.one;
+            view.rebuildOnStart = false;
+            view.buildPolygonCollider2D = false;
+
+            return root.AddComponent<RuntimeTileMeshDraggableBlock>();
+        }
+
+        private static BlockSpec CreateBlockSpec(Vector2Int worldCell)
+        {
+            return new BlockSpec { worldCell = worldCell };
+        }
+
+        private static bool CellSetsEqual(HashSet<Vector2Int> a, HashSet<Vector2Int> b)
+        {
+            if (a == null || b == null || a.Count != b.Count)
+                return false;
+
+            foreach (Vector2Int cell in a)
+            {
+                if (!b.Contains(cell))
+                    return false;
+            }
+
+            return true;
+        }
+
+        private static string FormatCells(HashSet<Vector2Int> cells)
+        {
+            List<Vector2Int> sorted = new List<Vector2Int>(cells);
+            sorted.Sort((a, b) =>
+            {
+                int yCompare = a.y.CompareTo(b.y);
+                return yCompare != 0 ? yCompare : a.x.CompareTo(b.x);
+            });
+
+            List<string> formatted = new List<string>(sorted.Count);
+            for (int i = 0; i < sorted.Count; i++)
+                formatted.Add("(" + sorted[i].x + "," + sorted[i].y + ")");
+
+            return string.Join(", ", formatted);
+        }
+
+        private struct BlockSpec
+        {
+            public Vector2Int worldCell;
         }
     }
 }

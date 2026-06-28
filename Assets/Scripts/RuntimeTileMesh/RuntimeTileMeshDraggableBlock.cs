@@ -145,6 +145,12 @@ namespace DuoCurtain.RuntimeTileMesh
             return worldCells;
         }
 
+        public void SnapRootToGrid(float gridSize, Vector2 gridOrigin)
+        {
+            Vector2Int rootCell = WorldToCell(transform.position, gridSize, gridOrigin);
+            transform.position = CellToWorld(rootCell, gridSize, gridOrigin, transform.position.z);
+        }
+
         public void ApplyWorldCells(HashSet<Vector2Int> worldCells, float gridSize, Vector2 gridOrigin)
         {
             ResolveView();

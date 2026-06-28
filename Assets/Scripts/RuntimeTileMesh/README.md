@@ -48,6 +48,7 @@ stays separate. The blocks use `WorldTile` projection, so the procedural tile
 continues in world space while the runtime mesh changes shape.
 
 To rebuild that scene, use `Tools/Duo Curtain/Runtime Tile Mesh/Create Test Scene`.
+To verify the mesh and fusion rules, use `Tools/Duo Curtain/Runtime Tile Mesh/Run Self Test`.
 
 To make a new manual test object:
 

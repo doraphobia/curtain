@@ -10,11 +10,18 @@ namespace DuoCurtain.RuntimeTileMesh
         public Camera worldCamera;
         public LayerMask blockLayerMask = ~0;
         public bool preserveGrabOffset = true;
+        public bool snapExistingBlocksOnAwake = true;
+        public bool mergeExistingBlocksOnAwake = true;
 
         [Header("Grid")]
         [Min(0.0001f)]
         public float gridSize = 1f;
         public Vector2 gridOrigin = Vector2.zero;
+
+        [Header("Fusion")]
+        public bool mergeAfterPlacement = true;
+        public bool deactivateAbsorbedBlocksImmediately = true;
+        public bool logFusionEvents = false;
 
         [Header("Visual")]
         public int normalSortingOrder = 0;
@@ -37,6 +44,11 @@ namespace DuoCurtain.RuntimeTileMesh
                 worldCamera = Camera.main;
 
             RefreshBlocks();
+            if (snapExistingBlocksOnAwake)
+                SnapAllBlocksToGrid();
+
+            if (mergeExistingBlocksOnAwake)
+                MergeAllConnectedBlocks();
         }
 
         void Update()
@@ -121,38 +133,200 @@ namespace DuoCurtain.RuntimeTileMesh
 
             placed.SetSelected(false);
             placed.SetSortingOrder(normalSortingOrder);
-            MergeConnectedBlocks(placed);
+            placed.SnapRootToGrid(gridSize, gridOrigin);
+
+            if (mergeAfterPlacement)
+                MergeConnectedBlocks(placed);
         }
 
-        private void MergeConnectedBlocks(RuntimeTileMeshDraggableBlock placed)
+        [ContextMenu("Merge All Connected Blocks")]
+        public int MergeAllConnectedBlocks()
         {
-            if (placed == null)
-                return;
-
             RefreshBlocks();
-            bool merged;
+            return MergeAllConnectedBlocks(blocks);
+        }
+
+        public int MergeAllConnectedBlocks(IList<RuntimeTileMeshDraggableBlock> sourceBlocks)
+        {
+            if (sourceBlocks == null || sourceBlocks.Count == 0)
+                return 0;
+
+            List<RuntimeTileMeshDraggableBlock> activeBlocks = BuildActiveBlockList(sourceBlocks);
+            int absorbedTotal = 0;
+
+            bool mergedThisPass;
             do
             {
-                merged = false;
-                for (int i = blocks.Count - 1; i >= 0; i--)
+                mergedThisPass = false;
+                for (int i = 0; i < activeBlocks.Count; i++)
                 {
-                    RuntimeTileMeshDraggableBlock candidate = blocks[i];
-                    if (candidate == null || candidate == placed)
+                    RuntimeTileMeshDraggableBlock seed = activeBlocks[i];
+                    if (seed == null)
                         continue;
 
-                    if (!placed.OverlapsOrSharesEdgeWith(candidate, gridSize, gridOrigin))
-                        continue;
-
-                    placed.Absorb(candidate, gridSize, gridOrigin);
-                    blocks.RemoveAt(i);
-                    Destroy(candidate.gameObject);
-                    merged = true;
+                    int absorbed = MergeConnectedBlockGroup(seed, activeBlocks);
+                    if (absorbed > 0)
+                    {
+                        absorbedTotal += absorbed;
+                        mergedThisPass = true;
+                        break;
+                    }
                 }
             }
-            while (merged);
+            while (mergedThisPass);
+
+            sourceBlocks.Clear();
+            for (int i = 0; i < activeBlocks.Count; i++)
+            {
+                if (activeBlocks[i] != null)
+                    sourceBlocks.Add(activeBlocks[i]);
+            }
+
+            blocks.Clear();
+            blocks.AddRange(activeBlocks);
+            return absorbedTotal;
+        }
+
+        public int MergeConnectedBlocks(RuntimeTileMeshDraggableBlock placed)
+        {
+            if (placed == null)
+                return 0;
+
+            RefreshBlocks();
+            if (!blocks.Contains(placed))
+                blocks.Add(placed);
+
+            int absorbed = MergeConnectedBlockGroup(placed, blocks);
 
             if (!blocks.Contains(placed))
                 blocks.Add(placed);
+
+            return absorbed;
+        }
+
+        public int MergeConnectedBlocks(
+            RuntimeTileMeshDraggableBlock placed,
+            IList<RuntimeTileMeshDraggableBlock> sourceBlocks)
+        {
+            if (placed == null || sourceBlocks == null)
+                return 0;
+
+            List<RuntimeTileMeshDraggableBlock> activeBlocks = BuildActiveBlockList(sourceBlocks);
+            if (!activeBlocks.Contains(placed))
+                activeBlocks.Add(placed);
+
+            int absorbed = MergeConnectedBlockGroup(placed, activeBlocks);
+
+            sourceBlocks.Clear();
+            for (int i = 0; i < activeBlocks.Count; i++)
+            {
+                if (activeBlocks[i] != null)
+                    sourceBlocks.Add(activeBlocks[i]);
+            }
+
+            blocks.Clear();
+            blocks.AddRange(activeBlocks);
+            return absorbed;
+        }
+
+        private int MergeConnectedBlockGroup(
+            RuntimeTileMeshDraggableBlock seed,
+            List<RuntimeTileMeshDraggableBlock> activeBlocks)
+        {
+            if (seed == null || activeBlocks == null || activeBlocks.Count <= 1)
+                return 0;
+
+            HashSet<RuntimeTileMeshDraggableBlock> group = new HashSet<RuntimeTileMeshDraggableBlock>();
+            HashSet<Vector2Int> mergedCells = seed.GetWorldCells(gridSize, gridOrigin);
+            group.Add(seed);
+
+            bool expanded;
+            do
+            {
+                expanded = false;
+                for (int i = 0; i < activeBlocks.Count; i++)
+                {
+                    RuntimeTileMeshDraggableBlock candidate = activeBlocks[i];
+                    if (candidate == null || group.Contains(candidate))
+                        continue;
+
+                    HashSet<Vector2Int> candidateCells = candidate.GetWorldCells(gridSize, gridOrigin);
+                    if (!RuntimeTileMeshDraggableBlock.CellSetsOverlapOrShareEdge(mergedCells, candidateCells))
+                        continue;
+
+                    group.Add(candidate);
+                    foreach (Vector2Int cell in candidateCells)
+                        mergedCells.Add(cell);
+
+                    expanded = true;
+                }
+            }
+            while (expanded);
+
+            if (group.Count <= 1)
+                return 0;
+
+            seed.SetHovered(false);
+            seed.SetSelected(false);
+            seed.SetSortingOrder(normalSortingOrder);
+            seed.ApplyWorldCells(mergedCells, gridSize, gridOrigin);
+
+            int absorbed = 0;
+            for (int i = activeBlocks.Count - 1; i >= 0; i--)
+            {
+                RuntimeTileMeshDraggableBlock candidate = activeBlocks[i];
+                if (candidate == null || candidate == seed || !group.Contains(candidate))
+                    continue;
+
+                activeBlocks.RemoveAt(i);
+                RemoveAbsorbedBlock(candidate);
+                absorbed++;
+            }
+
+            if (logFusionEvents)
+                Debug.Log("[RuntimeTileMeshFusionSandbox] Merged " + (absorbed + 1) + " block(s) into " + seed.name + " with " + mergedCells.Count + " occupied cell(s).", seed);
+
+            return absorbed;
+        }
+
+        private static List<RuntimeTileMeshDraggableBlock> BuildActiveBlockList(IList<RuntimeTileMeshDraggableBlock> sourceBlocks)
+        {
+            List<RuntimeTileMeshDraggableBlock> activeBlocks = new List<RuntimeTileMeshDraggableBlock>();
+            for (int i = 0; i < sourceBlocks.Count; i++)
+            {
+                RuntimeTileMeshDraggableBlock block = sourceBlocks[i];
+                if (block != null && !activeBlocks.Contains(block))
+                    activeBlocks.Add(block);
+            }
+
+            return activeBlocks;
+        }
+
+        private void RemoveAbsorbedBlock(RuntimeTileMeshDraggableBlock block)
+        {
+            if (block == null)
+                return;
+
+            block.SetHovered(false);
+            block.SetSelected(false);
+
+            if (deactivateAbsorbedBlocksImmediately)
+                block.gameObject.SetActive(false);
+
+            if (Application.isPlaying)
+                Destroy(block.gameObject);
+            else
+                DestroyImmediate(block.gameObject);
+        }
+
+        private void SnapAllBlocksToGrid()
+        {
+            for (int i = 0; i < blocks.Count; i++)
+            {
+                RuntimeTileMeshDraggableBlock block = blocks[i];
+                if (block != null)
+                    block.SnapRootToGrid(gridSize, gridOrigin);
+            }
         }
 
         private RuntimeTileMeshDraggableBlock FindBlockAt(Vector3 worldPoint)

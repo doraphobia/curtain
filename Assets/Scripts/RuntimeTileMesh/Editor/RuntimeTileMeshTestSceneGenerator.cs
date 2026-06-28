@@ -252,6 +252,11 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             sandbox.gridSize = 1f;
             sandbox.gridOrigin = Vector2.zero;
             sandbox.preserveGrabOffset = true;
+            sandbox.snapExistingBlocksOnAwake = true;
+            sandbox.mergeExistingBlocksOnAwake = true;
+            sandbox.mergeAfterPlacement = true;
+            sandbox.deactivateAbsorbedBlocksImmediately = true;
+            sandbox.logFusionEvents = true;
             sandbox.sceneGridHalfExtents = new Vector2Int(10, 6);
         }
 

@@ -2373,8 +2373,13 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 4294967295
   preserveGrabOffset: 1
+  snapExistingBlocksOnAwake: 1
+  mergeExistingBlocksOnAwake: 1
   gridSize: 1
   gridOrigin: {x: 0, y: 0}
+  mergeAfterPlacement: 1
+  deactivateAbsorbedBlocksImmediately: 1
+  logFusionEvents: 1
   normalSortingOrder: 0
   selectedSortingOrder: 10
   drawSceneGrid: 1
