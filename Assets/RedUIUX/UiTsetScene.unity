@@ -695,7 +695,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ac6a265fa977f8d489b6ad3481f6e519, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  cellSize: {x: 5, y: 5}
+  cellSize: {x: 1, y: 5}
   origin: {x: 0, y: 0}
 --- !u!156049354 &208323814
 Grid:

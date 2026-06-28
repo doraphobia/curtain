@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -8,7 +9,10 @@ using UnityEditor;
 [DisallowMultipleComponent]
 public class TilePlacementGrid : MonoBehaviour
 {
-    public const int DefaultTileUnit = 5;
+    public const int DefaultCellWidth = 1;
+    public const int DefaultCellHeight = 5;
+    public const int DefaultTileUnit = DefaultCellWidth;
+    public static readonly Vector2 DefaultCellSize = new Vector2(DefaultCellWidth, DefaultCellHeight);
 
     public struct TileBlockInfo
     {
@@ -26,7 +30,7 @@ public class TilePlacementGrid : MonoBehaviour
     [Header("Grid")]
     [Min(1)]
     public int tileUnit = DefaultTileUnit;
-    public Vector2 cellSize = new Vector2(DefaultTileUnit, DefaultTileUnit);
+    public Vector2 cellSize = new Vector2(DefaultCellWidth, DefaultCellHeight);
     public Vector2 origin;
 
     [Header("Fallback Room Seeding")]
@@ -40,6 +44,22 @@ public class TilePlacementGrid : MonoBehaviour
     [Tooltip("移动路径检测的采样间距，以一个 tile 单元为基准。0.25 表示每 1/4 tile 检查一次。")]
     [Range(0.05f, 1f)]
     public float pathSampleCellStep = 0.25f;
+
+    [Header("Connected Room Plane")]
+    [Tooltip("运行时把所有四向贴合的房间 cells 合并为整体 Mesh 平面。")]
+    public bool buildConnectedRoomPlanes = true;
+    [Tooltip("生成整体平面后隐藏旧的单块 SpriteRenderer，避免旧图像边缘和逻辑边缘不一致。")]
+    public bool hideRoomPieceRenderersForConnectedPlane = true;
+    [Tooltip("生成整体平面后禁用旧的单块 Collider2D，避免独立矩形碰撞覆盖空隙。")]
+    public bool disableRoomPieceCollidersForConnectedPlane = true;
+    [Tooltip("为每个连通房间整体生成 PolygonCollider2D。默认作为 trigger，实际玩家阻挡仍由网格逻辑负责。")]
+    public bool buildConnectedPlaneCollider = true;
+    public bool connectedPlaneColliderIsTrigger = true;
+    [Tooltip("未指定时会创建一个简单的 Sprites/Default 运行时材质；之后可以在这里挂你的整体房间 shader/material。")]
+    public Material connectedPlaneMaterial;
+    public Color connectedPlaneFallbackColor = new Color(0.62f, 0.62f, 0.62f, 1f);
+    public string connectedPlaneRootName = "__Connected Room Planes";
+    public int connectedPlaneSortingOrder = 0;
 
     [Header("Debug")]
     public bool drawDebugOccupiedCells = true;
@@ -64,6 +84,8 @@ public class TilePlacementGrid : MonoBehaviour
     private readonly HashSet<Vector2Int> roomCells = new HashSet<Vector2Int>();
     private readonly Dictionary<Vector2Int, TilePieceDefinition> roomCellDefinitions = new Dictionary<Vector2Int, TilePieceDefinition>();
     private readonly Dictionary<Vector2Int, string> roomCellNames = new Dictionary<Vector2Int, string>();
+    private bool connectedPlanesDirty;
+    private Material runtimeConnectedPlaneMaterial;
 
     void OnValidate()
     {
@@ -77,6 +99,31 @@ public class TilePlacementGrid : MonoBehaviour
 
         if (seedRendererBoundsWhenEmpty && roomCells.Count == 0)
             RegisterSceneRendererBoundsByName(seedRendererNameKeyword);
+    }
+
+    void Start()
+    {
+        QueueConnectedRoomPlaneRebuild();
+    }
+
+    void LateUpdate()
+    {
+        if (!connectedPlanesDirty)
+            return;
+
+        connectedPlanesDirty = false;
+        RebuildConnectedRoomPlanes();
+    }
+
+    void OnDestroy()
+    {
+        if (runtimeConnectedPlaneMaterial != null)
+        {
+            if (Application.isPlaying)
+                Destroy(runtimeConnectedPlaneMaterial);
+            else
+                DestroyImmediate(runtimeConnectedPlaneMaterial);
+        }
     }
 
     public Vector2Int WorldToCell(Vector3 worldPosition)
@@ -140,11 +187,17 @@ public class TilePlacementGrid : MonoBehaviour
         bool isRoomPiece = definition.placementLayer == TilePieceDefinition.PlacementLayer.Tile;
         for (int i = 0; i < definition.Cells.Count; i++)
             RegisterCell(anchorCell + definition.Cells[i], isRoomPiece, definition, GetDefinitionDisplayName(definition));
+
+        if (isRoomPiece)
+            QueueConnectedRoomPlaneRebuild();
     }
 
     public void RegisterCell(Vector2Int cell, bool isRoomCell = true)
     {
         RegisterCell(cell, isRoomCell, null, null);
+
+        if (isRoomCell)
+            QueueConnectedRoomPlaneRebuild();
     }
 
     public void RegisterWorldBounds(Bounds worldBounds)
@@ -179,6 +232,8 @@ public class TilePlacementGrid : MonoBehaviour
 
         if (!registeredAny)
             RegisterCell(WorldToCell(worldBounds.center), true, null, sourceName);
+
+        QueueConnectedRoomPlaneRebuild();
     }
 
     public int OccupiedCount()
@@ -294,6 +349,390 @@ public class TilePlacementGrid : MonoBehaviour
         return new Bounds(center, size);
     }
 
+    [ContextMenu("Rebuild Connected Room Planes")]
+    public void RebuildConnectedRoomPlanes()
+    {
+        DestroyConnectedRoomPlaneRoot();
+
+        if (!buildConnectedRoomPlanes || roomCells.Count == 0)
+            return;
+
+        Transform root = CreateConnectedRoomPlaneRoot();
+        List<List<Vector2Int>> components = CollectConnectedRoomComponents();
+        for (int i = 0; i < components.Count; i++)
+            CreateConnectedRoomPlane(root, components[i], i);
+
+        ApplyRoomPieceVisibilityForConnectedPlanes();
+    }
+
+    private void QueueConnectedRoomPlaneRebuild()
+    {
+        if (!Application.isPlaying || !buildConnectedRoomPlanes)
+            return;
+
+        connectedPlanesDirty = true;
+    }
+
+    private Transform CreateConnectedRoomPlaneRoot()
+    {
+        GameObject rootObject = new GameObject(connectedPlaneRootName);
+        Transform root = rootObject.transform;
+        root.SetParent(transform, false);
+        root.localPosition = Vector3.zero;
+        root.localRotation = Quaternion.identity;
+        root.localScale = Vector3.one;
+        return root;
+    }
+
+    private void DestroyConnectedRoomPlaneRoot()
+    {
+        Transform existingRoot = transform.Find(connectedPlaneRootName);
+        if (existingRoot == null)
+            return;
+
+        MeshFilter[] filters = existingRoot.GetComponentsInChildren<MeshFilter>(true);
+        for (int i = 0; i < filters.Length; i++)
+        {
+            Mesh mesh = filters[i] != null ? filters[i].sharedMesh : null;
+            if (mesh == null)
+                continue;
+
+            if (Application.isPlaying)
+                Destroy(mesh);
+            else
+                DestroyImmediate(mesh);
+        }
+
+        if (Application.isPlaying)
+            Destroy(existingRoot.gameObject);
+        else
+            DestroyImmediate(existingRoot.gameObject);
+    }
+
+    private List<List<Vector2Int>> CollectConnectedRoomComponents()
+    {
+        List<List<Vector2Int>> components = new List<List<Vector2Int>>();
+        HashSet<Vector2Int> remaining = new HashSet<Vector2Int>(roomCells);
+        Queue<Vector2Int> queue = new Queue<Vector2Int>();
+
+        while (remaining.Count > 0)
+        {
+            Vector2Int start = default(Vector2Int);
+            foreach (Vector2Int cell in remaining)
+            {
+                start = cell;
+                break;
+            }
+
+            List<Vector2Int> component = new List<Vector2Int>();
+            remaining.Remove(start);
+            queue.Enqueue(start);
+
+            while (queue.Count > 0)
+            {
+                Vector2Int cell = queue.Dequeue();
+                component.Add(cell);
+
+                for (int i = 0; i < CardinalDirections.Length; i++)
+                {
+                    Vector2Int neighbor = cell + CardinalDirections[i];
+                    if (!remaining.Remove(neighbor))
+                        continue;
+
+                    queue.Enqueue(neighbor);
+                }
+            }
+
+            components.Add(component);
+        }
+
+        return components;
+    }
+
+    private void CreateConnectedRoomPlane(Transform root, List<Vector2Int> component, int index)
+    {
+        if (component == null || component.Count == 0)
+            return;
+
+        Bounds componentBounds = GetComponentWorldBounds(component);
+        List<Vector3> vertices = new List<Vector3>(component.Count * 4);
+        List<Vector2> uvs = new List<Vector2>(component.Count * 4);
+        List<int> triangles = new List<int>(component.Count * 6);
+
+        for (int i = 0; i < component.Count; i++)
+            AddCellQuad(component[i], componentBounds, vertices, uvs, triangles);
+
+        Mesh mesh = new Mesh();
+        mesh.name = "Connected Room Plane Mesh " + index;
+        mesh.SetVertices(vertices);
+        mesh.SetUVs(0, uvs);
+        mesh.SetTriangles(triangles, 0);
+        mesh.RecalculateNormals();
+        mesh.RecalculateBounds();
+
+        GameObject planeObject = new GameObject("Connected Room Plane " + index);
+        Transform planeTransform = planeObject.transform;
+        planeTransform.SetParent(root, false);
+        planeTransform.localPosition = Vector3.zero;
+        planeTransform.localRotation = Quaternion.identity;
+        planeTransform.localScale = Vector3.one;
+
+        MeshFilter filter = planeObject.AddComponent<MeshFilter>();
+        filter.sharedMesh = mesh;
+
+        MeshRenderer renderer = planeObject.AddComponent<MeshRenderer>();
+        renderer.sharedMaterial = GetConnectedPlaneMaterial();
+        renderer.sortingOrder = connectedPlaneSortingOrder;
+
+        if (buildConnectedPlaneCollider)
+            AddConnectedPlaneCollider(planeObject, component);
+    }
+
+    private Bounds GetComponentWorldBounds(List<Vector2Int> component)
+    {
+        Bounds bounds = GetCellWorldBounds(component[0]);
+        for (int i = 1; i < component.Count; i++)
+            bounds.Encapsulate(GetCellWorldBounds(component[i]));
+
+        return bounds;
+    }
+
+    private void AddCellQuad(
+        Vector2Int cell,
+        Bounds componentBounds,
+        List<Vector3> vertices,
+        List<Vector2> uvs,
+        List<int> triangles)
+    {
+        Bounds bounds = GetCellWorldBounds(cell);
+        Vector3 min = bounds.min;
+        Vector3 max = bounds.max;
+        int start = vertices.Count;
+
+        Vector3 bottomLeft = new Vector3(min.x, min.y, 0f);
+        Vector3 bottomRight = new Vector3(max.x, min.y, 0f);
+        Vector3 topRight = new Vector3(max.x, max.y, 0f);
+        Vector3 topLeft = new Vector3(min.x, max.y, 0f);
+
+        vertices.Add(WorldToConnectedPlaneLocal(bottomLeft));
+        vertices.Add(WorldToConnectedPlaneLocal(bottomRight));
+        vertices.Add(WorldToConnectedPlaneLocal(topRight));
+        vertices.Add(WorldToConnectedPlaneLocal(topLeft));
+
+        uvs.Add(GetConnectedPlaneUv(bottomLeft, componentBounds));
+        uvs.Add(GetConnectedPlaneUv(bottomRight, componentBounds));
+        uvs.Add(GetConnectedPlaneUv(topRight, componentBounds));
+        uvs.Add(GetConnectedPlaneUv(topLeft, componentBounds));
+
+        triangles.Add(start);
+        triangles.Add(start + 1);
+        triangles.Add(start + 2);
+        triangles.Add(start);
+        triangles.Add(start + 2);
+        triangles.Add(start + 3);
+    }
+
+    private Vector3 WorldToConnectedPlaneLocal(Vector3 worldPosition)
+    {
+        return transform.InverseTransformPoint(worldPosition);
+    }
+
+    private Vector2 GetConnectedPlaneUv(Vector3 worldPosition, Bounds componentBounds)
+    {
+        float width = Mathf.Max(0.0001f, componentBounds.size.x);
+        float height = Mathf.Max(0.0001f, componentBounds.size.y);
+        return new Vector2(
+            (worldPosition.x - componentBounds.min.x) / width,
+            (worldPosition.y - componentBounds.min.y) / height
+        );
+    }
+
+    private Material GetConnectedPlaneMaterial()
+    {
+        if (connectedPlaneMaterial != null)
+            return connectedPlaneMaterial;
+
+        if (runtimeConnectedPlaneMaterial == null)
+        {
+            Shader shader = Shader.Find("Sprites/Default");
+            if (shader == null)
+                shader = Shader.Find("Unlit/Color");
+
+            if (shader == null)
+                return null;
+
+            runtimeConnectedPlaneMaterial = new Material(shader);
+            runtimeConnectedPlaneMaterial.name = "Duo Curtain Connected Room Plane Material";
+            runtimeConnectedPlaneMaterial.color = connectedPlaneFallbackColor;
+        }
+
+        return runtimeConnectedPlaneMaterial;
+    }
+
+    private void AddConnectedPlaneCollider(GameObject planeObject, List<Vector2Int> component)
+    {
+        List<List<Vector2>> paths = BuildBoundaryPaths(component);
+        if (paths.Count == 0)
+            return;
+
+        PolygonCollider2D collider = planeObject.AddComponent<PolygonCollider2D>();
+        collider.isTrigger = connectedPlaneColliderIsTrigger;
+        collider.pathCount = paths.Count;
+
+        for (int i = 0; i < paths.Count; i++)
+            collider.SetPath(i, paths[i].ToArray());
+    }
+
+    private List<List<Vector2>> BuildBoundaryPaths(List<Vector2Int> component)
+    {
+        Dictionary<BoundaryEdge, DirectedBoundaryEdge> boundaryEdges =
+            new Dictionary<BoundaryEdge, DirectedBoundaryEdge>();
+
+        for (int i = 0; i < component.Count; i++)
+        {
+            Vector2Int cell = component[i];
+            GridCorner bottomLeft = GetCellCorner(cell, -1, -1);
+            GridCorner bottomRight = GetCellCorner(cell, 1, -1);
+            GridCorner topRight = GetCellCorner(cell, 1, 1);
+            GridCorner topLeft = GetCellCorner(cell, -1, 1);
+
+            AddBoundaryEdge(boundaryEdges, bottomLeft, bottomRight);
+            AddBoundaryEdge(boundaryEdges, bottomRight, topRight);
+            AddBoundaryEdge(boundaryEdges, topRight, topLeft);
+            AddBoundaryEdge(boundaryEdges, topLeft, bottomLeft);
+        }
+
+        HashSet<BoundaryEdge> remaining = new HashSet<BoundaryEdge>(boundaryEdges.Keys);
+        List<List<Vector2>> paths = new List<List<Vector2>>();
+
+        while (remaining.Count > 0)
+        {
+            DirectedBoundaryEdge startEdge = GetFirstRemainingBoundaryEdge(remaining, boundaryEdges);
+            GridCorner start = startEdge.from;
+            GridCorner current = startEdge.from;
+            GridCorner next = startEdge.to;
+            List<Vector2> path = new List<Vector2>();
+            int guard = boundaryEdges.Count + 4;
+
+            path.Add(CornerToConnectedPlaneLocal(current));
+
+            while (guard-- > 0)
+            {
+                BoundaryEdge consumed = new BoundaryEdge(current, next);
+                remaining.Remove(consumed);
+                current = next;
+                path.Add(CornerToConnectedPlaneLocal(current));
+
+                if (current.Equals(start))
+                    break;
+
+                if (!TryGetNextBoundaryCorner(current, remaining, boundaryEdges, out next))
+                    break;
+            }
+
+            if (path.Count > 1 && Approximately(path[0], path[path.Count - 1]))
+                path.RemoveAt(path.Count - 1);
+
+            if (path.Count >= 3)
+                paths.Add(path);
+        }
+
+        return paths;
+    }
+
+    private void AddBoundaryEdge(
+        Dictionary<BoundaryEdge, DirectedBoundaryEdge> boundaryEdges,
+        GridCorner from,
+        GridCorner to)
+    {
+        BoundaryEdge key = new BoundaryEdge(from, to);
+        if (boundaryEdges.ContainsKey(key))
+        {
+            boundaryEdges.Remove(key);
+            return;
+        }
+
+        boundaryEdges.Add(key, new DirectedBoundaryEdge(from, to));
+    }
+
+    private DirectedBoundaryEdge GetFirstRemainingBoundaryEdge(
+        HashSet<BoundaryEdge> remaining,
+        Dictionary<BoundaryEdge, DirectedBoundaryEdge> boundaryEdges)
+    {
+        foreach (BoundaryEdge key in remaining)
+            return boundaryEdges[key];
+
+        return default(DirectedBoundaryEdge);
+    }
+
+    private bool TryGetNextBoundaryCorner(
+        GridCorner current,
+        HashSet<BoundaryEdge> remaining,
+        Dictionary<BoundaryEdge, DirectedBoundaryEdge> boundaryEdges,
+        out GridCorner next)
+    {
+        foreach (BoundaryEdge key in remaining)
+        {
+            DirectedBoundaryEdge edge = boundaryEdges[key];
+            if (!edge.from.Equals(current))
+                continue;
+
+            next = edge.to;
+            return true;
+        }
+
+        next = default(GridCorner);
+        return false;
+    }
+
+    private Vector2 CornerToConnectedPlaneLocal(GridCorner corner)
+    {
+        Vector3 world = new Vector3(
+            origin.x + corner.x * 0.5f * cellSize.x,
+            origin.y + corner.y * 0.5f * cellSize.y,
+            0f
+        );
+        return WorldToConnectedPlaneLocal(world);
+    }
+
+    private static GridCorner GetCellCorner(Vector2Int cell, int xOffset, int yOffset)
+    {
+        return new GridCorner(cell.x * 2 + xOffset, cell.y * 2 + yOffset);
+    }
+
+    private void ApplyRoomPieceVisibilityForConnectedPlanes()
+    {
+        if (!hideRoomPieceRenderersForConnectedPlane && !disableRoomPieceCollidersForConnectedPlane)
+            return;
+
+        HashSet<TilePieceDefinition> definitions = new HashSet<TilePieceDefinition>(roomCellDefinitions.Values);
+        foreach (TilePieceDefinition definition in definitions)
+        {
+            if (definition == null)
+                continue;
+
+            if (hideRoomPieceRenderersForConnectedPlane)
+            {
+                SpriteRenderer[] renderers = definition.GetComponents<SpriteRenderer>();
+                for (int i = 0; i < renderers.Length; i++)
+                {
+                    if (renderers[i] != null)
+                        renderers[i].enabled = false;
+                }
+            }
+
+            if (disableRoomPieceCollidersForConnectedPlane)
+            {
+                Collider2D[] colliders = definition.GetComponents<Collider2D>();
+                for (int i = 0; i < colliders.Length; i++)
+                {
+                    if (colliders[i] != null)
+                        colliders[i].enabled = false;
+                }
+            }
+        }
+    }
+
     private void RegisterCell(Vector2Int cell, bool isRoomCell, TilePieceDefinition definition, string sourceName)
     {
         occupiedCells.Add(cell);
@@ -312,14 +751,14 @@ public class TilePlacementGrid : MonoBehaviour
 
     private void NormalizeGridSettings()
     {
-        tileUnit = Mathf.Max(1, Mathf.RoundToInt(tileUnit));
+        tileUnit = DefaultCellWidth;
         cellSize = new Vector2(
-            SnapPositiveToTileMultiple(cellSize.x, tileUnit),
-            SnapPositiveToTileMultiple(cellSize.y, tileUnit)
+            SnapPositiveToTileMultiple(cellSize.x, DefaultCellWidth),
+            SnapPositiveToTileMultiple(cellSize.y, DefaultCellHeight)
         );
         origin = new Vector2(
-            SnapToTileMultiple(origin.x, tileUnit),
-            SnapToTileMultiple(origin.y, tileUnit)
+            SnapToTileMultiple(origin.x, DefaultCellWidth),
+            SnapToTileMultiple(origin.y, DefaultCellHeight)
         );
     }
 
@@ -663,6 +1102,98 @@ public class TilePlacementGrid : MonoBehaviour
             return definition.shopData.displayName;
 
         return definition.gameObject != null ? definition.gameObject.name : "Tile";
+    }
+
+    private struct GridCorner : IEquatable<GridCorner>
+    {
+        public readonly int x;
+        public readonly int y;
+
+        public GridCorner(int x, int y)
+        {
+            this.x = x;
+            this.y = y;
+        }
+
+        public bool Equals(GridCorner other)
+        {
+            return x == other.x && y == other.y;
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is GridCorner other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                return (x * 397) ^ y;
+            }
+        }
+    }
+
+    private struct BoundaryEdge : IEquatable<BoundaryEdge>
+    {
+        public readonly GridCorner a;
+        public readonly GridCorner b;
+
+        public BoundaryEdge(GridCorner first, GridCorner second)
+        {
+            if (Compare(first, second) <= 0)
+            {
+                a = first;
+                b = second;
+            }
+            else
+            {
+                a = second;
+                b = first;
+            }
+        }
+
+        public bool Equals(BoundaryEdge other)
+        {
+            return a.Equals(other.a) && b.Equals(other.b);
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is BoundaryEdge other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                return (a.GetHashCode() * 397) ^ b.GetHashCode();
+            }
+        }
+
+        private static int Compare(GridCorner first, GridCorner second)
+        {
+            int xCompare = first.x.CompareTo(second.x);
+            return xCompare != 0 ? xCompare : first.y.CompareTo(second.y);
+        }
+    }
+
+    private struct DirectedBoundaryEdge
+    {
+        public readonly GridCorner from;
+        public readonly GridCorner to;
+
+        public DirectedBoundaryEdge(GridCorner from, GridCorner to)
+        {
+            this.from = from;
+            this.to = to;
+        }
+    }
+
+    private static bool Approximately(Vector2 a, Vector2 b)
+    {
+        return Mathf.Abs(a.x - b.x) <= 0.0001f &&
+               Mathf.Abs(a.y - b.y) <= 0.0001f;
     }
 
     private static bool TryGetVisualBounds(GameObject root, out Bounds bounds)

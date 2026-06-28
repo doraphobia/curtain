@@ -13,7 +13,8 @@ namespace DuoCurtain.Editor
 {
     public static class GridIntegerNormalizationUtility
     {
-        private const int TileUnit = TilePlacementGrid.DefaultTileUnit;
+        private const int CellWidth = TilePlacementGrid.DefaultCellWidth;
+        private const int CellHeight = TilePlacementGrid.DefaultCellHeight;
         private const string MenuPath = "Tools/Duo Curtain/Grid/Normalize Integer Tile Grid";
         private const string RunOnceMarkerPath = "Temp/DuoCurtainRunGridNormalizationOnce.flag";
 
@@ -150,7 +151,7 @@ namespace DuoCurtain.Editor
                 return false;
 
             bool changed = false;
-            changed |= SetVector2(ref definition.childCellSize, new Vector2(TileUnit, TileUnit));
+            changed |= SetVector2(ref definition.childCellSize, TilePlacementGrid.DefaultCellSize);
 
             if (definition.autoGenerateCellsFromChildren)
             {
@@ -186,16 +187,16 @@ namespace DuoCurtain.Editor
                 return false;
 
             bool changed = false;
-            if (grid.tileUnit != TileUnit)
+            if (grid.tileUnit != CellWidth)
             {
-                grid.tileUnit = TileUnit;
+                grid.tileUnit = CellWidth;
                 changed = true;
             }
 
-            changed |= SetVector2(ref grid.cellSize, new Vector2(TileUnit, TileUnit));
+            changed |= SetVector2(ref grid.cellSize, TilePlacementGrid.DefaultCellSize);
             changed |= SetVector2(ref grid.origin, new Vector2(
-                TilePlacementGrid.SnapToTileMultiple(grid.origin.x, TileUnit),
-                TilePlacementGrid.SnapToTileMultiple(grid.origin.y, TileUnit)
+                TilePlacementGrid.SnapToTileMultiple(grid.origin.x, CellWidth),
+                TilePlacementGrid.SnapToTileMultiple(grid.origin.y, CellHeight)
             ));
 
             if (changed)
@@ -214,8 +215,8 @@ namespace DuoCurtain.Editor
             float currentWorldX = Mathf.Abs(transform.localScale.x * safeParentX);
             float currentWorldY = Mathf.Abs(transform.localScale.y * safeParentY);
             Vector2 targetWorldSize = new Vector2(
-                TilePlacementGrid.SnapPositiveToTileMultiple(currentWorldX, TileUnit),
-                TilePlacementGrid.SnapPositiveToTileMultiple(currentWorldY, TileUnit)
+                TilePlacementGrid.SnapPositiveToTileMultiple(currentWorldX, CellWidth),
+                TilePlacementGrid.SnapPositiveToTileMultiple(currentWorldY, CellHeight)
             );
 
             Vector3 targetLocalScale = transform.localScale;
@@ -229,8 +230,8 @@ namespace DuoCurtain.Editor
             }
 
             Vector3 position = transform.localPosition;
-            position.x = Mathf.Round(position.x);
-            position.y = Mathf.Round(position.y);
+            position.x = TilePlacementGrid.SnapToTileMultiple(position.x, CellWidth);
+            position.y = TilePlacementGrid.SnapToTileMultiple(position.y, CellHeight);
             position.z = Mathf.Round(position.z);
             if (!Approximately(transform.localPosition, position))
             {
@@ -250,8 +251,8 @@ namespace DuoCurtain.Editor
                 return false;
 
             Vector3 worldScale = definition.transform.lossyScale;
-            int width = Mathf.Max(1, Mathf.RoundToInt(Mathf.Abs(worldScale.x) / TileUnit));
-            int height = Mathf.Max(1, Mathf.RoundToInt(Mathf.Abs(worldScale.y) / TileUnit));
+            int width = Mathf.Max(1, Mathf.RoundToInt(Mathf.Abs(worldScale.x) / CellWidth));
+            int height = Mathf.Max(1, Mathf.RoundToInt(Mathf.Abs(worldScale.y) / CellHeight));
 
             List<Vector2Int> targetCells = new List<Vector2Int>(width * height);
             for (int y = 0; y < height; y++)
@@ -345,8 +346,8 @@ namespace DuoCurtain.Editor
                 bool rendererChanged = false;
                 Transform transform = renderer.transform;
                 Vector3 scale = transform.localScale;
-                scale.x = Mathf.Sign(scale.x == 0f ? 1f : scale.x) * TilePlacementGrid.SnapPositiveToTileMultiple(Mathf.Abs(scale.x), TileUnit);
-                scale.y = Mathf.Sign(scale.y == 0f ? 1f : scale.y) * TilePlacementGrid.SnapPositiveToTileMultiple(Mathf.Abs(scale.y), TileUnit);
+                scale.x = Mathf.Sign(scale.x == 0f ? 1f : scale.x) * TilePlacementGrid.SnapPositiveToTileMultiple(Mathf.Abs(scale.x), CellWidth);
+                scale.y = Mathf.Sign(scale.y == 0f ? 1f : scale.y) * TilePlacementGrid.SnapPositiveToTileMultiple(Mathf.Abs(scale.y), CellHeight);
                 if (!Approximately(transform.localScale, scale))
                 {
                     transform.localScale = scale;
@@ -354,8 +355,8 @@ namespace DuoCurtain.Editor
                 }
 
                 Vector3 position = transform.localPosition;
-                position.x = Mathf.Round(position.x);
-                position.y = Mathf.Round(position.y);
+                position.x = TilePlacementGrid.SnapToTileMultiple(position.x, CellWidth);
+                position.y = TilePlacementGrid.SnapToTileMultiple(position.y, CellHeight);
                 position.z = Mathf.Round(position.z);
                 if (!Approximately(transform.localPosition, position))
                 {

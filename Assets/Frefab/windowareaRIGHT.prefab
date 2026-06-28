@@ -579,7 +579,7 @@ MonoBehaviour:
   cells:
   - {x: 0, y: 0}
   autoGenerateCellsFromChildren: 0
-  childCellSize: {x: 5, y: 5}
+  childCellSize: {x: 1, y: 5}
   includeRootCell: 1
   shopData:
     displayName: Window RIght
