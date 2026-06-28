@@ -19,6 +19,7 @@ namespace DuoCurtain.RuntimeTileMesh
         }
 
         public DemoShape shape = DemoShape.L;
+        public bool applyShapeOnStart = true;
         public bool rebuildOnValidate = true;
 
         private RuntimeTileMeshView view;
@@ -30,7 +31,8 @@ namespace DuoCurtain.RuntimeTileMesh
 
         void Start()
         {
-            ApplyShape();
+            if (applyShapeOnStart)
+                ApplyShape();
         }
 
         void OnValidate()

@@ -103,6 +103,7 @@ namespace DuoCurtain.RuntimeTileMesh
                 return result;
             }
 
+            ReverseTriangleWinding(meshData.triangles);
             meshData.bounds = PolygonUtility.CalculateBounds(outer);
             TileMeshUVGenerator.GenerateUVs(meshData.vertices, meshData.bounds, settings, meshData.uvs);
             result.meshData = meshData;
@@ -151,6 +152,16 @@ namespace DuoCurtain.RuntimeTileMesh
             }
 
             return bestIndex;
+        }
+
+        private static void ReverseTriangleWinding(List<int> triangles)
+        {
+            for (int i = 0; i + 2 < triangles.Count; i += 3)
+            {
+                int first = triangles[i];
+                triangles[i] = triangles[i + 2];
+                triangles[i + 2] = first;
+            }
         }
     }
 }

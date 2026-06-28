@@ -21,6 +21,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             failures += ExpectSuccessfulComponents("Z", RuntimeTileMeshDemo.CreateShape(RuntimeTileMeshDemo.DemoShape.Z), settings, 1);
             failures += ExpectSuccessfulComponents("DiagonalTouch", RuntimeTileMeshDemo.CreateShape(RuntimeTileMeshDemo.DemoShape.DiagonalTouch), settings, 2);
             failures += ExpectHoleWarning("RingWithHole", RuntimeTileMeshDemo.CreateShape(RuntimeTileMeshDemo.DemoShape.RingWithHole), settings);
+            failures += ExpectFusionConnectionRules();
 
             if (failures == 0)
             {
@@ -57,6 +58,13 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                 {
                     Debug.LogError("[RuntimeTileMeshSelfTest] " + name + " component " + i + " did not generate triangles.");
                     failures++;
+                    continue;
+                }
+
+                if (!FirstTriangleFacesDefault2DCamera(component.meshData))
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] " + name + " component " + i + " triangle winding faces away from the default 2D camera.");
+                    failures++;
                 }
             }
 
@@ -70,6 +78,45 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             }
 
             return failures;
+        }
+
+        private static bool FirstTriangleFacesDefault2DCamera(RuntimeTileMeshData meshData)
+        {
+            if (meshData == null || meshData.triangles.Count < 3)
+                return false;
+
+            Vector3 a = meshData.vertices[meshData.triangles[0]];
+            Vector3 b = meshData.vertices[meshData.triangles[1]];
+            Vector3 c = meshData.vertices[meshData.triangles[2]];
+            float z = Vector3.Cross(b - a, c - a).z;
+            return z < -0.000001f;
+        }
+
+        private static int ExpectFusionConnectionRules()
+        {
+            int failures = 0;
+            HashSet<Vector2Int> baseCells = new HashSet<Vector2Int> { Vector2Int.zero };
+
+            failures += ExpectCellConnection("Overlap", baseCells, new HashSet<Vector2Int> { Vector2Int.zero }, true);
+            failures += ExpectCellConnection("HorizontalEdge", baseCells, new HashSet<Vector2Int> { Vector2Int.right }, true);
+            failures += ExpectCellConnection("VerticalEdge", baseCells, new HashSet<Vector2Int> { Vector2Int.up }, true);
+            failures += ExpectCellConnection("DiagonalCorner", baseCells, new HashSet<Vector2Int> { Vector2Int.one }, false);
+            failures += ExpectCellConnection("OneCellGap", baseCells, new HashSet<Vector2Int> { new Vector2Int(2, 0) }, false);
+            return failures;
+        }
+
+        private static int ExpectCellConnection(
+            string name,
+            HashSet<Vector2Int> ownCells,
+            HashSet<Vector2Int> otherCells,
+            bool expected)
+        {
+            bool actual = RuntimeTileMeshDraggableBlock.CellSetsOverlapOrShareEdge(ownCells, otherCells);
+            if (actual == expected)
+                return 0;
+
+            Debug.LogError("[RuntimeTileMeshSelfTest] Fusion connection rule " + name + " expected " + expected + ", got " + actual + ".");
+            return 1;
         }
 
         private static int ExpectHoleWarning(

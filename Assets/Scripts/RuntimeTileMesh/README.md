@@ -25,6 +25,17 @@ Triangulation:
 
 Testing:
 
+Use `Assets/Scenes/RuntimeTileMeshTest.unity` as the main manual test scene. It contains
+an interactive fusion sandbox for dragging white connected planes on a `1x1`
+test grid. Hover fades a block red, click selects it blue, movement snaps to
+the grid, and clicking again places it. Placed blocks merge into one new block
+when their occupied cells overlap or share an edge. Diagonal corner-only contact
+stays separate.
+
+To rebuild that scene, use `Tools/Duo Curtain/Runtime Tile Mesh/Create Test Scene`.
+
+To make a new manual test object:
+
 1. Create an empty GameObject.
 2. Add `RuntimeTileMeshView`.
 3. Add `RuntimeTileMeshDemo`.
@@ -38,3 +49,4 @@ Expected behavior:
 - `L`, `T`, and `Z` triangulate as one concave mesh per connected component.
 - `DiagonalTouch` creates two separate component meshes because corner contact is not a four-neighbor connection.
 - `RingWithHole` logs a warning with the fallback triangulator instead of silently filling the hole.
+- In the fusion sandbox, overlap and exact edge contact merge blocks; diagonal corner contact does not.
