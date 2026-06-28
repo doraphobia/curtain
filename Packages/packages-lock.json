@@ -15,9 +15,7 @@
       "source": "embedded",
       "dependencies": {
         "com.unity.nuget.newtonsoft-json": "3.2.2",
-        "com.unity.textmeshpro": "2.1.4",
-        "com.unity.ugui": "2.0.0",
-        "com.unity.vectorgraphics": "2.0.0-preview.25"
+        "com.unity.ugui": "2.0.0"
       }
     },
     "com.unity.2d.animation": {
@@ -304,15 +302,6 @@
       },
       "url": "https://packages.unity.com"
     },
-    "com.unity.textmeshpro": {
-      "version": "2.1.4",
-      "depth": 0,
-      "source": "registry",
-      "dependencies": {
-        "com.unity.ugui": "1.0.0"
-      },
-      "url": "https://packages.unity.com"
-    },
     "com.unity.timeline": {
       "version": "1.8.10",
       "depth": 0,
@@ -333,25 +322,6 @@
         "com.unity.modules.ui": "1.0.0",
         "com.unity.modules.imgui": "1.0.0"
       }
-    },
-    "com.unity.vectorgraphics": {
-      "version": "2.0.0-preview.25",
-      "depth": 0,
-      "source": "registry",
-      "dependencies": {
-        "com.unity.ugui": "1.0.0",
-        "com.unity.2d.sprite": "1.0.0",
-        "com.unity.modules.ui": "1.0.0",
-        "com.unity.modules.physics": "1.0.0",
-        "com.unity.modules.animation": "1.0.0",
-        "com.unity.modules.physics2d": "1.0.0",
-        "com.unity.modules.uielements": "1.0.0",
-        "com.unity.modules.imageconversion": "1.0.0",
-        "com.unity.modules.unitywebrequest": "1.0.0",
-        "com.unity.modules.unitywebrequestwww": "1.0.0",
-        "com.unity.modules.unitywebrequesttexture": "1.0.0"
-      },
-      "url": "https://packages.unity.com"
     },
     "com.unity.visualscripting": {
       "version": "1.9.9",

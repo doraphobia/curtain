@@ -23,9 +23,7 @@ namespace FigmaImporter.Editor
         private static readonly PackageDescriptor[] RequiredPackages =
         {
             new PackageDescriptor("com.unity.nuget.newtonsoft-json", "com.unity.nuget.newtonsoft-json"),
-            new PackageDescriptor("com.unity.ugui", "com.unity.ugui"),
-            new PackageDescriptor("com.unity.textmeshpro", "com.unity.textmeshpro"),
-            new PackageDescriptor("com.unity.vectorgraphics", "com.unity.vectorgraphics@2.0.0-preview.25", "com.unity.vectorgraphics")
+            new PackageDescriptor("com.unity.ugui", "com.unity.ugui")
         };
 
         static FigmaPackageBootstrapper()
@@ -181,16 +179,6 @@ namespace FigmaImporter.Editor
                 var missingPackages = new List<PackageDescriptor>();
                 foreach (var required in RequiredPackages)
                 {
-                    if (string.Equals(required.Name, "com.unity.textmeshpro", StringComparison.OrdinalIgnoreCase) &&
-                        IsTextMeshProAvailable())
-                    {
-                        if (force)
-                        {
-                            Debug.Log("[FigmaImporter] Skip 'com.unity.textmeshpro' because TMPro types are already available.");
-                        }
-                        continue;
-                    }
-
                     var found = false;
                     foreach (var installed in installedPackages)
                     {

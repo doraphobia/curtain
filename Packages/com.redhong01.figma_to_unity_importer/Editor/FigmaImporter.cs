@@ -1724,7 +1724,9 @@ namespace FigmaImporter.Editor
 #if VECTOR_GRAHICS_IMPORTED
             return Task.CompletedTask;
 #else
-            return EnsureVectorGraphicsInstalledIfNeededInternal(cancellationToken);
+            // Unity 6000.3 currently fails to compile com.unity.vectorgraphics@2.0.0-preview.25.
+            // Keep SVG-specific code disabled and use the existing PNG/native fallback path.
+            return Task.CompletedTask;
 #endif
         }
 
