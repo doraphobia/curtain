@@ -16,10 +16,7 @@ namespace DuoCurtain.Editor
         private const string SilenceMenuPath = "Tools/Duo Curtain/DOTween/Silence Editor Tools";
         private const string DOTweenEditorDllPath = "Assets/Plugins/Demigiant/DOTween/Editor/DOTweenEditor.dll";
         private const string DOTweenUpgradeManagerDllPath = "Assets/Plugins/Demigiant/DOTween/Editor/DOTweenUpgradeManager.dll";
-        private const double SuppressionWindowSeconds = 30.0d;
 
-        private static double suppressUntilTime;
-        private static bool manualOpenRequested;
         private static int openPanelAttempts;
 
         static DOTweenStartupPopupSuppressor()
@@ -29,15 +26,12 @@ namespace DuoCurtain.Editor
                 return;
             }
 
-            suppressUntilTime = EditorApplication.timeSinceStartup + SuppressionWindowSeconds;
             AppDomain.CurrentDomain.AssemblyLoad += OnAssemblyLoaded;
             EditorApplication.delayCall += EnforceSilentMode;
-            EditorApplication.update += SuppressDOTweenStartupWindows;
 
             if (EditorPrefs.GetBool(EditorToolsEnabledKey, false) &&
                 SessionState.GetBool(OpenPanelRequestedKey, false))
             {
-                manualOpenRequested = true;
                 EditorApplication.delayCall += TryOpenDOTweenUtilityPanel;
             }
         }
@@ -45,7 +39,6 @@ namespace DuoCurtain.Editor
         [MenuItem(EnableMenuPath)]
         private static void EnableEditorToolsAndOpenPanel()
         {
-            manualOpenRequested = true;
             openPanelAttempts = 0;
             SessionState.SetBool(OpenPanelRequestedKey, true);
             EditorPrefs.SetBool(EditorToolsEnabledKey, true);
@@ -63,10 +56,8 @@ namespace DuoCurtain.Editor
         [MenuItem(SilenceMenuPath)]
         private static void SilenceEditorTools()
         {
-            manualOpenRequested = false;
             openPanelAttempts = 0;
             SessionState.SetBool(OpenPanelRequestedKey, false);
-            suppressUntilTime = EditorApplication.timeSinceStartup + SuppressionWindowSeconds;
             EditorPrefs.SetBool(EditorToolsEnabledKey, false);
             SetDOTweenEditorToolsEnabled(false);
             MarkDOTweenSetupDialogAsHandled();
@@ -91,24 +82,6 @@ namespace DuoCurtain.Editor
             CloseDOTweenEditorWindows();
         }
 
-        private static void SuppressDOTweenStartupWindows()
-        {
-            if (EditorApplication.timeSinceStartup > suppressUntilTime)
-            {
-                EditorApplication.update -= SuppressDOTweenStartupWindows;
-                AppDomain.CurrentDomain.AssemblyLoad -= OnAssemblyLoaded;
-                return;
-            }
-
-            if (manualOpenRequested)
-            {
-                return;
-            }
-
-            MarkDOTweenSetupDialogAsHandled();
-            CloseDOTweenEditorWindows();
-        }
-
         private static void OnAssemblyLoaded(object sender, AssemblyLoadEventArgs args)
         {
             var assemblyName = args.LoadedAssembly.GetName().Name;
@@ -117,7 +90,7 @@ namespace DuoCurtain.Editor
                 return;
             }
 
-            MarkDOTweenSetupDialogAsHandled();
+            MarkDOTweenSetupDialogAsHandled(args.LoadedAssembly);
         }
 
         private static void SetDOTweenEditorToolsEnabled(bool enabled)
@@ -163,7 +136,6 @@ namespace DuoCurtain.Editor
 
             if (EditorApplication.ExecuteMenuItem(DOTweenMenuPath))
             {
-                manualOpenRequested = false;
                 SessionState.SetBool(OpenPanelRequestedKey, false);
                 StopStartupSuppression();
                 return;
@@ -176,7 +148,6 @@ namespace DuoCurtain.Editor
         {
             if (openPanelAttempts >= 20)
             {
-                manualOpenRequested = false;
                 SessionState.SetBool(OpenPanelRequestedKey, false);
                 Debug.LogWarning("[DuoCurtain] DOTween editor tools were enabled, but the DOTween Utility Panel menu was not available yet.");
                 return;
@@ -187,44 +158,63 @@ namespace DuoCurtain.Editor
 
         private static void StopStartupSuppression()
         {
-            suppressUntilTime = 0.0d;
-            EditorApplication.update -= SuppressDOTweenStartupWindows;
             AppDomain.CurrentDomain.AssemblyLoad -= OnAssemblyLoaded;
         }
 
         private static void MarkDOTweenSetupDialogAsHandled()
         {
+            var dotweenEditorAssembly = GetDOTweenEditorAssembly();
+            if (dotweenEditorAssembly == null)
+            {
+                return;
+            }
+
+            MarkDOTweenSetupDialogAsHandled(dotweenEditorAssembly);
+        }
+
+        private static Assembly GetDOTweenEditorAssembly()
+        {
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
-                Type[] types;
-                try
+                if (assembly.GetName().Name == "DOTweenEditor")
                 {
-                    types = assembly.GetTypes();
+                    return assembly;
                 }
-                catch (ReflectionTypeLoadException exception)
-                {
-                    types = exception.Types;
-                }
-                catch
+            }
+
+            return null;
+        }
+
+        private static void MarkDOTweenSetupDialogAsHandled(Assembly assembly)
+        {
+            Type[] types;
+            try
+            {
+                types = assembly.GetTypes();
+            }
+            catch (ReflectionTypeLoadException exception)
+            {
+                types = exception.Types;
+            }
+            catch
+            {
+                return;
+            }
+
+            if (types == null)
+            {
+                return;
+            }
+
+            foreach (var type in types)
+            {
+                if (type == null || !IsDOTweenEditorType(type))
                 {
                     continue;
                 }
 
-                if (types == null)
-                {
-                    continue;
-                }
-
-                foreach (var type in types)
-                {
-                    if (type == null || !IsDOTweenEditorType(type))
-                    {
-                        continue;
-                    }
-
-                    SetBoolField(type, "_setupDialogRequested", true);
-                    SetBoolField(type, "_setupRequired", false);
-                }
+                SetBoolField(type, "_setupDialogRequested", true);
+                SetBoolField(type, "_setupRequired", false);
             }
         }
 
