@@ -1,10 +1,13 @@
 #if UNITY_EDITOR
+using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using Object = UnityEngine.Object;
 
 namespace DuoCurtain.Editor
 {
@@ -487,6 +490,563 @@ namespace DuoCurtain.Editor
         private static bool Approximately(Vector3 a, Vector3 b)
         {
             return Approximately(a.x, b.x) && Approximately(a.y, b.y) && Approximately(a.z, b.z);
+        }
+    }
+
+    [InitializeOnLoad]
+    internal static class DuoCurtainAutoReload
+    {
+        private const string EnabledKey = "DuoCurtain.AutoReload.Enabled";
+        private const string ToggleMenuPath = "Tools/Duo Curtain/Auto Reload/Enabled";
+        private const string ReloadNowMenuPath = "Tools/Duo Curtain/Auto Reload/Reload Project Now";
+        private const double DebounceSeconds = 0.75d;
+        private const double BusyRetrySeconds = 1.5d;
+        private const double WatcherSuppressionSeconds = 2d;
+
+        private static readonly object PendingLock = new object();
+        private static readonly HashSet<string> PendingPaths =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly List<FileSystemWatcher> Watchers = new List<FileSystemWatcher>();
+
+        private static long lastChangeUtcTicks;
+        private static long suppressWatcherUntilUtcTicks;
+        private static bool forceFullReload;
+        private static bool initialized;
+        private static volatile bool autoReloadEnabled;
+        private static bool ownsAutoRefreshLock;
+
+        static DuoCurtainAutoReload()
+        {
+            if (Application.isBatchMode)
+                return;
+
+            autoReloadEnabled = EditorPrefs.GetBool(EnabledKey, true);
+            AcquireAutoRefreshLock();
+            EditorApplication.update += Tick;
+            EditorApplication.quitting += Shutdown;
+            AssemblyReloadEvents.beforeAssemblyReload += Shutdown;
+            EditorSceneManager.sceneSaved += OnSceneSaved;
+            EditorApplication.delayCall += Initialize;
+        }
+
+        [MenuItem(ToggleMenuPath)]
+        private static void ToggleAutoReload()
+        {
+            bool enabled = !IsEnabled;
+            EditorPrefs.SetBool(EnabledKey, enabled);
+            autoReloadEnabled = enabled;
+
+            if (enabled)
+            {
+                AcquireAutoRefreshLock();
+                Initialize();
+                QueueFullReload();
+            }
+            else
+            {
+                DisposeWatchers();
+                ClearPendingChanges();
+                initialized = false;
+                ReleaseAutoRefreshLock();
+            }
+
+            Debug.Log("[DuoCurtain Auto Reload] " + (enabled ? "Enabled." : "Disabled."));
+        }
+
+        [MenuItem(ToggleMenuPath, true)]
+        private static bool ValidateToggleAutoReload()
+        {
+            Menu.SetChecked(ToggleMenuPath, IsEnabled);
+            return true;
+        }
+
+        [MenuItem(ReloadNowMenuPath)]
+        private static void ReloadProjectNow()
+        {
+            QueueFullReload();
+        }
+
+        private static bool IsEnabled
+        {
+            get { return autoReloadEnabled; }
+        }
+
+        private static string ProjectRoot
+        {
+            get { return Path.GetFullPath(Path.Combine(Application.dataPath, "..")); }
+        }
+
+        private static void Initialize()
+        {
+            if (initialized || !IsEnabled)
+                return;
+
+            AcquireAutoRefreshLock();
+            initialized = true;
+            CreateWatcher("Assets");
+            CreateWatcher("Packages");
+            CreateWatcher("ProjectSettings");
+            Debug.Log("[DuoCurtain Auto Reload] Watching Assets, Packages, and ProjectSettings.");
+        }
+
+        private static void CreateWatcher(string projectRelativeDirectory)
+        {
+            string absolutePath = Path.Combine(ProjectRoot, projectRelativeDirectory);
+            if (!Directory.Exists(absolutePath))
+                return;
+
+            try
+            {
+                FileSystemWatcher watcher = new FileSystemWatcher(absolutePath);
+                watcher.IncludeSubdirectories = true;
+                watcher.NotifyFilter =
+                    NotifyFilters.FileName |
+                    NotifyFilters.DirectoryName |
+                    NotifyFilters.LastWrite |
+                    NotifyFilters.Size;
+                watcher.InternalBufferSize = 64 * 1024;
+                watcher.Changed += OnFileChanged;
+                watcher.Created += OnFileChanged;
+                watcher.Deleted += OnFileChanged;
+                watcher.Renamed += OnFileRenamed;
+                watcher.Error += OnWatcherError;
+                watcher.EnableRaisingEvents = true;
+                Watchers.Add(watcher);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError(
+                    "[DuoCurtain Auto Reload] Could not watch " +
+                    projectRelativeDirectory +
+                    ": " +
+                    exception.Message);
+            }
+        }
+
+        private static void OnFileChanged(object sender, FileSystemEventArgs args)
+        {
+            QueueChangedPath(args.FullPath);
+        }
+
+        private static void OnFileRenamed(object sender, RenamedEventArgs args)
+        {
+            QueueChangedPath(args.OldFullPath);
+            QueueChangedPath(args.FullPath);
+        }
+
+        private static void OnWatcherError(object sender, ErrorEventArgs args)
+        {
+            lock (PendingLock)
+            {
+                forceFullReload = true;
+                lastChangeUtcTicks = DateTime.UtcNow.Ticks;
+            }
+        }
+
+        private static void QueueChangedPath(string fullPath)
+        {
+            if (!IsEnabled || IsWatcherSuppressed() || ShouldIgnorePath(fullPath))
+                return;
+
+            lock (PendingLock)
+            {
+                PendingPaths.Add(NormalizePath(fullPath));
+                lastChangeUtcTicks = DateTime.UtcNow.Ticks;
+            }
+        }
+
+        private static void QueueFullReload()
+        {
+            lock (PendingLock)
+            {
+                forceFullReload = true;
+                lastChangeUtcTicks = 0;
+            }
+        }
+
+        private static void Tick()
+        {
+            if (!IsEnabled)
+                return;
+
+            if (!initialized)
+                Initialize();
+
+            if (IsEditorBusy())
+                return;
+
+            List<string> changedPaths;
+            bool fullReload;
+            long queuedAtTicks;
+
+            lock (PendingLock)
+            {
+                fullReload = forceFullReload;
+                if (!fullReload && PendingPaths.Count == 0)
+                    return;
+
+                queuedAtTicks = lastChangeUtcTicks;
+                double elapsedSeconds = queuedAtTicks == 0
+                    ? DebounceSeconds
+                    : new TimeSpan(DateTime.UtcNow.Ticks - queuedAtTicks).TotalSeconds;
+                if (elapsedSeconds < DebounceSeconds)
+                    return;
+
+                changedPaths = new List<string>(PendingPaths);
+                PendingPaths.Clear();
+                forceFullReload = false;
+            }
+
+            if (!PrepareOpenScenesForExternalReload(changedPaths))
+            {
+                Requeue(changedPaths, fullReload, BusyRetrySeconds);
+                return;
+            }
+
+            SuppressWatcherEvents(WatcherSuppressionSeconds);
+
+            try
+            {
+                AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
+                EditorApplication.QueuePlayerLoopUpdate();
+                SceneView.RepaintAll();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError("[DuoCurtain Auto Reload] Reload failed: " + exception);
+                Requeue(changedPaths, fullReload, BusyRetrySeconds);
+                return;
+            }
+
+            string scope = fullReload
+                ? "the project"
+                : changedPaths.Count + " changed path(s)";
+            Debug.Log(
+                "[DuoCurtain Auto Reload] Reloaded " +
+                scope +
+                " without a confirmation dialog.");
+        }
+
+        private static bool PrepareOpenScenesForExternalReload(List<string> changedPaths)
+        {
+            HashSet<string> changedScenePaths = CollectChangedSceneAssetPaths(changedPaths);
+            if (changedScenePaths.Count == 0)
+                return true;
+
+            SceneSetup[] setup = EditorSceneManager.GetSceneManagerSetup();
+            bool reloadOpenScenes = false;
+            for (int i = 0; i < setup.Length; i++)
+            {
+                if (setup[i].isLoaded &&
+                    changedScenePaths.Contains(NormalizePath(setup[i].path)))
+                {
+                    reloadOpenScenes = true;
+                    break;
+                }
+            }
+
+            if (!reloadOpenScenes)
+                return true;
+
+            for (int i = 0; i < SceneManager.sceneCount; i++)
+            {
+                Scene scene = SceneManager.GetSceneAt(i);
+                if (!scene.IsValid() ||
+                    !scene.isLoaded ||
+                    !scene.isDirty ||
+                    string.IsNullOrWhiteSpace(scene.path))
+                {
+                    continue;
+                }
+
+                string scenePath = NormalizePath(scene.path);
+                if (changedScenePaths.Contains(scenePath))
+                {
+                    if (!BackupDirtySceneBeforeExternalReload(scene))
+                        return false;
+                }
+                else if (!EditorSceneManager.SaveScene(scene))
+                {
+                    Debug.LogError(
+                        "[DuoCurtain Auto Reload] Could not save dirty scene before reload: " +
+                        scene.path);
+                    return false;
+                }
+            }
+
+            try
+            {
+                SuppressWatcherEvents(WatcherSuppressionSeconds);
+
+                for (int i = SceneManager.sceneCount - 1; i >= 0; i--)
+                {
+                    Scene scene = SceneManager.GetSceneAt(i);
+                    if (!scene.IsValid() ||
+                        !scene.isLoaded ||
+                        string.IsNullOrWhiteSpace(scene.path))
+                    {
+                        continue;
+                    }
+
+                    if (changedScenePaths.Contains(NormalizePath(scene.path)))
+                        EditorSceneManager.CloseScene(scene, true);
+                }
+
+                EditorSceneManager.RestoreSceneManagerSetup(setup);
+                SceneView.RepaintAll();
+                Debug.Log(
+                    "[DuoCurtain Auto Reload] Reloaded externally changed open scene(s) from disk.");
+                return true;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError(
+                    "[DuoCurtain Auto Reload] Could not reload the open scene setup: " +
+                    exception);
+                return false;
+            }
+        }
+
+        private static bool BackupDirtySceneBeforeExternalReload(Scene scene)
+        {
+            string sceneAbsolutePath = Path.Combine(ProjectRoot, scene.path);
+            if (!File.Exists(sceneAbsolutePath))
+                return false;
+
+            string backupDirectory =
+                Path.Combine(ProjectRoot, "Temp", "DuoCurtainAutoReloadBackups");
+            Directory.CreateDirectory(backupDirectory);
+
+            string timestamp = DateTime.Now.ToString("yyyyMMdd-HHmmss-fff");
+            string sceneName = Path.GetFileNameWithoutExtension(scene.path);
+            string externalSnapshotPath = Path.Combine(
+                backupDirectory,
+                sceneName + "-ExternalSnapshot-" + Guid.NewGuid().ToString("N") + ".unity");
+            string editorBackupPath = Path.Combine(
+                backupDirectory,
+                sceneName + "-EditorBackup-" + timestamp + ".unity");
+            bool diskWasOverwritten = false;
+            bool externalRestored = false;
+
+            try
+            {
+                SuppressWatcherEvents(WatcherSuppressionSeconds);
+                File.Copy(sceneAbsolutePath, externalSnapshotPath, true);
+
+                if (!EditorSceneManager.SaveScene(scene))
+                {
+                    Debug.LogError(
+                        "[DuoCurtain Auto Reload] Could not preserve dirty scene: " +
+                        scene.path);
+                    return false;
+                }
+
+                diskWasOverwritten = true;
+                File.Copy(sceneAbsolutePath, editorBackupPath, true);
+                File.Copy(externalSnapshotPath, sceneAbsolutePath, true);
+                externalRestored = true;
+                Debug.LogWarning(
+                    "[DuoCurtain Auto Reload] Preserved unsaved editor scene changes at: " +
+                    editorBackupPath);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                if (diskWasOverwritten && !externalRestored)
+                {
+                    try
+                    {
+                        File.Copy(externalSnapshotPath, sceneAbsolutePath, true);
+                        externalRestored = true;
+                        EditorSceneManager.MarkSceneDirty(scene);
+                    }
+                    catch (Exception restoreException)
+                    {
+                        Debug.LogError(
+                            "[DuoCurtain Auto Reload] External scene snapshot remains at " +
+                            externalSnapshotPath +
+                            " because restoring it failed: " +
+                            restoreException);
+                    }
+                }
+
+                Debug.LogError(
+                    "[DuoCurtain Auto Reload] Scene backup failed for " +
+                    scene.path +
+                    ": " +
+                    exception);
+                return false;
+            }
+            finally
+            {
+                if (!diskWasOverwritten || externalRestored)
+                    TryDeleteFile(externalSnapshotPath);
+            }
+        }
+
+        private static HashSet<string> CollectChangedSceneAssetPaths(List<string> changedPaths)
+        {
+            HashSet<string> result =
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < changedPaths.Count; i++)
+            {
+                string assetPath = ToProjectRelativePath(changedPaths[i]);
+                if (!string.IsNullOrWhiteSpace(assetPath) &&
+                    assetPath.EndsWith(".unity", StringComparison.OrdinalIgnoreCase) &&
+                    File.Exists(changedPaths[i]))
+                {
+                    result.Add(NormalizePath(assetPath));
+                }
+            }
+
+            return result;
+        }
+
+        private static void OnSceneSaved(Scene scene)
+        {
+            SuppressWatcherEvents(WatcherSuppressionSeconds);
+        }
+
+        private static bool IsEditorBusy()
+        {
+            return EditorApplication.isCompiling ||
+                   EditorApplication.isUpdating ||
+                   EditorApplication.isPlayingOrWillChangePlaymode ||
+                   BuildPipeline.isBuildingPlayer;
+        }
+
+        private static bool IsWatcherSuppressed()
+        {
+            return Interlocked.Read(ref suppressWatcherUntilUtcTicks) > DateTime.UtcNow.Ticks;
+        }
+
+        private static void SuppressWatcherEvents(double seconds)
+        {
+            long targetTicks = DateTime.UtcNow.AddSeconds(seconds).Ticks;
+            Interlocked.Exchange(ref suppressWatcherUntilUtcTicks, targetTicks);
+        }
+
+        private static void Requeue(
+            List<string> changedPaths,
+            bool fullReload,
+            double delaySeconds)
+        {
+            lock (PendingLock)
+            {
+                for (int i = 0; i < changedPaths.Count; i++)
+                    PendingPaths.Add(changedPaths[i]);
+
+                forceFullReload |= fullReload;
+                lastChangeUtcTicks =
+                    DateTime.UtcNow.AddSeconds(delaySeconds - DebounceSeconds).Ticks;
+            }
+        }
+
+        private static void ClearPendingChanges()
+        {
+            lock (PendingLock)
+            {
+                PendingPaths.Clear();
+                forceFullReload = false;
+                lastChangeUtcTicks = 0;
+            }
+        }
+
+        private static bool ShouldIgnorePath(string fullPath)
+        {
+            if (string.IsNullOrWhiteSpace(fullPath))
+                return true;
+
+            string fileName = Path.GetFileName(fullPath);
+            return fileName.Equals(".DS_Store", StringComparison.OrdinalIgnoreCase) ||
+                   fileName.EndsWith("~", StringComparison.Ordinal) ||
+                   fileName.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase) ||
+                   fileName.EndsWith(".swp", StringComparison.OrdinalIgnoreCase) ||
+                   fileName.EndsWith(".lock", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string ToProjectRelativePath(string fullPath)
+        {
+            string normalizedRoot = NormalizePath(ProjectRoot).TrimEnd('/');
+            string normalizedFullPath = NormalizePath(Path.GetFullPath(fullPath));
+            string prefix = normalizedRoot + "/";
+
+            if (!normalizedFullPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                return null;
+
+            return normalizedFullPath.Substring(prefix.Length);
+        }
+
+        private static string NormalizePath(string path)
+        {
+            return string.IsNullOrWhiteSpace(path)
+                ? string.Empty
+                : path.Replace('\\', '/');
+        }
+
+        private static void TryDeleteFile(string path)
+        {
+            try
+            {
+                if (File.Exists(path))
+                    File.Delete(path);
+            }
+            catch
+            {
+                // Temp backups may be cleaned up on the next editor launch.
+            }
+        }
+
+        private static void Shutdown()
+        {
+            EditorApplication.update -= Tick;
+            EditorApplication.quitting -= Shutdown;
+            AssemblyReloadEvents.beforeAssemblyReload -= Shutdown;
+            EditorSceneManager.sceneSaved -= OnSceneSaved;
+            DisposeWatchers();
+            ReleaseAutoRefreshLock();
+            initialized = false;
+        }
+
+        private static void AcquireAutoRefreshLock()
+        {
+            if (!IsEnabled || ownsAutoRefreshLock)
+                return;
+
+            // The project watcher performs refreshes after open scenes are prepared.
+            AssetDatabase.DisallowAutoRefresh();
+            ownsAutoRefreshLock = true;
+        }
+
+        private static void ReleaseAutoRefreshLock()
+        {
+            if (!ownsAutoRefreshLock)
+                return;
+
+            AssetDatabase.AllowAutoRefresh();
+            ownsAutoRefreshLock = false;
+        }
+
+        private static void DisposeWatchers()
+        {
+            for (int i = 0; i < Watchers.Count; i++)
+            {
+                FileSystemWatcher watcher = Watchers[i];
+                if (watcher == null)
+                    continue;
+
+                try
+                {
+                    watcher.EnableRaisingEvents = false;
+                    watcher.Dispose();
+                }
+                catch
+                {
+                    // The watcher may already be disposed during an assembly reload.
+                }
+            }
+
+            Watchers.Clear();
         }
     }
 }
