@@ -51,6 +51,11 @@ public class TilePieceDefinition : MonoBehaviour
 
     void OnValidate()
     {
+        childCellSize = new Vector2(
+            TilePlacementGrid.SnapPositiveToTileMultiple(childCellSize.x),
+            TilePlacementGrid.SnapPositiveToTileMultiple(childCellSize.y)
+        );
+
         if (autoGenerateCellsFromChildren)
             RegenerateCellsFromChildren();
 

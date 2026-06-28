@@ -307,6 +307,22 @@ public class PlayerControl : MonoBehaviour
         return false;
     }
 
+    public static bool TryGetInteractionWorldPosition(out Vector3 worldPosition)
+    {
+        if (TryGetHeadingWorldPosition(out worldPosition))
+            return true;
+
+        return TryGetPlayerWorldPosition(out worldPosition);
+    }
+
+    public static bool TryGetInteractionScreenPosition(out Vector2 screenPosition)
+    {
+        if (TryGetHeadingScreenPosition(out screenPosition))
+            return true;
+
+        return TryGetPlayerScreenPosition(out screenPosition);
+    }
+
     private void ResolveReferences()
     {
         if (targetCamera == null)

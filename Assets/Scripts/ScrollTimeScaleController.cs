@@ -113,7 +113,7 @@ public class ScrollTimeScaleController : MonoBehaviour, IPointerEnterHandler, IP
         if (!useLogicalCursorForWorldTarget)
             return;
 
-        if (!PlayerControl.TryGetHeadingWorldPosition(out Vector3 cursorWorld))
+        if (!PlayerControl.TryGetInteractionWorldPosition(out Vector3 cursorWorld))
             return;
 
         bool isHovering = false;

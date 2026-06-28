@@ -122,8 +122,7 @@ public class TilePlacementManager : MonoBehaviour
     private void UpdatePreviewPosition()
     {
         Vector3 mouseWorld;
-        if (!PlayerControl.TryGetHeadingWorldPosition(out mouseWorld) &&
-            !PlayerControl.TryGetPlayerWorldPosition(out mouseWorld))
+        if (!PlayerControl.TryGetInteractionWorldPosition(out mouseWorld))
         {
             mouseWorld = targetCamera.ScreenToWorldPoint(Input.mousePosition);
             mouseWorld.z = 0f;

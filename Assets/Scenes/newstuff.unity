@@ -181,15 +181,15 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 4549981359021507866, guid: 8eb6d9da4c6b4614da9b451d2334153c, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -1.516332
+      value: -2
       objectReference: {fileID: 0}
     - target: {fileID: 4549981359021507866, guid: 8eb6d9da4c6b4614da9b451d2334153c, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 1.6532055
+      value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 4549981359021507866, guid: 8eb6d9da4c6b4614da9b451d2334153c, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -0.7
+      value: -1
       objectReference: {fileID: 0}
     - target: {fileID: 4549981359021507866, guid: 8eb6d9da4c6b4614da9b451d2334153c, type: 3}
       propertyPath: m_LocalRotation.w
@@ -1444,7 +1444,7 @@ BoxCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0, y: 0.21133333}
+  m_Offset: {x: 0, y: 0}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.28866667}
@@ -2492,8 +2492,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ac6a265fa977f8d489b6ad3481f6e519, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  tileUnit: 5
   cellSize: {x: 5, y: 5}
   origin: {x: 0, y: 0}
+  seedRendererBoundsWhenEmpty: 1
+  seedRendererNameKeyword: Floorplan
+  drawDebugOccupiedCells: 1
+  drawDebugExteriorEdges: 1
+  drawDebugVisualBounds: 1
+  drawDebugColliderBounds: 1
+  drawDebugBlockLabels: 1
+  debugOccupiedCellColor: {r: 0.25, g: 0.9, b: 1, a: 0.65}
+  debugExteriorEdgeColor: {r: 1, g: 0.86, b: 0.2, a: 1}
+  debugVisualBoundsColor: {r: 0.25, g: 1, b: 0.35, a: 0.85}
+  debugColliderBoundsColor: {r: 1, g: 0.3, b: 0.3, a: 0.85}
 --- !u!4 &328419145
 Transform:
   m_ObjectHideFlags: 0
@@ -2595,8 +2607,8 @@ Transform:
   m_GameObject: {fileID: 336883119}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 2.435808, y: 1.0532055, z: 0.31930473}
-  m_LocalScale: {x: 5.5608, y: 8.229984, z: 5.5608}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 5, y: 5, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 760585064}
@@ -3069,15 +3081,15 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 4549981359021507866, guid: b5ad85a0c3a35aa4790ea8006b9002ff, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 3.81
+      value: 4
       objectReference: {fileID: 0}
     - target: {fileID: 4549981359021507866, guid: b5ad85a0c3a35aa4790ea8006b9002ff, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.17
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 4549981359021507866, guid: b5ad85a0c3a35aa4790ea8006b9002ff, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -0.7000003
+      value: -1
       objectReference: {fileID: 0}
     - target: {fileID: 4549981359021507866, guid: b5ad85a0c3a35aa4790ea8006b9002ff, type: 3}
       propertyPath: m_LocalRotation.w
@@ -3689,8 +3701,8 @@ Transform:
   m_GameObject: {fileID: 475673793}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -2.2639263, y: 2.3772795, z: 0.31930473}
-  m_LocalScale: {x: 5.5608, y: 5.5608, z: 5.5608}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 5, y: 5, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 760585064}
@@ -3899,6 +3911,7 @@ MonoBehaviour:
   clampPosition: 0
   minPosition: {x: -10, y: -10}
   maxPosition: {x: 10, y: 10}
+  disableWhenLogicalCursorActive: 1
 --- !u!1 &536539593
 GameObject:
   m_ObjectHideFlags: 0
@@ -5430,6 +5443,7 @@ MonoBehaviour:
   maxTimeScale: 4
   invertScrollDirection: 0
   affectGlobalTimeScale: 1
+  useLogicalCursorForWorldTarget: 1
   hoverCursorTexture: {fileID: 2800000, guid: 6d3071ab958d2f848bb4c4e60a04e6a4, type: 3}
   cursorHotspot: {x: 0, y: 0}
   cursorMode: 0
@@ -6380,7 +6394,7 @@ BoxCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0, y: 0.21133333}
+  m_Offset: {x: 0, y: 0}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.28866667}
@@ -9614,6 +9628,10 @@ MonoBehaviour:
   noSentenceFallback: ...
   eventTriggerClip: {fileID: 8300000, guid: c92e0c2f61e05134887e1d67a20a3336, type: 3}
   eventTriggerVolume: 1
+  useFoleyProfileForEventTrigger: 1
+  eventFoleyPlayer: {fileID: 0}
+  eventFoleyProfile: {fileID: 0}
+  eventFoleySurfaceId: Window
   sentenceLibrary:
   - text: hi can i borrow your phone
     isGood: 1
@@ -12050,15 +12068,15 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 3495386259030035789, guid: ff8f1f2aefc2d8747ac1a13199400eb1, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -3.5540621
+      value: -4
       objectReference: {fileID: 0}
     - target: {fileID: 3495386259030035789, guid: ff8f1f2aefc2d8747ac1a13199400eb1, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 2.2632055
+      value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 3495386259030035789, guid: ff8f1f2aefc2d8747ac1a13199400eb1, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0.23930474
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3495386259030035789, guid: ff8f1f2aefc2d8747ac1a13199400eb1, type: 3}
       propertyPath: m_LocalRotation.w
@@ -12143,15 +12161,15 @@ PrefabInstance:
       objectReference: {fileID: 519420031}
     - target: {fileID: 3877669506815950678, guid: 0b9c378fc0f10fd4fa89bc711ea165be, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 3.7358081
+      value: 4
       objectReference: {fileID: 0}
     - target: {fileID: 3877669506815950678, guid: 0b9c378fc0f10fd4fa89bc711ea165be, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -0.6567944
+      value: -1
       objectReference: {fileID: 0}
     - target: {fileID: 3877669506815950678, guid: 0b9c378fc0f10fd4fa89bc711ea165be, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0.23930474
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3877669506815950678, guid: 0b9c378fc0f10fd4fa89bc711ea165be, type: 3}
       propertyPath: m_LocalRotation.w
@@ -12218,11 +12236,11 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 4166944114280091324, guid: 9210bb97ad1ba4149907ed66218c237b, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 3.42844
+      value: 3
       objectReference: {fileID: 0}
     - target: {fileID: 4166944114280091324, guid: 9210bb97ad1ba4149907ed66218c237b, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -0.34305
+      value: -0
       objectReference: {fileID: 0}
     - target: {fileID: 4166944114280091324, guid: 9210bb97ad1ba4149907ed66218c237b, type: 3}
       propertyPath: m_LocalPosition.z

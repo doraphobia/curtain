@@ -258,12 +258,17 @@ MonoBehaviour:
   stepPerScroll: 0.08
   invertScroll: 0
   allowLocalHoverInput: 1
+  useLogicalCursorHover: 1
   hoverCursorTexture: {fileID: 2800000, guid: 6d3071ab958d2f848bb4c4e60a04e6a4, type: 3}
   cursorHotspot: {x: 0, y: 0}
   cursorMode: 0
   scrollAudioSource: {fileID: 4912007425144851137, guid: 9210bb97ad1ba4149907ed66218c237b, type: 3}
   scrollClip: {fileID: 0}
   scrollVolume: 1
+  useFoleyProfileForScroll: 1
+  scrollFoleyPlayer: {fileID: 0}
+  scrollFoleyProfile: {fileID: 0}
+  scrollFoleySurfaceId: Curtain
   syncedRotationTargets:
   - {fileID: 417407388184731184}
   - {fileID: 1317445440570778242}
@@ -493,8 +498,8 @@ Transform:
   m_GameObject: {fileID: 4535982140001161836}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0.96592593, w: -0.25881898}
-  m_LocalPosition: {x: -3.5540621, y: 2.2632055, z: 0.23930474}
-  m_LocalScale: {x: 3.3617, y: 3.3617, z: 3.3617}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 5, y: 5, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 7773356881754536110}
@@ -573,8 +578,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TilePieceDefinition
   cells:
   - {x: 0, y: 0}
-  autoGenerateCellsFromChildren: 1
-  childCellSize: {x: 1, y: 1}
+  autoGenerateCellsFromChildren: 0
+  childCellSize: {x: 5, y: 5}
   includeRootCell: 1
   shopData:
     displayName: Window RIght

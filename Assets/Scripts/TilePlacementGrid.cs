@@ -8,6 +8,8 @@ using UnityEditor;
 [DisallowMultipleComponent]
 public class TilePlacementGrid : MonoBehaviour
 {
+    public const int DefaultTileUnit = 5;
+
     public struct TileBlockInfo
     {
         public bool isValid;
@@ -22,7 +24,9 @@ public class TilePlacementGrid : MonoBehaviour
     }
 
     [Header("Grid")]
-    public Vector2 cellSize = Vector2.one;
+    [Min(1)]
+    public int tileUnit = DefaultTileUnit;
+    public Vector2 cellSize = new Vector2(DefaultTileUnit, DefaultTileUnit);
     public Vector2 origin;
 
     [Header("Fallback Room Seeding")]
@@ -54,8 +58,14 @@ public class TilePlacementGrid : MonoBehaviour
     private readonly Dictionary<Vector2Int, TilePieceDefinition> roomCellDefinitions = new Dictionary<Vector2Int, TilePieceDefinition>();
     private readonly Dictionary<Vector2Int, string> roomCellNames = new Dictionary<Vector2Int, string>();
 
+    void OnValidate()
+    {
+        NormalizeGridSettings();
+    }
+
     void Awake()
     {
+        NormalizeGridSettings();
         RegisterExistingTiles();
 
         if (seedRendererBoundsWhenEmpty && roomCells.Count == 0)
@@ -291,6 +301,32 @@ public class TilePlacementGrid : MonoBehaviour
 
         if (!string.IsNullOrWhiteSpace(sourceName))
             roomCellNames[cell] = sourceName;
+    }
+
+    private void NormalizeGridSettings()
+    {
+        tileUnit = Mathf.Max(1, Mathf.RoundToInt(tileUnit));
+        cellSize = new Vector2(
+            SnapPositiveToTileMultiple(cellSize.x, tileUnit),
+            SnapPositiveToTileMultiple(cellSize.y, tileUnit)
+        );
+        origin = new Vector2(
+            SnapToTileMultiple(origin.x, tileUnit),
+            SnapToTileMultiple(origin.y, tileUnit)
+        );
+    }
+
+    public static float SnapPositiveToTileMultiple(float value, int unit = DefaultTileUnit)
+    {
+        unit = Mathf.Max(1, unit);
+        int multiples = Mathf.Max(1, Mathf.RoundToInt(value / unit));
+        return multiples * unit;
+    }
+
+    public static float SnapToTileMultiple(float value, int unit = DefaultTileUnit)
+    {
+        unit = Mathf.Max(1, unit);
+        return Mathf.RoundToInt(value / unit) * unit;
     }
 
     private void RegisterExistingTiles()

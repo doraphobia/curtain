@@ -216,7 +216,7 @@ public class HoverScrollColorLerp2D : MonoBehaviour
         if (!useLogicalCursorHover || targetCollider == null)
             return;
 
-        if (!PlayerControl.TryGetHeadingWorldPosition(out Vector3 cursorWorld))
+        if (!PlayerControl.TryGetInteractionWorldPosition(out Vector3 cursorWorld))
             return;
 
         cursorWorld.z = transform.position.z;
