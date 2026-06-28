@@ -12,6 +12,19 @@ namespace DuoCurtain.Editor
     {
         private const int TileUnit = TilePlacementGrid.DefaultTileUnit;
         private const string MenuPath = "Tools/Duo Curtain/Grid/Normalize Integer Tile Grid";
+        private const string RunOnceMarkerPath = "Temp/DuoCurtainRunGridNormalizationOnce.flag";
+
+        [InitializeOnLoadMethod]
+        private static void RunPendingNormalizationOnce()
+        {
+            string markerPath = Path.Combine(Directory.GetCurrentDirectory(), RunOnceMarkerPath);
+            if (!File.Exists(markerPath))
+                return;
+
+            File.Delete(markerPath);
+            Debug.Log("[GridIntegerNormalizationUtility] Running pending one-shot normalization.");
+            EditorApplication.delayCall += NormalizeIntegerTileGrid;
+        }
 
         [MenuItem(MenuPath)]
         public static void NormalizeIntegerTileGrid()
@@ -49,7 +62,7 @@ namespace DuoCurtain.Editor
 
                 try
                 {
-                    changed |= NormalizeTilePieces(prefabRoot, true);
+                    changed |= NormalizeTilePieces(prefabRoot);
                     changed |= NormalizeHoverInteractions(prefabRoot);
                     changed |= NormalizeCurtainAudioSource(prefabRoot, true);
 
@@ -112,23 +125,23 @@ namespace DuoCurtain.Editor
             bool changed = false;
 
             for (int i = 0; i < definitions.Length; i++)
-                changed |= NormalizeTilePiece(definitions[i], false);
+                changed |= NormalizeTilePiece(definitions[i]);
 
             return changed;
         }
 
-        private static bool NormalizeTilePieces(GameObject root, bool prefabAsset)
+        private static bool NormalizeTilePieces(GameObject root)
         {
             TilePieceDefinition[] definitions = root.GetComponentsInChildren<TilePieceDefinition>(true);
             bool changed = false;
 
             for (int i = 0; i < definitions.Length; i++)
-                changed |= NormalizeTilePiece(definitions[i], prefabAsset);
+                changed |= NormalizeTilePiece(definitions[i]);
 
             return changed;
         }
 
-        private static bool NormalizeTilePiece(TilePieceDefinition definition, bool prefabAsset)
+        private static bool NormalizeTilePiece(TilePieceDefinition definition)
         {
             if (definition == null)
                 return false;
@@ -142,18 +155,20 @@ namespace DuoCurtain.Editor
                 changed = true;
             }
 
-            changed |= NormalizeCells(definition);
-
             bool nestedTile = definition.placementLayer == TilePieceDefinition.PlacementLayer.Tile &&
                               HasAncestorTilePieceDefinition(definition.transform);
             if (!nestedTile)
-                changed |= NormalizeTileTransform(definition, prefabAsset);
+            {
+                changed |= NormalizeTileTransform(definition);
+                changed |= NormalizeCellsFromSnappedSize(definition);
+            }
             else if (definition.registerOnStart)
             {
                 definition.registerOnStart = false;
                 changed = true;
             }
 
+            changed |= NormalizeCells(definition);
             changed |= NormalizeRootColliders(definition);
 
             if (changed)
@@ -186,23 +201,23 @@ namespace DuoCurtain.Editor
             return changed;
         }
 
-        private static bool NormalizeTileTransform(TilePieceDefinition definition, bool prefabAsset)
+        private static bool NormalizeTileTransform(TilePieceDefinition definition)
         {
             Transform transform = definition.transform;
             bool changed = false;
-            Vector2Int footprint = GetFootprintSize(definition);
-            Vector2 targetWorldSize = new Vector2(
-                Mathf.Max(1, footprint.x) * TileUnit,
-                Mathf.Max(1, footprint.y) * TileUnit
-            );
-
             Vector3 parentScale = transform.parent != null ? transform.parent.lossyScale : Vector3.one;
             float safeParentX = Mathf.Abs(parentScale.x) > 0.0001f ? parentScale.x : 1f;
             float safeParentY = Mathf.Abs(parentScale.y) > 0.0001f ? parentScale.y : 1f;
+            float currentWorldX = Mathf.Abs(transform.localScale.x * safeParentX);
+            float currentWorldY = Mathf.Abs(transform.localScale.y * safeParentY);
+            Vector2 targetWorldSize = new Vector2(
+                TilePlacementGrid.SnapPositiveToTileMultiple(currentWorldX, TileUnit),
+                TilePlacementGrid.SnapPositiveToTileMultiple(currentWorldY, TileUnit)
+            );
+
             Vector3 targetLocalScale = transform.localScale;
-            targetLocalScale.x = targetWorldSize.x / safeParentX;
-            targetLocalScale.y = targetWorldSize.y / safeParentY;
-            targetLocalScale.z = 1f;
+            targetLocalScale.x = Mathf.Sign(transform.localScale.x == 0f ? 1f : transform.localScale.x) * targetWorldSize.x / Mathf.Abs(safeParentX);
+            targetLocalScale.y = Mathf.Sign(transform.localScale.y == 0f ? 1f : transform.localScale.y) * targetWorldSize.y / Mathf.Abs(safeParentY);
 
             if (!Approximately(transform.localScale, targetLocalScale))
             {
@@ -210,31 +225,43 @@ namespace DuoCurtain.Editor
                 changed = true;
             }
 
-            if (prefabAsset && transform.parent == null)
+            Vector3 position = transform.localPosition;
+            position.x = Mathf.Round(position.x);
+            position.y = Mathf.Round(position.y);
+            position.z = Mathf.Round(position.z);
+            if (!Approximately(transform.localPosition, position))
             {
-                if (!Approximately(transform.localPosition, Vector3.zero))
-                {
-                    transform.localPosition = Vector3.zero;
-                    changed = true;
-                }
-            }
-            else
-            {
-                Vector3 position = transform.localPosition;
-                position.x = Mathf.Round(position.x);
-                position.y = Mathf.Round(position.y);
-                position.z = Mathf.Round(position.z);
-                if (!Approximately(transform.localPosition, position))
-                {
-                    transform.localPosition = position;
-                    changed = true;
-                }
+                transform.localPosition = position;
+                changed = true;
             }
 
             if (changed)
                 EditorUtility.SetDirty(transform);
 
             return changed;
+        }
+
+        private static bool NormalizeCellsFromSnappedSize(TilePieceDefinition definition)
+        {
+            if (definition == null)
+                return false;
+
+            Vector3 worldScale = definition.transform.lossyScale;
+            int width = Mathf.Max(1, Mathf.RoundToInt(Mathf.Abs(worldScale.x) / TileUnit));
+            int height = Mathf.Max(1, Mathf.RoundToInt(Mathf.Abs(worldScale.y) / TileUnit));
+
+            List<Vector2Int> targetCells = new List<Vector2Int>(width * height);
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                    targetCells.Add(new Vector2Int(x, y));
+            }
+
+            if (CellsMatch(definition.cells, targetCells))
+                return false;
+
+            definition.cells = targetCells;
+            return true;
         }
 
         private static bool NormalizeRootColliders(TilePieceDefinition definition)
@@ -315,9 +342,8 @@ namespace DuoCurtain.Editor
                 bool rendererChanged = false;
                 Transform transform = renderer.transform;
                 Vector3 scale = transform.localScale;
-                scale.x = TileUnit;
-                scale.y = TileUnit;
-                scale.z = 1f;
+                scale.x = Mathf.Sign(scale.x == 0f ? 1f : scale.x) * TilePlacementGrid.SnapPositiveToTileMultiple(Mathf.Abs(scale.x), TileUnit);
+                scale.y = Mathf.Sign(scale.y == 0f ? 1f : scale.y) * TilePlacementGrid.SnapPositiveToTileMultiple(Mathf.Abs(scale.y), TileUnit);
                 if (!Approximately(transform.localScale, scale))
                 {
                     transform.localScale = scale;
@@ -325,8 +351,8 @@ namespace DuoCurtain.Editor
                 }
 
                 Vector3 position = transform.localPosition;
-                position.x = TilePlacementGrid.SnapToTileMultiple(position.x, TileUnit);
-                position.y = TilePlacementGrid.SnapToTileMultiple(position.y, TileUnit);
+                position.x = Mathf.Round(position.x);
+                position.y = Mathf.Round(position.y);
                 position.z = Mathf.Round(position.z);
                 if (!Approximately(transform.localPosition, position))
                 {
@@ -416,19 +442,18 @@ namespace DuoCurtain.Editor
             return normalized.Contains("curtain") || normalized.Contains("curtian");
         }
 
-        private static Vector2Int GetFootprintSize(TilePieceDefinition definition)
+        private static bool CellsMatch(List<Vector2Int> current, List<Vector2Int> target)
         {
-            Vector2Int min = definition.cells[0];
-            Vector2Int max = definition.cells[0];
+            if (current == null || target == null || current.Count != target.Count)
+                return false;
 
-            for (int i = 1; i < definition.cells.Count; i++)
+            for (int i = 0; i < current.Count; i++)
             {
-                Vector2Int cell = definition.cells[i];
-                min = Vector2Int.Min(min, cell);
-                max = Vector2Int.Max(max, cell);
+                if (current[i] != target[i])
+                    return false;
             }
 
-            return new Vector2Int(max.x - min.x + 1, max.y - min.y + 1);
+            return true;
         }
 
         private static bool HasAncestorTilePieceDefinition(Transform transform)
