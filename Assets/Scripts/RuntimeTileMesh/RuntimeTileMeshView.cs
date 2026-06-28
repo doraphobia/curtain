@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -46,6 +47,8 @@ namespace DuoCurtain.RuntimeTileMesh
         private RuntimeTileMeshBuildResult lastBuildResult;
         private Material runtimeFallbackMaterial;
 
+        public event Action<RuntimeTileMeshView> Rebuilt;
+
         void Start()
         {
             if (rebuildOnStart)
@@ -86,7 +89,21 @@ namespace DuoCurtain.RuntimeTileMesh
                     Debug.LogWarning("[RuntimeTileMeshView] " + lastBuildResult.warnings[i], this);
             }
 
+            Rebuilt?.Invoke(this);
             return lastBuildResult;
+        }
+
+        public void CollectGeneratedRenderers(List<Renderer> results)
+        {
+            if (results == null)
+                return;
+
+            results.Clear();
+            Transform root = transform.Find(GeneratedRootName);
+            if (root == null)
+                return;
+
+            root.GetComponentsInChildren(true, results);
         }
 
         public RuntimeTileMeshSettings CreateSettings()

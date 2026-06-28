@@ -11,11 +11,25 @@ Current project integration:
 - Generic runtime tile coordinates are treated as `1x1` logical cells.
 - `RuntimeTileMeshView.tileSize` scales those logical cells into Unity space.
 - `TilePlacementGrid` can pass its current `1x5` room cell size into this system, so the project grid remains aligned while the mesh algorithm stays generic.
+- `RuntimeTileMeshView` is only responsible for geometry and clipping. It should not own procedural-motion scale decisions.
+- `RuntimeTileMeshProjectionRenderer` owns visual projection state and pushes it through `MaterialPropertyBlock`, so mesh rebuilds do not restart or rescale the pattern.
 
 UV modes:
 
 - `Bounds`: maps the entire connected mesh bounds to `0-1`.
 - `ObjectSpace`: uses vertex `x/y` positions times `uvTilingScale`, plus `uvOffset`.
+- Bounds UV is only appropriate for deliberate stretch effects such as logo reveals. Procedural motion should use a projection shader instead.
+
+Projection modes:
+
+- `StretchToBounds`: uses generated mesh UV and stretches to the current mesh bounds.
+- `ObjectSpace`: repeats in local object coordinates.
+- `WorldTile`: repeats in stable world coordinates. This is the default for merged room/block motion.
+- `AnchoredTile`: repeats from an explicit world-space anchor for object-owned pattern variants.
+
+For AE-style reusable motion tiles, author one tile such as `3x3`, set
+`motionTileSize` to that cell span, and let the shader use `frac(globalPatternCoordinate / motionTileSize)`.
+Merging should reveal more of the same infinite pattern rather than changing UV scale.
 
 Triangulation:
 
@@ -30,7 +44,8 @@ an interactive fusion sandbox for dragging white connected planes on a `1x1`
 test grid. Hover fades a block red, click selects it blue, movement snaps to
 the grid, and clicking again places it. Placed blocks merge into one new block
 when their occupied cells overlap or share an edge. Diagonal corner-only contact
-stays separate.
+stays separate. The blocks use `WorldTile` projection, so the procedural tile
+continues in world space while the runtime mesh changes shape.
 
 To rebuild that scene, use `Tools/Duo Curtain/Runtime Tile Mesh/Create Test Scene`.
 

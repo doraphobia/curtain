@@ -8,14 +8,23 @@ using UnityEngine.SceneManagement;
 
 namespace DuoCurtain.RuntimeTileMesh.Editor
 {
+    [InitializeOnLoad]
     public static class RuntimeTileMeshTestSceneGenerator
     {
         private const string ScenePath = "Assets/Scenes/RuntimeTileMeshTest.unity";
         private const string DemoFolder = "Assets/Scripts/RuntimeTileMesh/Demo";
         private const string WhiteMaterialPath = DemoFolder + "/RuntimeTileMesh_White.mat";
+        private const string ProjectionMaterialPath = DemoFolder + "/RuntimeTileMesh_WorldProjection.mat";
         private const string RunOnceMarkerPath = "Temp/DuoCurtainGenerateRuntimeTileMeshTestScene.flag";
         private const string LogPrefix = "[RuntimeTileMeshTestSceneGenerator] ";
         private static bool generationQueued;
+
+        static RuntimeTileMeshTestSceneGenerator()
+        {
+            EditorApplication.update -= WatchMarker;
+            EditorApplication.update += WatchMarker;
+            GenerateSceneIfRequested();
+        }
 
         [InitializeOnLoadMethod]
         private static void GenerateSceneIfRequested()
@@ -24,6 +33,21 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                 return;
 
             QueueMarkerGeneration();
+        }
+
+        private static void WatchMarker()
+        {
+            if (!MarkerExists())
+                return;
+
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                if (!generationQueued)
+                    QueueMarkerGeneration();
+                return;
+            }
+
+            TryGenerateSceneFromMarker();
         }
 
         [MenuItem("Tools/Duo Curtain/Runtime Tile Mesh/Create Test Scene")]
@@ -42,15 +66,16 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             scene.name = "RuntimeTileMeshTest";
 
             Material material = AssetDatabase.LoadAssetAtPath<Material>(WhiteMaterialPath);
+            Material projectionMaterial = AssetDatabase.LoadAssetAtPath<Material>(ProjectionMaterialPath);
             CreateCamera();
             CreateInstructionText();
             CreateGridOverlay(material);
             CreateFusionSandboxController();
 
-            CreateFusionBlock("Fusion Block - L", RuntimeTileMeshDemo.DemoShape.L, new Vector3(-6f, 0f, 0f), material);
-            CreateFusionBlock("Fusion Block - 1x3", RuntimeTileMeshDemo.DemoShape.OneByThree, new Vector3(-1f, -2f, 0f), material);
-            CreateFusionBlock("Fusion Block - T", RuntimeTileMeshDemo.DemoShape.T, new Vector3(3f, 1f, 0f), material);
-            CreateFusionBlock("Fusion Block - Z", RuntimeTileMeshDemo.DemoShape.Z, new Vector3(6f, -2f, 0f), material);
+            CreateFusionBlock("Fusion Block - L", RuntimeTileMeshDemo.DemoShape.L, new Vector3(-6f, 0f, 0f), projectionMaterial);
+            CreateFusionBlock("Fusion Block - 1x3", RuntimeTileMeshDemo.DemoShape.OneByThree, new Vector3(-1f, -2f, 0f), projectionMaterial);
+            CreateFusionBlock("Fusion Block - T", RuntimeTileMeshDemo.DemoShape.T, new Vector3(3f, 1f, 0f), projectionMaterial);
+            CreateFusionBlock("Fusion Block - Z", RuntimeTileMeshDemo.DemoShape.Z, new Vector3(6f, -2f, 0f), projectionMaterial);
 
             Directory.CreateDirectory(Path.GetDirectoryName(ScenePath));
             EditorSceneManager.SaveScene(scene, ScenePath);
@@ -109,13 +134,15 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
 
         private static string MarkerAbsolutePath()
         {
-            return Path.Combine(Directory.GetCurrentDirectory(), RunOnceMarkerPath);
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            return Path.Combine(projectRoot, RunOnceMarkerPath);
         }
 
         private static void EnsureDemoAssets()
         {
             Directory.CreateDirectory(DemoFolder);
             CreateWhiteMaterial();
+            CreateProjectionMaterial();
         }
 
         private static void CreateWhiteMaterial()
@@ -154,6 +181,47 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             AssetDatabase.SaveAssets();
         }
 
+        private static void CreateProjectionMaterial()
+        {
+            Shader shader = Shader.Find("Duo Curtain/Runtime Tile Projection Unlit");
+            if (shader == null)
+            {
+                Debug.LogWarning(LogPrefix + "Projection shader was not found. Falling back to the white material.");
+                return;
+            }
+
+            Material material = AssetDatabase.LoadAssetAtPath<Material>(ProjectionMaterialPath);
+            if (material == null)
+            {
+                material = new Material(shader);
+                AssetDatabase.CreateAsset(material, ProjectionMaterialPath);
+            }
+            else
+            {
+                material.shader = shader;
+            }
+
+            if (material.HasProperty("_BaseColor"))
+                material.SetColor("_BaseColor", Color.white);
+            if (material.HasProperty("_Color"))
+                material.SetColor("_Color", Color.white);
+            if (material.HasProperty("_ProjectionMode"))
+                material.SetFloat("_ProjectionMode", (float)RuntimeTileMeshProjectionMode.WorldTile);
+            if (material.HasProperty("_PatternCellSize"))
+                material.SetVector("_PatternCellSize", new Vector4(1f, 1f, 0f, 0f));
+            if (material.HasProperty("_MotionTileSize"))
+                material.SetVector("_MotionTileSize", new Vector4(3f, 3f, 0f, 0f));
+            if (material.HasProperty("_PatternScale"))
+                material.SetFloat("_PatternScale", 1f);
+            if (material.HasProperty("_PatternIntensity"))
+                material.SetFloat("_PatternIntensity", 0.38f);
+            if (material.HasProperty("_PatternLineWidth"))
+                material.SetFloat("_PatternLineWidth", 0.055f);
+
+            EditorUtility.SetDirty(material);
+            AssetDatabase.SaveAssets();
+        }
+
         private static void CreateCamera()
         {
             GameObject cameraObject = new GameObject("Main Camera");
@@ -169,7 +237,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
         private static void CreateInstructionText()
         {
             CreateLabel(
-                "Fusion Sandbox\nHover fades red. Click a block to pick it up, move to snap, click again to place.\nPlaced blocks merge when their occupied grid cells overlap.",
+                "Fusion Sandbox\nWorldTile projection: mesh reveals a stable infinite 3x3 motion tile.\nHover fades red. Click to pick up, snap, place, and merge by overlap or shared edge.",
                 new Vector3(-8.8f, 5.45f, -0.2f),
                 0.09f,
                 TextAnchor.UpperLeft,
@@ -261,7 +329,19 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             block.selectedColor = new Color(0.08f, 0.35f, 1f, 1f);
             block.colorLerpSpeed = 7f;
 
+            RuntimeTileMeshProjectionRenderer projection = root.AddComponent<RuntimeTileMeshProjectionRenderer>();
+            projection.visualState.material = material;
+            projection.visualState.projectionMode = RuntimeTileMeshProjectionMode.WorldTile;
+            projection.visualState.cellSize = Vector2.one;
+            projection.visualState.motionTileSize = new Vector2(3f, 3f);
+            projection.visualState.patternScale = 1f;
+            projection.visualState.patternIntensity = 0.38f;
+            projection.visualState.lineWidth = 0.055f;
+            projection.captureAnchorOnEnable = false;
+            projection.animateInPlayMode = true;
+
             view.Rebuild();
+            projection.Apply();
         }
 
         private static void CreateLabel(
