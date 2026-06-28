@@ -4,6 +4,9 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public class TilePieceDefinition : MonoBehaviour
 {
+    private const string GeneratedVisualRootName = "__Generated Tile Cell Visuals";
+    private const string GeneratedVisualName = "Visual";
+
     public enum PlacementLayer
     {
         Tile,
@@ -38,6 +41,20 @@ public class TilePieceDefinition : MonoBehaviour
     [Header("Scene Registration")]
     [Tooltip("场景里已经摆好的地图块，游戏开始时是否自动注册到网格中。")]
     public bool registerOnStart = true;
+
+    [Header("Cell Visuals")]
+    [Tooltip("运行时用 cells 生成 5x5 的房间视觉 tile。房间画面与程序 footprint 共用同一份 cells。")]
+    public bool buildVisualsFromCells = true;
+    [Tooltip("生成 cell 视觉后隐藏根物体上的旧 SpriteRenderer，避免旧大图和真实格子边缘不一致。")]
+    public bool hideRootRoomSpriteRenderers = true;
+    [Tooltip("生成每个 cell 的 BoxCollider2D，让物理边缘也按 5x5 tile 对齐。")]
+    public bool buildCellColliders = true;
+    [Tooltip("生成 cell collider 后禁用根物体上的旧 BoxCollider2D，避免旧矩形覆盖房间之间的空隙。")]
+    public bool disableRootRoomColliders = true;
+    [Tooltip("未指定时会复用根物体 SpriteRenderer 的 sprite。")]
+    public Sprite cellVisualSprite;
+    public Color cellVisualColor = Color.white;
+    public Vector3 cellVisualLocalOffset = Vector3.zero;
 
     public IReadOnlyList<Vector2Int> Cells => cells;
 
@@ -76,6 +93,38 @@ public class TilePieceDefinition : MonoBehaviour
         }
     }
 
+    void Awake()
+    {
+        RebuildCellVisuals();
+    }
+
+    [ContextMenu("Rebuild Cell Visuals")]
+    public void RebuildCellVisuals()
+    {
+        if (!ShouldBuildCellVisuals())
+            return;
+
+        SpriteRenderer templateRenderer = GetRootSpriteRenderer();
+        Sprite sprite = cellVisualSprite != null ? cellVisualSprite : templateRenderer != null ? templateRenderer.sprite : null;
+        Transform existingRoot = FindGeneratedVisualRoot();
+
+        if (CellVisualsAreCurrent(existingRoot, sprite, templateRenderer))
+        {
+            ApplySourceRendererVisibility();
+            ApplyRootColliderVisibility();
+            return;
+        }
+
+        DestroyGeneratedVisualRoot(existingRoot);
+        Transform visualRoot = CreateGeneratedVisualRoot();
+
+        for (int i = 0; i < cells.Count; i++)
+            CreateGeneratedCell(visualRoot, cells[i], sprite, templateRenderer);
+
+        ApplySourceRendererVisibility();
+        ApplyRootColliderVisibility();
+    }
+
     [ContextMenu("Regenerate Cells From Children")]
     public void RegenerateCellsFromChildren()
     {
@@ -102,5 +151,235 @@ public class TilePieceDefinition : MonoBehaviour
 
             cells.Add(cell);
         }
+    }
+
+    private bool ShouldBuildCellVisuals()
+    {
+        return buildVisualsFromCells &&
+               placementLayer == PlacementLayer.Tile &&
+               cells != null &&
+               cells.Count > 0;
+    }
+
+    private Transform CreateGeneratedVisualRoot()
+    {
+        GameObject visualRootObject = new GameObject(GeneratedVisualRootName);
+        Transform visualRoot = visualRootObject.transform;
+        visualRoot.SetParent(transform, false);
+        visualRoot.localPosition = Vector3.zero;
+        visualRoot.localRotation = Quaternion.identity;
+        visualRoot.localScale = GetInverseLocalScale(transform.localScale);
+        return visualRoot;
+    }
+
+    private void CreateGeneratedCell(
+        Transform visualRoot,
+        Vector2Int cell,
+        Sprite sprite,
+        SpriteRenderer templateRenderer)
+    {
+        GameObject cellObject = new GameObject(GetGeneratedCellName(cell));
+        Transform cellTransform = cellObject.transform;
+        cellTransform.SetParent(visualRoot, false);
+        cellTransform.localPosition = new Vector3(
+            cell.x * childCellSize.x,
+            cell.y * childCellSize.y,
+            0f
+        ) + cellVisualLocalOffset;
+        cellTransform.localRotation = Quaternion.identity;
+        cellTransform.localScale = Vector3.one;
+
+        if (buildCellColliders)
+        {
+            BoxCollider2D collider = cellObject.AddComponent<BoxCollider2D>();
+            collider.size = new Vector2(childCellSize.x, childCellSize.y);
+            collider.offset = Vector2.zero;
+        }
+
+        if (sprite == null)
+            return;
+
+        GameObject visualObject = new GameObject(GeneratedVisualName);
+        Transform visualTransform = visualObject.transform;
+        visualTransform.SetParent(cellTransform, false);
+        visualTransform.localPosition = Vector3.zero;
+        visualTransform.localRotation = Quaternion.identity;
+        visualTransform.localScale = GetSpriteScaleForCell(sprite);
+
+        SpriteRenderer renderer = visualObject.AddComponent<SpriteRenderer>();
+        renderer.sprite = sprite;
+        renderer.color = cellVisualColor;
+
+        if (templateRenderer == null)
+            return;
+
+        renderer.sharedMaterial = templateRenderer.sharedMaterial;
+        renderer.sortingLayerID = templateRenderer.sortingLayerID;
+        renderer.sortingOrder = templateRenderer.sortingOrder;
+        renderer.maskInteraction = templateRenderer.maskInteraction;
+        renderer.flipX = templateRenderer.flipX;
+        renderer.flipY = templateRenderer.flipY;
+    }
+
+    private bool CellVisualsAreCurrent(Transform visualRoot, Sprite sprite, SpriteRenderer templateRenderer)
+    {
+        if (visualRoot == null || visualRoot.childCount != cells.Count)
+            return false;
+
+        if (!Approximately(visualRoot.localScale, GetInverseLocalScale(transform.localScale)))
+            return false;
+
+        for (int i = 0; i < cells.Count; i++)
+        {
+            Vector2Int cell = cells[i];
+            Transform cellTransform = visualRoot.Find(GetGeneratedCellName(cell));
+            if (cellTransform == null)
+                return false;
+
+            Vector3 expectedPosition = new Vector3(
+                cell.x * childCellSize.x,
+                cell.y * childCellSize.y,
+                0f
+            ) + cellVisualLocalOffset;
+            if (!Approximately(cellTransform.localPosition, expectedPosition))
+                return false;
+
+            if (buildCellColliders)
+            {
+                BoxCollider2D collider = cellTransform.GetComponent<BoxCollider2D>();
+                if (collider == null ||
+                    !Approximately(collider.size.x, childCellSize.x) ||
+                    !Approximately(collider.size.y, childCellSize.y))
+                {
+                    return false;
+                }
+            }
+
+            Transform visualTransform = cellTransform.Find(GeneratedVisualName);
+            if (sprite == null)
+            {
+                if (visualTransform != null)
+                    return false;
+
+                continue;
+            }
+
+            if (visualTransform == null)
+                return false;
+
+            SpriteRenderer renderer = visualTransform.GetComponent<SpriteRenderer>();
+            if (renderer == null || renderer.sprite != sprite)
+                return false;
+
+            if (!Approximately(visualTransform.localScale, GetSpriteScaleForCell(sprite)))
+                return false;
+
+            if (templateRenderer != null &&
+                (renderer.sortingLayerID != templateRenderer.sortingLayerID ||
+                 renderer.sortingOrder != templateRenderer.sortingOrder))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private Transform FindGeneratedVisualRoot()
+    {
+        for (int i = 0; i < transform.childCount; i++)
+        {
+            Transform child = transform.GetChild(i);
+            if (child != null && child.name == GeneratedVisualRootName)
+                return child;
+        }
+
+        return null;
+    }
+
+    private SpriteRenderer GetRootSpriteRenderer()
+    {
+        SpriteRenderer[] renderers = GetComponents<SpriteRenderer>();
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            if (renderers[i] != null)
+                return renderers[i];
+        }
+
+        return null;
+    }
+
+    private void ApplySourceRendererVisibility()
+    {
+        if (!hideRootRoomSpriteRenderers)
+            return;
+
+        SpriteRenderer[] renderers = GetComponents<SpriteRenderer>();
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            if (renderers[i] != null)
+                renderers[i].enabled = false;
+        }
+    }
+
+    private void ApplyRootColliderVisibility()
+    {
+        if (!disableRootRoomColliders)
+            return;
+
+        BoxCollider2D[] colliders = GetComponents<BoxCollider2D>();
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            if (colliders[i] != null)
+                colliders[i].enabled = false;
+        }
+    }
+
+    private void DestroyGeneratedVisualRoot(Transform visualRoot)
+    {
+        if (visualRoot == null)
+            return;
+
+        if (Application.isPlaying)
+            Destroy(visualRoot.gameObject);
+        else
+            DestroyImmediate(visualRoot.gameObject);
+    }
+
+    private Vector3 GetSpriteScaleForCell(Sprite sprite)
+    {
+        if (sprite == null)
+            return Vector3.one;
+
+        Vector2 spriteSize = sprite.bounds.size;
+        float scaleX = Mathf.Abs(spriteSize.x) <= 0.0001f ? 1f : childCellSize.x / spriteSize.x;
+        float scaleY = Mathf.Abs(spriteSize.y) <= 0.0001f ? 1f : childCellSize.y / spriteSize.y;
+        return new Vector3(scaleX, scaleY, 1f);
+    }
+
+    private static Vector3 GetInverseLocalScale(Vector3 scale)
+    {
+        return new Vector3(
+            Mathf.Abs(scale.x) <= 0.0001f ? 1f : 1f / scale.x,
+            Mathf.Abs(scale.y) <= 0.0001f ? 1f : 1f / scale.y,
+            Mathf.Abs(scale.z) <= 0.0001f ? 1f : 1f / scale.z
+        );
+    }
+
+    private static string GetGeneratedCellName(Vector2Int cell)
+    {
+        return "Tile Cell " + cell.x + "," + cell.y;
+    }
+
+    private static bool Approximately(Vector3 a, Vector3 b)
+    {
+        return Approximately(a.x, b.x) &&
+               Approximately(a.y, b.y) &&
+               Approximately(a.z, b.z);
+    }
+
+    private static bool Approximately(float a, float b)
+    {
+        return Mathf.Abs(a - b) <= 0.0001f;
     }
 }

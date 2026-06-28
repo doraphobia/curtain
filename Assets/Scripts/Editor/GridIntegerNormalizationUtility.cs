@@ -778,7 +778,9 @@ namespace DuoCurtain.Editor
             {
                 SuppressWatcherEvents(WatcherSuppressionSeconds);
 
-                for (int i = SceneManager.sceneCount - 1; i >= 0; i--)
+                int loadedSceneCount = 0;
+                string singleChangedScenePath = null;
+                for (int i = 0; i < SceneManager.sceneCount; i++)
                 {
                     Scene scene = SceneManager.GetSceneAt(i);
                     if (!scene.IsValid() ||
@@ -788,11 +790,34 @@ namespace DuoCurtain.Editor
                         continue;
                     }
 
+                    loadedSceneCount++;
                     if (changedScenePaths.Contains(NormalizePath(scene.path)))
-                        EditorSceneManager.CloseScene(scene, true);
+                        singleChangedScenePath = scene.path;
                 }
 
-                EditorSceneManager.RestoreSceneManagerSetup(setup);
+                if (loadedSceneCount == 1 && !string.IsNullOrWhiteSpace(singleChangedScenePath))
+                {
+                    EditorSceneManager.OpenScene(singleChangedScenePath, OpenSceneMode.Single);
+                }
+                else
+                {
+                    for (int i = SceneManager.sceneCount - 1; i >= 0; i--)
+                    {
+                        Scene scene = SceneManager.GetSceneAt(i);
+                        if (!scene.IsValid() ||
+                            !scene.isLoaded ||
+                            string.IsNullOrWhiteSpace(scene.path))
+                        {
+                            continue;
+                        }
+
+                        if (changedScenePaths.Contains(NormalizePath(scene.path)))
+                            EditorSceneManager.CloseScene(scene, true);
+                    }
+
+                    EditorSceneManager.RestoreSceneManagerSetup(setup);
+                }
+
                 SceneView.RepaintAll();
                 Debug.Log(
                     "[DuoCurtain Auto Reload] Reloaded externally changed open scene(s) from disk.");

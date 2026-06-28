@@ -31,8 +31,15 @@ public class TilePlacementGrid : MonoBehaviour
 
     [Header("Fallback Room Seeding")]
     [Tooltip("如果场景里没有 TilePieceDefinition，可用名字匹配的 SpriteRenderer 初始化房间区域。")]
-    public bool seedRendererBoundsWhenEmpty = true;
+    public bool seedRendererBoundsWhenEmpty = false;
     public string seedRendererNameKeyword = "Floorplan";
+
+    [Header("Movement Connectivity")]
+    [Tooltip("玩家移动时必须沿途一直停留在已注册房间格内，避免从一个独立房间直接跨过空隙进入另一个房间。")]
+    public bool requireContinuousRoomPath = true;
+    [Tooltip("移动路径检测的采样间距，以一个 tile 单元为基准。0.25 表示每 1/4 tile 检查一次。")]
+    [Range(0.05f, 1f)]
+    public float pathSampleCellStep = 0.25f;
 
     [Header("Debug")]
     public bool drawDebugOccupiedCells = true;
@@ -266,11 +273,11 @@ public class TilePlacementGrid : MonoBehaviour
         previousWorldPoint.z = 0f;
         clearanceRadius = Mathf.Max(0f, clearanceRadius);
 
-        if (ContainsWorldPoint(desiredWorldPoint, clearanceRadius))
-            return desiredWorldPoint;
-
         if (ContainsWorldPoint(previousWorldPoint, clearanceRadius))
             return ClampSegmentToOccupiedArea(previousWorldPoint, desiredWorldPoint, clearanceRadius);
+
+        if (ContainsWorldPoint(desiredWorldPoint, clearanceRadius))
+            return desiredWorldPoint;
 
         return GetNearestOccupiedPoint(desiredWorldPoint, clearanceRadius);
     }
@@ -361,8 +368,33 @@ public class TilePlacementGrid : MonoBehaviour
 
     private Vector3 ClampSegmentToOccupiedArea(Vector3 from, Vector3 to, float clearanceRadius)
     {
-        Vector3 low = from;
-        Vector3 high = to;
+        if (!requireContinuousRoomPath && ContainsWorldPoint(to, clearanceRadius))
+            return to;
+
+        Vector3 lastValid = from;
+        Vector3 firstInvalid = to;
+        bool foundInvalid = false;
+        int steps = GetSegmentSampleCount(from, to);
+
+        for (int i = 1; i <= steps; i++)
+        {
+            Vector3 sample = Vector3.Lerp(from, to, i / (float)steps);
+            if (ContainsWorldPoint(sample, clearanceRadius))
+            {
+                lastValid = sample;
+                continue;
+            }
+
+            firstInvalid = sample;
+            foundInvalid = true;
+            break;
+        }
+
+        if (!foundInvalid)
+            return to;
+
+        Vector3 low = lastValid;
+        Vector3 high = firstInvalid;
 
         for (int i = 0; i < 18; i++)
         {
@@ -374,6 +406,17 @@ public class TilePlacementGrid : MonoBehaviour
         }
 
         return low;
+    }
+
+    private int GetSegmentSampleCount(Vector3 from, Vector3 to)
+    {
+        float distance = Vector2.Distance(from, to);
+        if (distance <= 0.0001f)
+            return 1;
+
+        float smallestCellSize = Mathf.Max(0.0001f, Mathf.Min(Mathf.Abs(cellSize.x), Mathf.Abs(cellSize.y)));
+        float sampleDistance = Mathf.Max(0.05f, smallestCellSize * Mathf.Clamp(pathSampleCellStep, 0.05f, 1f));
+        return Mathf.Max(1, Mathf.CeilToInt(distance / sampleDistance));
     }
 
     private Vector3 GetNearestOccupiedPoint(Vector3 desiredWorldPoint, float clearanceRadius)
@@ -547,20 +590,14 @@ public class TilePlacementGrid : MonoBehaviour
 
     private bool TouchesOtherOccupiedCell(Vector2Int cell, HashSet<Vector2Int> candidateCells)
     {
-        for (int x = -1; x <= 1; x++)
+        for (int i = 0; i < CardinalDirections.Length; i++)
         {
-            for (int y = -1; y <= 1; y++)
-            {
-                if (x == 0 && y == 0)
-                    continue;
+            Vector2Int neighbor = cell + CardinalDirections[i];
+            if (candidateCells.Contains(neighbor))
+                continue;
 
-                Vector2Int neighbor = new Vector2Int(cell.x + x, cell.y + y);
-                if (candidateCells.Contains(neighbor))
-                    continue;
-
-                if (occupiedCells.Contains(neighbor))
-                    return true;
-            }
+            if (occupiedCells.Contains(neighbor))
+                return true;
         }
 
         return false;

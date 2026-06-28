@@ -2495,8 +2495,10 @@ MonoBehaviour:
   tileUnit: 5
   cellSize: {x: 5, y: 5}
   origin: {x: 0, y: 0}
-  seedRendererBoundsWhenEmpty: 1
+  seedRendererBoundsWhenEmpty: 0
   seedRendererNameKeyword: Floorplan
+  requireContinuousRoomPath: 1
+  pathSampleCellStep: 0.25
   drawDebugOccupiedCells: 1
   drawDebugExteriorEdges: 1
   drawDebugVisualBounds: 1
