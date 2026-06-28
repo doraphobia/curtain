@@ -72,10 +72,10 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             CreateGridOverlay(material);
             CreateFusionSandboxController();
 
-            CreateFusionBlock("Fusion Block - L", RuntimeTileMeshDemo.DemoShape.L, new Vector3(-6f, 0f, 0f), projectionMaterial);
-            CreateFusionBlock("Fusion Block - 1x3", RuntimeTileMeshDemo.DemoShape.OneByThree, new Vector3(-1f, -2f, 0f), projectionMaterial);
-            CreateFusionBlock("Fusion Block - T", RuntimeTileMeshDemo.DemoShape.T, new Vector3(3f, 1f, 0f), projectionMaterial);
-            CreateFusionBlock("Fusion Block - Z", RuntimeTileMeshDemo.DemoShape.Z, new Vector3(6f, -2f, 0f), projectionMaterial);
+            CreateFusionBlock("Fusion Block - L", RuntimeTileMeshDemo.DemoShape.L, new Vector3(-6f, 0f, 0f), material, projectionMaterial);
+            CreateFusionBlock("Fusion Block - 1x3", RuntimeTileMeshDemo.DemoShape.OneByThree, new Vector3(-1f, -2f, 0f), material, projectionMaterial);
+            CreateFusionBlock("Fusion Block - T", RuntimeTileMeshDemo.DemoShape.T, new Vector3(3f, 1f, 0f), material, projectionMaterial);
+            CreateFusionBlock("Fusion Block - Z", RuntimeTileMeshDemo.DemoShape.Z, new Vector3(6f, -2f, 0f), material, projectionMaterial);
 
             Directory.CreateDirectory(Path.GetDirectoryName(ScenePath));
             EditorSceneManager.SaveScene(scene, ScenePath);
@@ -304,13 +304,15 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             string label,
             RuntimeTileMeshDemo.DemoShape shape,
             Vector3 position,
-            Material material)
+            Material fallbackMaterial,
+            Material projectionMaterial)
         {
             GameObject root = new GameObject(label);
             root.transform.position = position;
+            Material displayMaterial = projectionMaterial != null ? projectionMaterial : fallbackMaterial;
 
             RuntimeTileMeshView view = root.AddComponent<RuntimeTileMeshView>();
-            view.material = material;
+            view.material = displayMaterial;
             view.tiles = RuntimeTileMeshDemo.CreateShape(shape);
             view.tileSize = Vector2.one;
             view.uvMode = RuntimeTileMeshUVMode.Bounds;
@@ -334,19 +336,25 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             block.selectedColor = new Color(0.08f, 0.35f, 1f, 1f);
             block.colorLerpSpeed = 7f;
 
-            RuntimeTileMeshProjectionRenderer projection = root.AddComponent<RuntimeTileMeshProjectionRenderer>();
-            projection.visualState.material = material;
-            projection.visualState.projectionMode = RuntimeTileMeshProjectionMode.WorldTile;
-            projection.visualState.cellSize = Vector2.one;
-            projection.visualState.motionTileSize = new Vector2(3f, 3f);
-            projection.visualState.patternScale = 1f;
-            projection.visualState.patternIntensity = 0.38f;
-            projection.visualState.lineWidth = 0.055f;
-            projection.captureAnchorOnEnable = false;
-            projection.animateInPlayMode = true;
+            RuntimeTileMeshProjectionRenderer projection = null;
+            if (projectionMaterial != null)
+            {
+                projection = root.AddComponent<RuntimeTileMeshProjectionRenderer>();
+                projection.visualState.material = projectionMaterial;
+                projection.visualState.projectionMode = RuntimeTileMeshProjectionMode.WorldTile;
+                projection.visualState.cellSize = Vector2.one;
+                projection.visualState.motionTileSize = new Vector2(3f, 3f);
+                projection.visualState.patternScale = 1f;
+                projection.visualState.patternIntensity = 0.38f;
+                projection.visualState.lineWidth = 0.055f;
+                projection.captureAnchorOnEnable = false;
+                projection.requireProjectionMaterial = true;
+                projection.animateInPlayMode = true;
+            }
 
             view.Rebuild();
-            projection.Apply();
+            if (projection != null)
+                projection.Apply();
         }
 
         private static void CreateLabel(

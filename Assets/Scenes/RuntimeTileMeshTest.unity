@@ -847,6 +847,7 @@ MonoBehaviour:
     lineWidth: 0.055
     anchorWorldPosition: {x: 3, y: 1}
   captureAnchorOnEnable: 0
+  requireProjectionMaterial: 1
   animateInEditMode: 0
   animateInPlayMode: 1
   useUnscaledTime: 0
@@ -2252,6 +2253,7 @@ MonoBehaviour:
     lineWidth: 0.055
     anchorWorldPosition: {x: -6, y: 0}
   captureAnchorOnEnable: 0
+  requireProjectionMaterial: 1
   animateInEditMode: 0
   animateInPlayMode: 1
   useUnscaledTime: 0
@@ -3615,6 +3617,7 @@ MonoBehaviour:
     lineWidth: 0.055
     anchorWorldPosition: {x: 6, y: -2}
   captureAnchorOnEnable: 0
+  requireProjectionMaterial: 1
   animateInEditMode: 0
   animateInPlayMode: 1
   useUnscaledTime: 0
@@ -5235,6 +5238,7 @@ MonoBehaviour:
     lineWidth: 0.055
     anchorWorldPosition: {x: -1, y: -2}
   captureAnchorOnEnable: 0
+  requireProjectionMaterial: 1
   animateInEditMode: 0
   animateInPlayMode: 1
   useUnscaledTime: 0

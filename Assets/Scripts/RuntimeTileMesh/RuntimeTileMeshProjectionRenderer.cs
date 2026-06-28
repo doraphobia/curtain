@@ -22,6 +22,7 @@ namespace DuoCurtain.RuntimeTileMesh
         [Header("State")]
         public RuntimeTileMeshVisualState visualState = new RuntimeTileMeshVisualState();
         public bool captureAnchorOnEnable = true;
+        public bool requireProjectionMaterial = true;
         public bool animateInEditMode;
         public bool animateInPlayMode = true;
         public bool useUnscaledTime;
@@ -90,6 +91,9 @@ namespace DuoCurtain.RuntimeTileMesh
 
             visualState ??= new RuntimeTileMeshVisualState();
             visualState.Sanitize();
+
+            if (requireProjectionMaterial && visualState.material == null)
+                return;
 
             view.CollectGeneratedRenderers(renderers);
             if (renderers.Count == 0)

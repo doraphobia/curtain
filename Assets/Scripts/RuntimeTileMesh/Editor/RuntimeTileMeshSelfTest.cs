@@ -21,6 +21,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             failures += ExpectSuccessfulComponents("Z", RuntimeTileMeshDemo.CreateShape(RuntimeTileMeshDemo.DemoShape.Z), settings, 1);
             failures += ExpectSuccessfulComponents("DiagonalTouch", RuntimeTileMeshDemo.CreateShape(RuntimeTileMeshDemo.DemoShape.DiagonalTouch), settings, 2);
             failures += ExpectHoleWarning("RingWithHole", RuntimeTileMeshDemo.CreateShape(RuntimeTileMeshDemo.DemoShape.RingWithHole), settings);
+            failures += ExpectDefaultFallbackMaterial();
             failures += ExpectFusionConnectionRules();
             failures += ExpectFusionBlockMergeRules();
 
@@ -141,6 +142,53 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
 
             Debug.LogError("[RuntimeTileMeshSelfTest] " + name + " should report an unsupported-hole warning instead of filling the hole.");
             return 1;
+        }
+
+        private static int ExpectDefaultFallbackMaterial()
+        {
+            GameObject root = new GameObject("RuntimeTileMeshSelfTest Default Visual");
+            try
+            {
+                RuntimeTileMeshView view = root.AddComponent<RuntimeTileMeshView>();
+                view.material = null;
+                view.tiles = RuntimeTileMeshDemo.CreateShape(RuntimeTileMeshDemo.DemoShape.Single);
+                view.tileSize = Vector2.one;
+                view.rebuildOnStart = false;
+                view.Rebuild();
+
+                List<Renderer> renderers = new List<Renderer>();
+                view.CollectGeneratedRenderers(renderers);
+                if (renderers.Count == 0)
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] Default fallback material test generated no renderers.");
+                    return 1;
+                }
+
+                Material material = renderers[0] != null ? renderers[0].sharedMaterial : null;
+                if (material == null || material.shader == null)
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] Default fallback material test expected a non-null white fallback material.");
+                    return 1;
+                }
+
+                if (material.HasProperty("_BaseColor") && material.GetColor("_BaseColor") != Color.white)
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] Default fallback material _BaseColor was not white.");
+                    return 1;
+                }
+
+                if (material.HasProperty("_Color") && material.GetColor("_Color") != Color.white)
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] Default fallback material _Color was not white.");
+                    return 1;
+                }
+
+                return 0;
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
         }
 
         private static int ExpectFusionBlockMergeRules()

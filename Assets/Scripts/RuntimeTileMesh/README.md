@@ -13,6 +13,7 @@ Current project integration:
 - `TilePlacementGrid` can pass its current `1x5` room cell size into this system, so the project grid remains aligned while the mesh algorithm stays generic.
 - `RuntimeTileMeshView` is only responsible for geometry and clipping. It should not own procedural-motion scale decisions.
 - `RuntimeTileMeshProjectionRenderer` owns visual projection state and pushes it through `MaterialPropertyBlock`, so mesh rebuilds do not restart or rescale the pattern.
+- Projection is optional. If no projection/animation material is assigned, `RuntimeTileMeshView` must keep the old plain white fallback visual.
 
 UV modes:
 

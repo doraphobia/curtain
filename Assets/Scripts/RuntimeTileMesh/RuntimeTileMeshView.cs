@@ -176,17 +176,55 @@ namespace DuoCurtain.RuntimeTileMesh
             if (renderer != null && renderer.sharedMaterial != null)
                 return renderer.sharedMaterial;
 
-            Shader shader = Shader.Find("Sprites/Default");
+            Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
+            if (shader == null)
+                shader = Shader.Find("Sprites/Default");
             if (shader == null)
                 shader = Shader.Find("Unlit/Color");
+            if (shader == null)
+                shader = Shader.Find("Unlit/Texture");
 
             if (shader == null)
                 return null;
 
-            if (runtimeFallbackMaterial == null)
+            if (runtimeFallbackMaterial == null || runtimeFallbackMaterial.shader != shader)
+            {
+                if (runtimeFallbackMaterial != null)
+                {
+                    if (Application.isPlaying)
+                        Destroy(runtimeFallbackMaterial);
+                    else
+                        DestroyImmediate(runtimeFallbackMaterial);
+                }
+
                 runtimeFallbackMaterial = new Material(shader);
+                runtimeFallbackMaterial.name = "RuntimeTileMesh Default White";
+            }
+
+            ApplyFallbackMaterialDefaults(runtimeFallbackMaterial);
 
             return runtimeFallbackMaterial;
+        }
+
+        private static void ApplyFallbackMaterialDefaults(Material fallback)
+        {
+            if (fallback == null)
+                return;
+
+            if (fallback.HasProperty("_BaseMap"))
+                fallback.SetTexture("_BaseMap", null);
+            if (fallback.HasProperty("_MainTex"))
+                fallback.SetTexture("_MainTex", null);
+            if (fallback.HasProperty("_BaseColor"))
+                fallback.SetColor("_BaseColor", Color.white);
+            if (fallback.HasProperty("_Color"))
+                fallback.SetColor("_Color", Color.white);
+            if (fallback.HasProperty("_Surface"))
+                fallback.SetFloat("_Surface", 0f);
+            if (fallback.HasProperty("_Cull"))
+                fallback.SetFloat("_Cull", 0f);
+            if (fallback.HasProperty("_ZWrite"))
+                fallback.SetFloat("_ZWrite", 0f);
         }
 
         private void DestroyGeneratedRoot()
