@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.2
+
+- Added an After Effects export progress header, progress bar, percent text, current task label, and progress description.
+- Wired progress updates into bridge export, direct export, motion export, Media Encoder queueing, layer collection, vector sampling, reference frames, and baked PNG frame export.
+- Updated compact Result page sizing so progress UI and detailed status logs remain visible in narrow docked panels.
+
 ## 0.6.1
 
 - Added procedural rounded rectangle and procedural open-path stroke runtime shaders.

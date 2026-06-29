@@ -1,6 +1,6 @@
 {
   "name": "com.redhong01.ae2unity",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "displayName": "AE2Unity",
   "description": "Imports After Effects metadata, realtime motion data, vector-only shape compositions, or baked composition frames and generates playable Unity 6 assets for 2D motion graphics.",
   "unity": "6000.0",

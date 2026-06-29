@@ -28,8 +28,11 @@
     var UI_COMPACT_TALL_ROW_HEIGHT = 82;
     var UI_COMPACT_OPTIONS_ROW_HEIGHT = 34;
     var UI_COMPACT_MEDIA_OPTIONS_HEIGHT = 112;
-    var UI_COMPACT_RESULT_GROUP_HEIGHT = 178;
-    var UI_COMPACT_RESULT_STATUS_HEIGHT = 132;
+    var UI_COMPACT_PROGRESS_HEADER_HEIGHT = 22;
+    var UI_COMPACT_PROGRESS_BAR_HEIGHT = 14;
+    var UI_COMPACT_PROGRESS_DESCRIPTION_HEIGHT = 34;
+    var UI_COMPACT_RESULT_GROUP_HEIGHT = 236;
+    var UI_COMPACT_RESULT_STATUS_HEIGHT = 86;
     var UI_FULL_WINDOW_SIZE = [860, 560];
     var UI_COMPACT_WINDOW_SIZE = [340, 560];
     var UI_MAX_VISIBLE_HEIGHT = 10000;
@@ -277,6 +280,36 @@
         checkResultButton.preferredSize.height = 34;
         checkResultButton.ae2unityCompactVisibleHeight = 34;
         setHelpTip(checkResultButton, "Read the latest Unity AEBridge result file.");
+        var progressHeaderGroup = resultGroup.add("group");
+        progressHeaderGroup.orientation = "row";
+        progressHeaderGroup.alignChildren = ["left", "center"];
+        progressHeaderGroup.alignment = ["fill", "top"];
+        progressHeaderGroup.spacing = 8;
+        progressHeaderGroup.margins = 0;
+        progressHeaderGroup.ae2unityProgressHeader = true;
+        progressHeaderGroup.ae2unityCompactVisibleHeight = UI_COMPACT_PROGRESS_HEADER_HEIGHT;
+        setHelpTip(progressHeaderGroup, "Current export task and percent complete.");
+        var progressTaskText = progressHeaderGroup.add("statictext", undefined, "Idle");
+        progressTaskText.alignment = ["fill", "center"];
+        progressTaskText.minimumSize.width = 120;
+        setHelpTip(progressTaskText, "The current export task.");
+        var progressPercentText = progressHeaderGroup.add("statictext", undefined, "0%");
+        fixedControl(progressPercentText, 54, UI_COMPACT_PROGRESS_HEADER_HEIGHT);
+        setHelpTip(progressPercentText, "Current export progress percentage.");
+        var progressBar = resultGroup.add("progressbar", undefined, 0, 100);
+        progressBar.alignment = ["fill", "top"];
+        progressBar.minimumSize.height = UI_COMPACT_PROGRESS_BAR_HEIGHT;
+        progressBar.preferredSize.height = UI_COMPACT_PROGRESS_BAR_HEIGHT;
+        progressBar.ae2unityProgressBar = true;
+        progressBar.ae2unityCompactVisibleHeight = UI_COMPACT_PROGRESS_BAR_HEIGHT;
+        setHelpTip(progressBar, "Visual export progress.");
+        var progressDescriptionText = resultGroup.add("statictext", undefined, "Waiting for export.");
+        progressDescriptionText.alignment = ["fill", "top"];
+        progressDescriptionText.minimumSize.height = 22;
+        progressDescriptionText.preferredSize.height = 28;
+        progressDescriptionText.ae2unityProgressDescription = true;
+        progressDescriptionText.ae2unityCompactVisibleHeight = UI_COMPACT_PROGRESS_DESCRIPTION_HEIGHT;
+        setHelpTip(progressDescriptionText, "Short description of the current export step.");
         var status = resultGroup.add("edittext", undefined, "Ready", { multiline: true, readonly: true, scrolling: true });
         status.alignment = ["fill", "top"];
         status.minimumSize.height = 72;
@@ -285,6 +318,13 @@
         status.ae2unityCompactVisibleHeight = UI_COMPACT_RESULT_STATUS_HEIGHT;
         stretchControl(status, UI_FIELD_WIDTH, 160);
         setHelpTip(status, "Shows export progress, warnings, and bridge results.");
+        panel.ae2unityProgressControls = {
+            task: progressTaskText,
+            percent: progressPercentText,
+            bar: progressBar,
+            description: progressDescriptionText,
+            status: status
+        };
 
         setCompactPages(panel, [
             {
@@ -437,8 +477,9 @@
         };
 
         function runExportAction() {
+            var progress = createExportProgress(panel);
             try {
-                showStatusResult(panel, status, "Running export...");
+                reportProgress(progress, 0, "Preparing export", "Reading panel settings and validating the selected composition.", "Running export...");
                 var exportResult = runConfiguredExport({
                     comp: getSelectedComposition(compSourceDropdown, compDropdown),
                     exportMode: getExportModeValue(exportModeDropdown),
@@ -455,11 +496,12 @@
                     exportProceduralShapes: proceduralShapesCheckbox.value,
                     bakeUnsupportedMotion: bakeUnsupportedCheckbox.value,
                     motionCurveDetail: curveDetailDropdown.selection ? curveDetailDropdown.selection.text : "Keys + Ease",
-                    motionSampleRate: sampleRateText.text
+                    motionSampleRate: sampleRateText.text,
+                    progress: progress
                 });
-                showStatusResult(panel, status, exportResult);
+                reportProgress(progress, 100, "Complete", "Export workflow finished.", exportResult);
             } catch (error) {
-                showStatusResult(panel, status, "Export failed: " + error.toString());
+                reportProgress(progress, 100, "Failed", error.toString(), "Export failed: " + error.toString());
                 alert(status.text);
             }
         }
@@ -469,9 +511,9 @@
 
         checkResultButton.onClick = function () {
             try {
-                showStatusResult(panel, status, readLastBridgeResult(projectPathText.text));
+                showExportProgress(panel, 100, "Bridge result", "Read the latest Unity AEBridge result file.", readLastBridgeResult(projectPathText.text));
             } catch (error) {
-                showStatusResult(panel, status, "Result check failed: " + error.toString());
+                showExportProgress(panel, 100, "Result check failed", error.toString(), "Result check failed: " + error.toString());
                 alert(status.text);
             }
         };
@@ -763,17 +805,50 @@
                 control.orientation = "column";
                 control.alignChildren = ["fill", "top"];
                 control.alignment = ["fill", "top"];
-                control.spacing = compact ? 6 : 8;
+                control.spacing = compact ? 5 : 8;
                 control.minimumSize.width = compact ? 80 : UI_FIELD_WIDTH;
                 control.preferredSize.width = compact ? compactWidth : UI_FIELD_WIDTH;
                 control.ae2unityCompactVisibleHeight = UI_COMPACT_RESULT_GROUP_HEIGHT;
+            }
+
+            if (control.ae2unityProgressHeader) {
+                control.orientation = "row";
+                control.alignChildren = ["left", "center"];
+                control.alignment = ["fill", "top"];
+                control.spacing = compact ? 6 : 8;
+                control.minimumSize.width = compact ? 80 : UI_FIELD_WIDTH;
+                control.preferredSize.width = compact ? compactWidth : UI_FIELD_WIDTH;
+                control.minimumSize.height = UI_COMPACT_PROGRESS_HEADER_HEIGHT;
+                control.preferredSize.height = UI_COMPACT_PROGRESS_HEADER_HEIGHT;
+                control.maximumSize.height = UI_COMPACT_PROGRESS_HEADER_HEIGHT;
+                control.ae2unityCompactVisibleHeight = UI_COMPACT_PROGRESS_HEADER_HEIGHT;
+            }
+
+            if (control.ae2unityProgressBar) {
+                control.alignment = ["fill", "top"];
+                control.minimumSize.width = compact ? 80 : 160;
+                control.preferredSize.width = compact ? compactWidth : UI_FIELD_WIDTH;
+                control.minimumSize.height = UI_COMPACT_PROGRESS_BAR_HEIGHT;
+                control.preferredSize.height = UI_COMPACT_PROGRESS_BAR_HEIGHT;
+                control.maximumSize.height = UI_COMPACT_PROGRESS_BAR_HEIGHT;
+                control.ae2unityCompactVisibleHeight = UI_COMPACT_PROGRESS_BAR_HEIGHT;
+            }
+
+            if (control.ae2unityProgressDescription) {
+                control.alignment = ["fill", "top"];
+                control.minimumSize.width = compact ? 80 : 160;
+                control.preferredSize.width = compact ? compactWidth : UI_FIELD_WIDTH;
+                control.minimumSize.height = compact ? UI_COMPACT_PROGRESS_DESCRIPTION_HEIGHT : 22;
+                control.preferredSize.height = compact ? UI_COMPACT_PROGRESS_DESCRIPTION_HEIGHT : 28;
+                control.maximumSize.height = compact ? UI_COMPACT_PROGRESS_DESCRIPTION_HEIGHT : 34;
+                control.ae2unityCompactVisibleHeight = UI_COMPACT_PROGRESS_DESCRIPTION_HEIGHT;
             }
 
             if (control.ae2unityResultStatus) {
                 control.alignment = ["fill", "top"];
                 control.minimumSize.width = compact ? 80 : 160;
                 control.preferredSize.width = compact ? compactWidth : UI_FIELD_WIDTH;
-                control.minimumSize.height = compact ? 96 : 72;
+                control.minimumSize.height = compact ? UI_COMPACT_RESULT_STATUS_HEIGHT : 72;
                 control.preferredSize.height = compact ? UI_COMPACT_RESULT_STATUS_HEIGHT : 88;
                 control.maximumSize.height = compact ? UI_COMPACT_RESULT_STATUS_HEIGHT : UI_MAX_VISIBLE_HEIGHT;
                 control.ae2unityCompactVisibleHeight = UI_COMPACT_RESULT_STATUS_HEIGHT;
@@ -947,6 +1022,96 @@
         setCompactPageByTitle(panel, "Result");
         relayoutPanel(panel);
         flushPanelUi(panel);
+    }
+
+    function createExportProgress(panel) {
+        return {
+            update: function (value, task, description, statusMessage) {
+                showExportProgress(panel, value, task, description, statusMessage);
+            }
+        };
+    }
+
+    function createProgressSection(progress, startValue, endValue) {
+        return {
+            update: function (value, task, description, statusMessage) {
+                var localValue = clampNumber(Number(value), 0, 100);
+                var mappedValue = Number(startValue) + (Number(endValue) - Number(startValue)) * (localValue / 100);
+                reportProgress(progress, mappedValue, task, description, statusMessage);
+            }
+        };
+    }
+
+    function reportProgress(progress, value, task, description, statusMessage) {
+        if (progress && progress.update) {
+            progress.update(value, task, description, statusMessage);
+        }
+    }
+
+    function showExportProgress(panel, value, task, description, statusMessage) {
+        var controls = panel ? panel.ae2unityProgressControls : null;
+        if (!controls) {
+            return;
+        }
+
+        var normalizedValue = clampNumber(Number(value), 0, 100);
+        var percentText = Math.round(normalizedValue) + "%";
+
+        try {
+            if (controls.bar) {
+                controls.bar.value = normalizedValue;
+            }
+        } catch (ignoredProgressBarUpdate) {
+        }
+
+        try {
+            if (controls.percent) {
+                controls.percent.text = percentText;
+            }
+        } catch (ignoredProgressPercentUpdate) {
+        }
+
+        try {
+            if (controls.task && task !== undefined) {
+                controls.task.text = task || "Working";
+            }
+        } catch (ignoredProgressTaskUpdate) {
+        }
+
+        try {
+            if (controls.description && description !== undefined) {
+                controls.description.text = description || "";
+            }
+        } catch (ignoredProgressDescriptionUpdate) {
+        }
+
+        try {
+            if (controls.status && statusMessage !== undefined) {
+                controls.status.text = statusMessage || "";
+            }
+        } catch (ignoredProgressStatusUpdate) {
+        }
+
+        setCompactPageByTitle(panel, "Result");
+        relayoutPanel(panel);
+        flushPanelUi(panel);
+    }
+
+    function clampNumber(value, minValue, maxValue) {
+        if (!isFinite(value)) {
+            return minValue;
+        }
+
+        return Math.max(minValue, Math.min(maxValue, value));
+    }
+
+    function shouldReportProgress(index, totalCount) {
+        if (totalCount <= 1) {
+            return true;
+        }
+
+        var interval = Math.max(1, Math.floor(totalCount / 40));
+        return index === 0 || index === totalCount - 1 || index % interval === 0;
     }
 
     function flushPanelUi(panel) {
@@ -1342,29 +1507,29 @@
     function runConfiguredExport(config) {
         var messages = [];
         var mode = config.exportMode || "bridge";
+        var progress = config.progress;
+        reportProgress(progress, 2, "Preparing export", "Mode: " + describeExportMode(mode) + ".", "Running export...");
 
         if (mode === "bridge" || mode === "bridgeMedia") {
+            var bridgeProgress = createProgressSection(progress, 5, mode === "bridgeMedia" ? 58 : 95);
             var bridgeResult = sendActiveCompToUnityBridge(
                 config.projectPath,
                 config.unityExportPath,
-                {
-                    comp: config.comp,
-                    exportReferenceFrames: config.exportReferenceFrames,
-                    exportBakedFrames: config.exportBakedFrames,
-                    generateShaderAndMaterial: config.generateShaderAndMaterial
-                });
+                copyExportOptionsWithProgress(config, bridgeProgress));
             messages.push("Bridge job sent: " + bridgeResult.jobId);
         }
 
         if (mode === "motionBridge") {
+            var motionBridgeProgress = createProgressSection(progress, 5, 95);
             var motionBridgeResult = sendMotionToUnityBridge(
                 config.projectPath,
                 config.unityExportPath,
-                config);
+                copyExportOptionsWithProgress(config, motionBridgeProgress));
             messages.push("Motion bridge job sent: " + motionBridgeResult.jobId);
         }
 
         if (mode === "media" || mode === "bridgeMedia") {
+            var mediaProgress = createProgressSection(progress, mode === "bridgeMedia" ? 60 : 5, 95);
             var mediaResult = queueMediaEncoderExport(
                 config.comp,
                 config.projectPath,
@@ -1372,46 +1537,90 @@
                 {
                     extension: config.mediaExtension,
                     outputModuleTemplate: config.outputModuleTemplate,
-                    startMediaEncoder: config.startMediaEncoder
+                    startMediaEncoder: config.startMediaEncoder,
+                    progress: mediaProgress
                 });
             messages.push("Media queued: " + mediaResult.fsName);
         }
 
         if (mode === "direct") {
+            var directProgress = createProgressSection(progress, 5, 95);
             var directResult = exportActiveCompToUnityProject(
                 config.projectPath,
                 config.unityExportPath,
-                {
-                    comp: config.comp,
-                    exportReferenceFrames: config.exportReferenceFrames,
-                    exportBakedFrames: config.exportBakedFrames
-                });
+                copyExportOptionsWithProgress(config, directProgress));
             messages.push("Exported: " + directResult.fsName);
         }
 
         if (mode === "motionDirect") {
+            var motionDirectProgress = createProgressSection(progress, 5, 95);
             var motionDirectResult = exportMotionToUnityProject(
                 config.projectPath,
                 config.unityExportPath,
-                config);
+                copyExportOptionsWithProgress(config, motionDirectProgress));
             messages.push("Exported motion: " + motionDirectResult.fsName);
         }
 
         if (mode === "folder") {
-            var folderResult = exportActiveCompToChosenFolder({
-                comp: config.comp,
-                exportReferenceFrames: config.exportReferenceFrames,
-                exportBakedFrames: config.exportBakedFrames
-            });
+            var folderProgress = createProgressSection(progress, 5, 95);
+            var folderResult = exportActiveCompToChosenFolder(copyExportOptionsWithProgress(config, folderProgress));
             messages.push("Exported: " + folderResult.fsName);
         }
 
         if (mode === "motionFolder") {
-            var motionFolderResult = exportMotionToChosenFolder(config);
+            var motionFolderProgress = createProgressSection(progress, 5, 95);
+            var motionFolderResult = exportMotionToChosenFolder(copyExportOptionsWithProgress(config, motionFolderProgress));
             messages.push("Exported motion: " + motionFolderResult.fsName);
         }
 
+        if (messages.length === 0) {
+            throw new Error("Unsupported export mode: " + mode);
+        }
+
+        reportProgress(progress, 98, "Finalizing", "Export steps completed. Preparing summary.", messages.join(" | "));
         return messages.join(" | ");
+    }
+
+    function copyExportOptionsWithProgress(options, progress) {
+        var copy = {};
+        options = options || {};
+        for (var key in options) {
+            if (options.hasOwnProperty(key)) {
+                copy[key] = options[key];
+            }
+        }
+
+        copy.progress = progress;
+        return copy;
+    }
+
+    function describeExportMode(mode) {
+        if (mode === "bridge") {
+            return "AEBridge .ae2shader";
+        }
+        if (mode === "bridgeMedia") {
+            return "AEBridge .ae2shader + media";
+        }
+        if (mode === "media") {
+            return "Media Encoder";
+        }
+        if (mode === "direct") {
+            return "Direct .ae2shader to Assets";
+        }
+        if (mode === "folder") {
+            return "Manual .ae2shader folder";
+        }
+        if (mode === "motionBridge") {
+            return "AEBridge .ae2motion";
+        }
+        if (mode === "motionDirect") {
+            return "Direct .ae2motion to Assets";
+        }
+        if (mode === "motionFolder") {
+            return "Manual .ae2motion folder";
+        }
+
+        return mode || "Unknown";
     }
 
     function getExportModeSelection(value) {
@@ -1855,18 +2064,23 @@
 
     function exportActiveCompToChosenFolder(options) {
         var comp = getCompositionFromOptions(options);
+        var progress = options && options.progress;
+        reportProgress(progress, 5, "Choose output folder", "Waiting for a manual export folder selection.");
         var folder = Folder.selectDialog("Choose export folder for " + comp.name);
         if (!folder) {
             throw new Error("Export cancelled.");
         }
 
+        reportProgress(progress, 12, "Preparing folder", "Creating export folder for " + comp.name + ".");
         var exportFolder = getCompositionOutputFolder(folder, comp);
         ensureFolderExists(exportFolder);
-        return exportActiveCompToFolder(comp, exportFolder, options);
+        return exportActiveCompToFolder(comp, exportFolder, copyExportOptionsWithProgress(options, createProgressSection(progress, 15, 98)));
     }
 
     function exportActiveCompToUnityProject(projectPath, relativePath, options) {
         var comp = getCompositionFromOptions(options);
+        var progress = options && options.progress;
+        reportProgress(progress, 5, "Validate Unity project", "Checking the selected Unity project folder.");
         var projectFolder = new Folder(projectPath);
         if (!isUnityProjectFolder(projectFolder)) {
             throw new Error("Choose a Unity project folder that contains Assets and ProjectSettings.");
@@ -1880,13 +2094,16 @@
         saveSetting("UnityProjectPath", projectFolder.fsName);
         saveSetting("UnityExportRelativePath", normalizedRelativePath);
 
+        reportProgress(progress, 14, "Prepare export folder", "Resolving " + normalizedRelativePath + " inside the Unity project.");
         var exportFolder = getCompositionOutputFolder(new Folder(joinPath(projectFolder.fsName, normalizedRelativePath)), comp);
         ensureFolderExists(exportFolder);
-        return exportActiveCompToFolder(comp, exportFolder, options);
+        return exportActiveCompToFolder(comp, exportFolder, copyExportOptionsWithProgress(options, createProgressSection(progress, 18, 98)));
     }
 
     function sendActiveCompToUnityBridge(projectPath, relativePath, options) {
         var comp = getCompositionFromOptions(options);
+        var progress = options && options.progress;
+        reportProgress(progress, 5, "Validate Unity bridge", "Checking the selected Unity project and bridge folders.");
         var projectFolder = new Folder(projectPath);
         if (!isUnityProjectFolder(projectFolder)) {
             throw new Error("Choose a Unity project folder that contains Assets and ProjectSettings.");
@@ -1907,12 +2124,14 @@
         ensureFolderExists(inboxFolder);
         ensureFolderExists(payloadsFolder);
         ensureFolderExists(outboxFolder);
+        reportProgress(progress, 18, "Prepare bridge payload", "Creating AEBridge payload folder.");
 
         var jobId = createJobId(comp);
         var payloadFolder = new Folder(payloadsFolder.fsName + "/" + jobId);
         ensureFolderExists(payloadFolder);
 
-        var payloadFile = exportActiveCompToFolder(comp, payloadFolder, options);
+        var payloadFile = exportActiveCompToFolder(comp, payloadFolder, copyExportOptionsWithProgress(options, createProgressSection(progress, 22, 78)));
+        reportProgress(progress, 84, "Write bridge job", "Writing ImportAe2Shader job for Unity.");
         var job = {
             protocolVersion: "0.1.0",
             jobId: jobId,
@@ -1940,6 +2159,7 @@
         }
 
         saveSetting("LastBridgeJobId", jobId);
+        reportProgress(progress, 100, "Bridge job sent", "Unity AEBridge can now import the payload.", "Bridge job sent: " + jobId);
         return {
             jobId: jobId,
             payloadFile: payloadFile
@@ -1948,18 +2168,23 @@
 
     function exportMotionToChosenFolder(options) {
         var comp = getCompositionFromOptions(options);
+        var progress = options && options.progress;
+        reportProgress(progress, 5, "Choose output folder", "Waiting for a manual .ae2motion export folder selection.");
         var folder = Folder.selectDialog("Choose a folder for the .ae2motion export");
         if (!folder) {
             throw new Error("Export cancelled.");
         }
 
+        reportProgress(progress, 12, "Preparing folder", "Creating .ae2motion export folder for " + comp.name + ".");
         var exportFolder = getCompositionOutputFolder(folder, comp);
         ensureFolderExists(exportFolder);
-        return exportMotionToFolder(comp, exportFolder, options);
+        return exportMotionToFolder(comp, exportFolder, copyExportOptionsWithProgress(options, createProgressSection(progress, 15, 98)));
     }
 
     function exportMotionToUnityProject(projectPath, relativePath, options) {
         var comp = getCompositionFromOptions(options);
+        var progress = options && options.progress;
+        reportProgress(progress, 5, "Validate Unity project", "Checking the selected Unity project folder.");
         var projectFolder = new Folder(projectPath);
         if (!isUnityProjectFolder(projectFolder)) {
             throw new Error("Choose a Unity project folder that contains Assets and ProjectSettings.");
@@ -1973,13 +2198,16 @@
         saveSetting("UnityProjectPath", projectFolder.fsName);
         saveSetting("UnityExportRelativePath", normalizedRelativePath);
 
+        reportProgress(progress, 14, "Prepare motion folder", "Resolving " + normalizedRelativePath + " inside the Unity project.");
         var exportFolder = getCompositionOutputFolder(new Folder(joinPath(projectFolder.fsName, normalizedRelativePath)), comp);
         ensureFolderExists(exportFolder);
-        return exportMotionToFolder(comp, exportFolder, options);
+        return exportMotionToFolder(comp, exportFolder, copyExportOptionsWithProgress(options, createProgressSection(progress, 18, 98)));
     }
 
     function sendMotionToUnityBridge(projectPath, relativePath, options) {
         var comp = getCompositionFromOptions(options);
+        var progress = options && options.progress;
+        reportProgress(progress, 5, "Validate motion bridge", "Checking the selected Unity project and bridge folders.");
         var projectFolder = new Folder(projectPath);
         if (!isUnityProjectFolder(projectFolder)) {
             throw new Error("Choose a Unity project folder that contains Assets and ProjectSettings.");
@@ -2000,12 +2228,14 @@
         ensureFolderExists(inboxFolder);
         ensureFolderExists(payloadsFolder);
         ensureFolderExists(outboxFolder);
+        reportProgress(progress, 18, "Prepare motion payload", "Creating AEBridge payload folder.");
 
         var jobId = createJobId(comp);
         var payloadFolder = new Folder(payloadsFolder.fsName + "/" + jobId);
         ensureFolderExists(payloadFolder);
 
-        var payloadFile = exportMotionToFolder(comp, payloadFolder, options);
+        var payloadFile = exportMotionToFolder(comp, payloadFolder, copyExportOptionsWithProgress(options, createProgressSection(progress, 22, 78)));
+        reportProgress(progress, 84, "Write bridge job", "Writing ImportAe2Motion job for Unity.");
         var job = {
             protocolVersion: "0.1.0",
             jobId: jobId,
@@ -2035,6 +2265,7 @@
         }
 
         saveSetting("LastBridgeJobId", jobId);
+        reportProgress(progress, 100, "Motion bridge job sent", "Unity AEBridge can now import the .ae2motion payload.", "Motion bridge job sent: " + jobId);
         return {
             jobId: jobId,
             payloadFile: payloadFile
@@ -2043,6 +2274,8 @@
 
     function queueMediaEncoderExport(comp, projectPath, mediaRelativePath, options) {
         options = options || {};
+        var progress = options.progress;
+        reportProgress(progress, 5, "Validate media export", "Checking the Unity project and media output folder.");
         var projectFolder = new Folder(projectPath);
         if (!isUnityProjectFolder(projectFolder)) {
             throw new Error("Choose a Unity project folder that contains Assets and ProjectSettings.");
@@ -2060,6 +2293,7 @@
 
         var extension = normalizeExtension(options.extension || "mp4");
         var outputFile = new File(mediaFolder.fsName + "/" + sanitizeFileName(comp.name) + "." + extension);
+        reportProgress(progress, 28, "Prepare Media Encoder item", "Creating render queue item for " + outputFile.name + ".");
         var existingItems = collectRenderQueueItems();
         var previousStates = setRenderQueueItemsRender(existingItems, false);
         var rqItem = null;
@@ -2072,12 +2306,14 @@
             var outputModule = rqItem.outputModule(1);
             if (options.outputModuleTemplate) {
                 try {
+                    reportProgress(progress, 48, "Apply output template", "Applying output module template: " + options.outputModuleTemplate + ".");
                     outputModule.applyTemplate(options.outputModuleTemplate);
                 } catch (ignoredTemplate) {
                 }
             }
 
             outputModule.file = outputFile;
+            reportProgress(progress, 70, "Queue in AME", "Sending the render queue item to Adobe Media Encoder.");
 
             if (!app.project.renderQueue.canQueueInAME) {
                 throw new Error("After Effects cannot queue the current render item in Adobe Media Encoder.");
@@ -2089,6 +2325,7 @@
             app.endUndoGroup();
         }
 
+        reportProgress(progress, 100, "Media queued", "Adobe Media Encoder job is queued.", "Media queued: " + outputFile.fsName);
         return outputFile;
     }
 
@@ -2170,6 +2407,8 @@
 
     function exportActiveCompToFolder(comp, folder, options) {
         options = options || {};
+        var progress = options.progress;
+        reportProgress(progress, 2, "Prepare output folder", "Creating folders for " + comp.name + ".");
         ensureFolderExists(folder);
 
         var assetMap = {};
@@ -2204,30 +2443,42 @@
         app.beginUndoGroup(SCRIPT_NAME);
         try {
             if (options.exportReferenceFrames !== false) {
+                reportProgress(progress, 8, "Prepare reference frames", "Creating reference frame folder.");
                 ensureFolderExists(referenceFolder);
             }
 
+            reportProgress(progress, 12, "Collect layers", "Reading AE layer metadata.");
+            var layerProgress = createProgressSection(progress, 14, 34);
             for (var i = 1; i <= exportComp.numLayers; i++) {
+                if (shouldReportProgress(i - 1, exportComp.numLayers)) {
+                    reportProgress(layerProgress, ((i - 1) / Math.max(1, exportComp.numLayers)) * 100, "Collect layers", "Reading layer " + i + " of " + exportComp.numLayers + ": " + exportComp.layer(i).name + ".");
+                }
                 layers.push(collectLayer(exportComp.layer(i), assetMap, assets, warnings));
             }
+            reportProgress(layerProgress, 100, "Collect layers", "Layer metadata collected.");
 
-            vectorAnimation = collectVectorAnimation(exportComp, warnings, prepared);
+            vectorAnimation = collectVectorAnimation(exportComp, warnings, prepared, createProgressSection(progress, 36, 54));
 
             if (options.exportReferenceFrames !== false) {
-                saveReferenceFrames(exportComp, referenceFolder, warnings);
+                saveReferenceFrames(exportComp, referenceFolder, warnings, createProgressSection(progress, 56, 68));
+            } else {
+                reportProgress(progress, 68, "Reference frames skipped", "Reference frame export is disabled.");
             }
 
             if (options.exportBakedFrames !== false && !(vectorAnimation.enabled && vectorAnimation.vectorOnly)) {
-                bakedFrames = saveBakedFrames(exportComp, folder, warnings);
+                bakedFrames = saveBakedFrames(exportComp, folder, warnings, createProgressSection(progress, 70, 92));
+            } else {
+                reportProgress(progress, 92, "Baked frames skipped", "Vector-only animation or bake option does not require PNG frame baking.");
             }
         } finally {
             prepared.cleanup();
             app.endUndoGroup();
         }
 
+        reportProgress(progress, 96, "Write .ae2shader", "Writing AE2Unity shader document.");
         var document = {
             schemaVersion: SCHEMA_VERSION,
-            exporter: "AE2Unity exporter 0.6.0",
+            exporter: "AE2Unity exporter 0.6.2",
             exportedAt: new Date().toUTCString(),
             comp: collectComp(comp),
             layers: layers,
@@ -2245,27 +2496,33 @@
 
         outputFile.write(toJson(document));
         outputFile.close();
+        reportProgress(progress, 100, "AE2Shader written", "Exported " + outputFile.name + ".", "Exported: " + outputFile.fsName);
         return outputFile;
     }
 
     function exportMotionToFolder(comp, folder, options) {
         options = options || {};
+        var progress = options.progress;
+        reportProgress(progress, 5, "Prepare motion folder", "Creating folders for " + comp.name + ".");
         ensureFolderExists(folder);
 
         if (options.exportMotionData === false) {
             throw new Error("Motion Data must be enabled for .ae2motion export.");
         }
 
-        var document = collectMotionDocument(comp, options);
+        var document = collectMotionDocument(comp, options, createProgressSection(progress, 16, 88));
+        reportProgress(progress, 94, "Write .ae2motion", "Writing AE2Unity motion document.");
         var outputFile = new File(folder.fsName + "/" + sanitizeFileName(comp.name) + ".ae2motion");
         writeTextFile(outputFile, toJson(document));
+        reportProgress(progress, 100, "AE2Motion written", "Exported " + outputFile.name + ".", "Exported motion: " + outputFile.fsName);
         return outputFile;
     }
 
-    function collectMotionDocument(comp, options) {
+    function collectMotionDocument(comp, options, progress) {
         var motionOptions = normalizeMotionOptions(comp, options);
         var warnings = [];
         var layers = [];
+        reportProgress(progress, 5, "Collect motion data", "Reading transform and shape motion from " + comp.name + ".");
 
         if (motionOptions.curveDetail === "Sampled Curve") {
             warnings.push(createMotionWarning(
@@ -2275,12 +2532,16 @@
         }
 
         for (var i = 1; i <= comp.numLayers; i++) {
+            if (shouldReportProgress(i - 1, comp.numLayers)) {
+                reportProgress(progress, 5 + ((i - 1) / Math.max(1, comp.numLayers)) * 90, "Collect motion data", "Reading motion layer " + i + " of " + comp.numLayers + ": " + comp.layer(i).name + ".");
+            }
             layers.push(collectMotionLayer(comp.layer(i), motionOptions, warnings));
         }
+        reportProgress(progress, 100, "Collect motion data", "Motion data collected.");
 
         return {
             schemaVersion: MOTION_SCHEMA_VERSION,
-            exporter: "AE2Unity Motion Exporter 0.6.1",
+            exporter: "AE2Unity Motion Exporter 0.6.2",
             exportedAt: new Date().toUTCString(),
             comp: collectComp(comp),
             motion: {
@@ -2886,7 +3147,7 @@
         return id ? "id-" + id : "name-" + comp.name;
     }
 
-    function collectVectorAnimation(comp, warnings, prepared) {
+    function collectVectorAnimation(comp, warnings, prepared, progress) {
         var frameRate = Math.max(1, Number(comp.frameRate));
         var duration = Math.max(0, Number(comp.duration));
         var frameCount = Math.max(1, Math.ceil(duration * frameRate - 0.000001));
@@ -2900,13 +3161,18 @@
             emittedTextPathWarning: false
         };
         var startTime = safeNumber(function () { return comp.displayStartTime; }, 0);
+        reportProgress(progress, 2, "Build vector animation", "Sampling vector frames for " + comp.name + ".");
 
         for (var frameIndex = 0; frameIndex < frameCount; frameIndex++) {
+            if (shouldReportProgress(frameIndex, frameCount)) {
+                reportProgress(progress, (frameIndex / Math.max(1, frameCount)) * 100, "Build vector animation", "Sampling vector frame " + (frameIndex + 1) + " of " + frameCount + ".");
+            }
             var time = startTime + frameIndex / frameRate;
             var lastValidTime = startTime + Math.max(0, duration - (0.5 / frameRate));
             time = Math.min(time, lastValidTime);
             collectCompVectorFrame(comp, time, frameIndex, matrixIdentity(), 1, "comp:" + sanitizeFileName(comp.name), state, {});
         }
+        reportProgress(progress, 100, "Build vector animation", "Vector animation sampling complete.");
 
         return {
             enabled: state.primitives.length > 0,
@@ -3691,7 +3957,7 @@
         return masks;
     }
 
-    function saveReferenceFrames(comp, folder, warnings) {
+    function saveReferenceFrames(comp, folder, warnings, progress) {
         var times = [
             comp.workAreaStart,
             comp.workAreaStart + comp.workAreaDuration * 0.5,
@@ -3700,6 +3966,7 @@
 
         for (var i = 0; i < times.length; i++) {
             var frameFile = new File(folder.fsName + "/" + sanitizeFileName(comp.name) + "_ref_" + i + ".png");
+            reportProgress(progress, (i / times.length) * 100, "Export reference frames", "Writing reference frame " + (i + 1) + " of " + times.length + ".");
             try {
                 comp.saveFrameToPng(times[i], frameFile);
                 warnIfPngMissingAlpha(frameFile, warnings, "REFERENCE_FRAME_ALPHA_MISSING", "Reference frame does not contain an alpha channel: " + frameFile.name);
@@ -3711,15 +3978,17 @@
                 });
             }
         }
+        reportProgress(progress, 100, "Export reference frames", "Reference frame export complete.");
     }
 
-    function saveBakedFrames(comp, exportFolder, warnings) {
+    function saveBakedFrames(comp, exportFolder, warnings, progress) {
         var safeCompName = sanitizeFileName(comp.name);
         var relativePath = safeCompName + ".frames";
         var framesFolder = new Folder(exportFolder.fsName + "/" + relativePath);
         ensureFolderExists(framesFolder);
 
         var oldFrames = framesFolder.getFiles("*.png");
+        reportProgress(progress, 4, "Clean baked frames", "Removing old baked PNG frames.");
         for (var oldIndex = 0; oldIndex < oldFrames.length; oldIndex++) {
             try {
                 if (oldFrames[oldIndex] instanceof File) {
@@ -3738,6 +4007,9 @@
         var alphaOk = true;
 
         for (var frameIndex = 0; frameIndex < frameCount; frameIndex++) {
+            if (shouldReportProgress(frameIndex, frameCount)) {
+                reportProgress(progress, 8 + (frameIndex / Math.max(1, frameCount)) * 88, "Bake animation frames", "Writing baked frame " + (frameIndex + 1) + " of " + frameCount + ".");
+            }
             var time = startTime + frameIndex / frameRate;
             var lastValidTime = startTime + Math.max(0, duration - (0.5 / frameRate));
             time = Math.min(time, lastValidTime);
@@ -3762,6 +4034,7 @@
                 break;
             }
         }
+        reportProgress(progress, 100, "Bake animation frames", "Baked frame export complete.");
 
         return {
             enabled: writtenCount === frameCount,
