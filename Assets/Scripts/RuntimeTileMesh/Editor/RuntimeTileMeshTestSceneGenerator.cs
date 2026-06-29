@@ -17,6 +17,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
         private const string ProjectionMaterialPath = DemoFolder + "/RuntimeTileMesh_WorldProjection.mat";
         private const string RunOnceMarkerPath = "Temp/DuoCurtainGenerateRuntimeTileMeshTestScene.flag";
         private const string LogPrefix = "[RuntimeTileMeshTestSceneGenerator] ";
+        private const bool UseProjectionMaterialByDefault = false;
         private static bool generationQueued;
 
         static RuntimeTileMeshTestSceneGenerator()
@@ -66,7 +67,9 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             scene.name = "RuntimeTileMeshTest";
 
             Material material = AssetDatabase.LoadAssetAtPath<Material>(WhiteMaterialPath);
-            Material projectionMaterial = AssetDatabase.LoadAssetAtPath<Material>(ProjectionMaterialPath);
+            Material projectionMaterial = UseProjectionMaterialByDefault
+                ? AssetDatabase.LoadAssetAtPath<Material>(ProjectionMaterialPath)
+                : null;
             CreateCamera();
             CreateInstructionText();
             CreateGridOverlay(material);

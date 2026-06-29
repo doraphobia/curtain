@@ -8,6 +8,8 @@ namespace DuoCurtain.RuntimeTileMesh
     [DisallowMultipleComponent]
     public sealed class RuntimeTileMeshProjectionRenderer : MonoBehaviour
     {
+        private const string ProjectionShaderName = "Duo Curtain/Runtime Tile Projection Unlit";
+
         private static readonly int ProjectionModeId = Shader.PropertyToID("_ProjectionMode");
         private static readonly int CellSizeId = Shader.PropertyToID("_PatternCellSize");
         private static readonly int MotionTileSizeId = Shader.PropertyToID("_MotionTileSize");
@@ -92,7 +94,7 @@ namespace DuoCurtain.RuntimeTileMesh
             visualState ??= new RuntimeTileMeshVisualState();
             visualState.Sanitize();
 
-            if (requireProjectionMaterial && visualState.material == null)
+            if (requireProjectionMaterial && !UsesProjectionShader(visualState.material))
                 return;
 
             view.CollectGeneratedRenderers(renderers);
@@ -152,6 +154,13 @@ namespace DuoCurtain.RuntimeTileMesh
         {
             if (view == null)
                 view = GetComponent<RuntimeTileMeshView>();
+        }
+
+        private static bool UsesProjectionShader(Material candidate)
+        {
+            return candidate != null &&
+                candidate.shader != null &&
+                candidate.shader.name == ProjectionShaderName;
         }
     }
 }

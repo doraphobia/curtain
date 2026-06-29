@@ -835,7 +835,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DuoCurtain.RuntimeTileMesh.RuntimeTileMeshProjectionRenderer
   visualState:
-    material: {fileID: 2100000, guid: 1225caad4171d4155adc93f0f0053993, type: 2}
+    material: {fileID: 0}
     projectionMode: 2
     cellSize: {x: 1, y: 1}
     motionTileSize: {x: 3, y: 3}
@@ -901,7 +901,7 @@ MonoBehaviour:
   - {x: 1, y: 0}
   - {x: 2, y: 0}
   rebuildOnStart: 0
-  material: {fileID: 2100000, guid: 1225caad4171d4155adc93f0f0053993, type: 2}
+  material: {fileID: 2100000, guid: 4e58f4b327f684fbfa0cf1905f950421, type: 2}
   buildPolygonCollider2D: 1
   polygonColliderIsTrigger: 1
   sortingOrder: 0
@@ -1396,7 +1396,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 1225caad4171d4155adc93f0f0053993, type: 2}
+  - {fileID: 2100000, guid: 4e58f4b327f684fbfa0cf1905f950421, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -1856,7 +1856,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 1225caad4171d4155adc93f0f0053993, type: 2}
+  - {fileID: 2100000, guid: 4e58f4b327f684fbfa0cf1905f950421, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -2241,7 +2241,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DuoCurtain.RuntimeTileMesh.RuntimeTileMeshProjectionRenderer
   visualState:
-    material: {fileID: 2100000, guid: 1225caad4171d4155adc93f0f0053993, type: 2}
+    material: {fileID: 0}
     projectionMode: 2
     cellSize: {x: 1, y: 1}
     motionTileSize: {x: 3, y: 3}
@@ -2307,7 +2307,7 @@ MonoBehaviour:
   - {x: 1, y: 0}
   - {x: 2, y: 0}
   rebuildOnStart: 0
-  material: {fileID: 2100000, guid: 1225caad4171d4155adc93f0f0053993, type: 2}
+  material: {fileID: 2100000, guid: 4e58f4b327f684fbfa0cf1905f950421, type: 2}
   buildPolygonCollider2D: 1
   polygonColliderIsTrigger: 1
   sortingOrder: 0
@@ -3540,7 +3540,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 1225caad4171d4155adc93f0f0053993, type: 2}
+  - {fileID: 2100000, guid: 4e58f4b327f684fbfa0cf1905f950421, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -3605,7 +3605,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DuoCurtain.RuntimeTileMesh.RuntimeTileMeshProjectionRenderer
   visualState:
-    material: {fileID: 2100000, guid: 1225caad4171d4155adc93f0f0053993, type: 2}
+    material: {fileID: 0}
     projectionMode: 2
     cellSize: {x: 1, y: 1}
     motionTileSize: {x: 3, y: 3}
@@ -3671,7 +3671,7 @@ MonoBehaviour:
   - {x: 1, y: 0}
   - {x: 2, y: 0}
   rebuildOnStart: 0
-  material: {fileID: 2100000, guid: 1225caad4171d4155adc93f0f0053993, type: 2}
+  material: {fileID: 2100000, guid: 4e58f4b327f684fbfa0cf1905f950421, type: 2}
   buildPolygonCollider2D: 1
   polygonColliderIsTrigger: 1
   sortingOrder: 0
@@ -5226,7 +5226,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DuoCurtain.RuntimeTileMesh.RuntimeTileMeshProjectionRenderer
   visualState:
-    material: {fileID: 2100000, guid: 1225caad4171d4155adc93f0f0053993, type: 2}
+    material: {fileID: 0}
     projectionMode: 2
     cellSize: {x: 1, y: 1}
     motionTileSize: {x: 3, y: 3}
@@ -5292,7 +5292,7 @@ MonoBehaviour:
   - {x: 1, y: 0}
   - {x: 2, y: 0}
   rebuildOnStart: 0
-  material: {fileID: 2100000, guid: 1225caad4171d4155adc93f0f0053993, type: 2}
+  material: {fileID: 2100000, guid: 4e58f4b327f684fbfa0cf1905f950421, type: 2}
   buildPolygonCollider2D: 1
   polygonColliderIsTrigger: 1
   sortingOrder: 0
@@ -6898,7 +6898,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 1225caad4171d4155adc93f0f0053993, type: 2}
+  - {fileID: 2100000, guid: 4e58f4b327f684fbfa0cf1905f950421, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
