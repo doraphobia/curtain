@@ -10,7 +10,7 @@ public class StagePanelVisibility : MonoBehaviour
 
     [Header("Stage")]
     [Tooltip("当当前阶段 id 等于这个值时显示 Panel")]
-    public string visibleStageId = "BeforeNight";
+    public string visibleStageId = StageIds.BeforeNight;
     public bool ignoreCase = true;
 
     private bool lastVisibleState;

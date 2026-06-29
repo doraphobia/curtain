@@ -138,7 +138,7 @@ public class HoverScrollColorLerp2D : MonoBehaviour
     {
         switch (stageId)
         {
-            case "DayTop":
+            case StageIds.DayTop:
                 switch (sideType)
                 {
                     case SideType.Right:
@@ -150,7 +150,7 @@ public class HoverScrollColorLerp2D : MonoBehaviour
                         return 0f;
                 }
 
-            case "DayBottom":
+            case StageIds.DayBottom:
                 switch (sideType)
                 {
                     case SideType.Left:
@@ -162,8 +162,8 @@ public class HoverScrollColorLerp2D : MonoBehaviour
                         return 0f;
                 }
 
-            case "Night":
-            case "BeforeNight":
+            case StageIds.Night:
+            case StageIds.BeforeNight:
             default:
                 return 0f;
         }

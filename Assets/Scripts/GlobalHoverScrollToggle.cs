@@ -52,7 +52,7 @@ public class GlobalHoverScrollToggle : MonoBehaviour
         if (isGlobalModeActive)
             return;
 
-        cachedTargets = FindObjectsByType<HoverScrollColorLerp2D>(FindObjectsSortMode.None);
+        cachedTargets = WindowQueryUtility.FindAllWindows();
         originalProgress.Clear();
 
         for (int i = 0; i < cachedTargets.Length; i++)

@@ -47,7 +47,7 @@ public class MouseSanityDrainZone2D : MonoBehaviour
             return;
         }
 
-        if (!string.Equals(stageController.CurrentStageId, "Night", System.StringComparison.Ordinal))
+        if (!stageController.IsNight)
         {
             RestoreFlickerRenderers();
             return;

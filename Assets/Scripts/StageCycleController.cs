@@ -20,9 +20,9 @@ public class StageCycleController : MonoBehaviour
     [Tooltip("按顺序循环播放的阶段列表，例如：白天上 -> 白天下 -> 黑夜")]
     public List<StageDefinition> stages = new List<StageDefinition>
     {
-        new StageDefinition { id = "DayTop", duration = 5f },
-        new StageDefinition { id = "DayBottom", duration = 5f },
-        new StageDefinition { id = "Night", duration = 8f }
+        new StageDefinition { id = StageIds.DayTop, duration = 5f },
+        new StageDefinition { id = StageIds.DayBottom, duration = 5f },
+        new StageDefinition { id = StageIds.Night, duration = 8f }
     };
 
     [Tooltip("在当前阶段结束前，提前多久开始向下一个阶段过渡")]
@@ -65,6 +65,7 @@ public class StageCycleController : MonoBehaviour
     public float StageTimer => stageTimer;
     public float CurrentStageDuration => GetStageDuration(currentStageIndex);
     public bool IsPaused => paused;
+    public bool IsNight => StageIds.IsNight(CurrentStageId);
 
     public bool IsTransitioning
     {
@@ -202,7 +203,7 @@ public class StageCycleController : MonoBehaviour
         if (nightLoopAudioSource.clip != nightLoopClip)
             nightLoopAudioSource.clip = nightLoopClip;
 
-        bool isNight = !forceStop && string.Equals(CurrentStageId, "Night", StringComparison.Ordinal);
+        bool isNight = !forceStop && IsNight;
 
         if (isNight && !wasNightLastFrame && nightLoopClip != null)
         {
@@ -260,7 +261,7 @@ public class StageCycleController : MonoBehaviour
         if (dayNightImage == null)
             return;
 
-        bool isNight = string.Equals(CurrentStageId, "Night", StringComparison.Ordinal);
+        bool isNight = IsNight;
         Sprite targetSprite = isNight ? nightSprite : daySprite;
 
         if (dayNightImage.sprite != targetSprite)

@@ -38,9 +38,9 @@ public class DayNightObjectColor : MonoBehaviour
     [Tooltip("给每个阶段配置颜色和要显示的物体；stageId 要和 StageCycleController 里的 id 一致")]
     public List<StageVisual> stageVisuals = new List<StageVisual>
     {
-        new StageVisual { stageId = "DayTop", color = Color.white },
-        new StageVisual { stageId = "DayBottom", color = new Color(0.85f, 0.85f, 0.85f, 1f) },
-        new StageVisual { stageId = "Night", color = Color.black }
+        new StageVisual { stageId = StageIds.DayTop, color = Color.white },
+        new StageVisual { stageId = StageIds.DayBottom, color = new Color(0.85f, 0.85f, 0.85f, 1f) },
+        new StageVisual { stageId = StageIds.Night, color = Color.black }
     };
 
     private float timer;

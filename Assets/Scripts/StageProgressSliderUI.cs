@@ -12,9 +12,9 @@ public class StageProgressSliderUI : MonoBehaviour
 
     [Header("Stage Groups")]
     [Tooltip("这些阶段会计入白天进度条")]
-    public List<string> dayStageIds = new List<string> { "DayTop", "DayBottom", "BeforeNight" };
+    public List<string> dayStageIds = new List<string> { StageIds.DayTop, StageIds.DayBottom, StageIds.BeforeNight };
     [Tooltip("这些阶段会计入夜晚进度条")]
-    public List<string> nightStageIds = new List<string> { "Night" };
+    public List<string> nightStageIds = new List<string> { StageIds.Night };
 
     void Start()
     {

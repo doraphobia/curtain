@@ -96,7 +96,7 @@ public class NightWindowEventController : MonoBehaviour
         if (stageController == null)
             return;
 
-        bool isNight = string.Equals(stageController.CurrentStageId, "Night", StringComparison.Ordinal);
+        bool isNight = stageController.IsNight;
 
         if (isNight && !wasNightLastFrame)
             HandleNightStarted();
@@ -315,24 +315,7 @@ public class NightWindowEventController : MonoBehaviour
 
     private void RefreshWindowList()
     {
-        if (useWindowTag && !string.IsNullOrWhiteSpace(windowTag))
-        {
-            GameObject[] taggedObjects = GameObject.FindGameObjectsWithTag(windowTag);
-            List<HoverScrollColorLerp2D> taggedWindows = new List<HoverScrollColorLerp2D>();
-
-            for (int i = 0; i < taggedObjects.Length; i++)
-            {
-                HoverScrollColorLerp2D hover = taggedObjects[i].GetComponent<HoverScrollColorLerp2D>();
-                if (hover != null)
-                    taggedWindows.Add(hover);
-            }
-
-            windows = taggedWindows.ToArray();
-            return;
-        }
-
-        if (autoFindWindows)
-            windows = FindObjectsByType<HoverScrollColorLerp2D>(FindObjectsSortMode.None);
+        windows = WindowQueryUtility.RefreshWindowList(windows, useWindowTag, windowTag, autoFindWindows);
     }
 
     private void SetSideIndicatorsVisible(HoverScrollColorLerp2D.SideType side)

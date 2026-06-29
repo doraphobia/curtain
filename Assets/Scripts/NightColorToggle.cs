@@ -42,8 +42,7 @@ public class NightColorToggle : MonoBehaviour
 
     private void ApplyCurrentColor()
     {
-        bool isNight = stageController != null &&
-                       string.Equals(stageController.CurrentStageId, "Night", System.StringComparison.Ordinal);
+        bool isNight = stageController != null && stageController.IsNight;
 
         Color targetColor = isNight ? nightColor : dayColor;
 
