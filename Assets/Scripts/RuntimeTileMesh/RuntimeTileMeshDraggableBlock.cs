@@ -171,7 +171,19 @@ namespace DuoCurtain.RuntimeTileMesh
         private void RefreshRenderers()
         {
             renderers.Clear();
-            GetComponentsInChildren(true, renderers);
+            List<Renderer> foundRenderers = new List<Renderer>();
+            GetComponentsInChildren(true, foundRenderers);
+            for (int i = 0; i < foundRenderers.Count; i++)
+            {
+                Renderer renderer = foundRenderers[i];
+                if (renderer == null)
+                    continue;
+
+                if (renderer.GetComponentInParent<RuntimeTileMeshFusionDoor>() != null)
+                    continue;
+
+                renderers.Add(renderer);
+            }
         }
 
         private void ApplyColor(Color color)

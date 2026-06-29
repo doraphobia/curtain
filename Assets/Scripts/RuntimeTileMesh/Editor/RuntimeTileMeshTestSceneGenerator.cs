@@ -4,7 +4,9 @@ using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 namespace DuoCurtain.RuntimeTileMesh.Editor
 {
@@ -15,6 +17,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
         private const string DemoFolder = "Assets/Scripts/RuntimeTileMesh/Demo";
         private const string WhiteMaterialPath = DemoFolder + "/RuntimeTileMesh_White.mat";
         private const string ProjectionMaterialPath = DemoFolder + "/RuntimeTileMesh_WorldProjection.mat";
+        private const string DefaultFootstepFoleyPath = "Assets/Audio/Foley/DefaultFootstepFoley.asset";
         private const string RunOnceMarkerPath = "Temp/DuoCurtainGenerateRuntimeTileMeshTestScene.flag";
         private const string LogPrefix = "[RuntimeTileMeshTestSceneGenerator] ";
         private const bool UseProjectionMaterialByDefault = false;
@@ -73,12 +76,13 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             CreateCamera();
             CreateInstructionText();
             CreateGridOverlay(material);
-            CreateFusionSandboxController();
+            RuntimeTileMeshFusionSandbox sandbox = CreateFusionSandboxController();
 
             CreateFusionBlock("Fusion Block - L", RuntimeTileMeshDemo.DemoShape.L, new Vector3(-6f, 0f, 0f), material, projectionMaterial);
             CreateFusionBlock("Fusion Block - 1x3", RuntimeTileMeshDemo.DemoShape.OneByThree, new Vector3(-1f, -2f, 0f), material, projectionMaterial);
             CreateFusionBlock("Fusion Block - T", RuntimeTileMeshDemo.DemoShape.T, new Vector3(3f, 1f, 0f), material, projectionMaterial);
             CreateFusionBlock("Fusion Block - Z", RuntimeTileMeshDemo.DemoShape.Z, new Vector3(6f, -2f, 0f), material, projectionMaterial);
+            CreatePlayerControl(sandbox);
 
             Directory.CreateDirectory(Path.GetDirectoryName(ScenePath));
             EditorSceneManager.SaveScene(scene, ScenePath);
@@ -247,7 +251,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                 new Color(0.88f, 0.92f, 1f, 1f));
         }
 
-        private static void CreateFusionSandboxController()
+        private static RuntimeTileMeshFusionSandbox CreateFusionSandboxController()
         {
             GameObject controllerObject = new GameObject("Fusion Sandbox Controller");
             RuntimeTileMeshFusionSandbox sandbox = controllerObject.AddComponent<RuntimeTileMeshFusionSandbox>();
@@ -261,6 +265,105 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             sandbox.deactivateAbsorbedBlocksImmediately = true;
             sandbox.logFusionEvents = true;
             sandbox.sceneGridHalfExtents = new Vector2Int(10, 6);
+            sandbox.generateDoorsOnFusion = true;
+            sandbox.doorSharedEdgeCells = 3;
+            sandbox.doorThickness = 0.5f;
+            sandbox.doorColor = Color.black;
+            sandbox.doorBlocksPlayer = true;
+            sandbox.wallDebugColor = new Color(0f, 0f, 0f, 0.9f);
+            sandbox.wallDebugLineWidth = 0.08f;
+            return sandbox;
+        }
+
+        private static void CreatePlayerControl(RuntimeTileMeshFusionSandbox sandbox)
+        {
+            EnsureEventSystem();
+
+            GameObject canvasObject = new GameObject(
+                "Player Control Canvas",
+                typeof(RectTransform),
+                typeof(Canvas),
+                typeof(CanvasScaler));
+            Canvas canvas = canvasObject.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 1000;
+
+            CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.matchWidthOrHeight = 0.5f;
+
+            Image playerImage = CreateControlImage(
+                canvas.transform,
+                "Player",
+                new Vector2(28f, 28f),
+                new Color(0.12f, 0.72f, 1f, 0.95f));
+            Image headingImage = CreateControlImage(
+                canvas.transform,
+                "Heading Point",
+                new Vector2(16f, 16f),
+                new Color(1f, 1f, 1f, 0.65f));
+
+            GameObject controllerObject = new GameObject("Player Control");
+            PlayerControl control = controllerObject.AddComponent<PlayerControl>();
+            control.targetCamera = Camera.main;
+            control.runtimeTileWalkableArea = sandbox;
+            control.playerImage = playerImage;
+            control.headingPointImage = headingImage;
+            control.spawnAtRandomRuntimeTileBlockCenter = true;
+            control.clampCursorToRoom = true;
+            control.hideSystemCursor = true;
+            control.showHeadingPoint = true;
+            control.limitHeadingPointReach = true;
+            control.headingPointReachRadius = 2.5f;
+            control.playerCollisionRadius = 0.22f;
+            control.driveCameraFromCursorOffset = false;
+            control.maxCursorMoveSpeed = 5.5f;
+            control.worldDistancePerFootstep = 1.1f;
+            control.footstepSurfaceIdOverride = "Concrete";
+
+            FoleyProfile profile = AssetDatabase.LoadAssetAtPath<FoleyProfile>(DefaultFootstepFoleyPath);
+            if (profile != null)
+                control.footstepFoleyProfile = profile;
+
+            FoleyPlayer foleyPlayer = controllerObject.AddComponent<FoleyPlayer>();
+            FoleySurfaceResolver2D resolver = controllerObject.AddComponent<FoleySurfaceResolver2D>();
+            resolver.fallbackSurfaceId = "Concrete";
+            control.footstepFoleyPlayer = foleyPlayer;
+
+            FoleyStepClock stepClock = controllerObject.AddComponent<FoleyStepClock>();
+            control.stepClock = stepClock;
+        }
+
+        private static Image CreateControlImage(Transform parent, string name, Vector2 size, Color color)
+        {
+            GameObject imageObject = new GameObject(
+                name,
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(Image));
+            imageObject.transform.SetParent(parent, false);
+
+            RectTransform rectTransform = imageObject.GetComponent<RectTransform>();
+            rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+            rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+            rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            rectTransform.sizeDelta = size;
+
+            Image image = imageObject.GetComponent<Image>();
+            image.color = color;
+            image.raycastTarget = false;
+            return image;
+        }
+
+        private static void EnsureEventSystem()
+        {
+            if (Object.FindFirstObjectByType<EventSystem>() != null)
+                return;
+
+            GameObject eventSystemObject = new GameObject("EventSystem");
+            eventSystemObject.AddComponent<EventSystem>();
+            eventSystemObject.AddComponent<StandaloneInputModule>();
         }
 
         private static void CreateGridOverlay(Material material)
@@ -338,6 +441,9 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             block.hoverColor = new Color(1f, 0.08f, 0.03f, 1f);
             block.selectedColor = new Color(0.08f, 0.35f, 1f, 1f);
             block.colorLerpSpeed = 7f;
+
+            FoleySurface2D surface = root.AddComponent<FoleySurface2D>();
+            surface.surfaceId = "Concrete";
 
             RuntimeTileMeshProjectionRenderer projection = null;
             if (projectionMaterial != null)

@@ -24,6 +24,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             failures += ExpectDefaultFallbackMaterial();
             failures += ExpectFusionConnectionRules();
             failures += ExpectFusionBlockMergeRules();
+            failures += ExpectFusionDoorRules();
 
             if (failures == 0)
             {
@@ -252,6 +253,138 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                 {
                     if (cleanup[i] != null)
                         UnityEngine.Object.DestroyImmediate(cleanup[i]);
+                }
+            }
+
+            return failures;
+        }
+
+        private static int ExpectFusionDoorRules()
+        {
+            int failures = 0;
+            GameObject controllerObject = new GameObject("RuntimeTileMeshSelfTest Door Controller");
+            RuntimeTileMeshFusionSandbox sandbox = controllerObject.AddComponent<RuntimeTileMeshFusionSandbox>();
+            sandbox.gridSize = 1f;
+            sandbox.gridOrigin = Vector2.zero;
+            sandbox.mergeAfterPlacement = true;
+            sandbox.mergeExistingBlocksOnAwake = false;
+            sandbox.snapExistingBlocksOnAwake = false;
+            sandbox.deactivateAbsorbedBlocksImmediately = true;
+            sandbox.generateDoorsOnFusion = true;
+            sandbox.doorSharedEdgeCells = 3;
+
+            List<GameObject> cleanup = new List<GameObject> { controllerObject };
+            try
+            {
+                failures += ExpectDoorMerge(
+                    sandbox,
+                    cleanup,
+                    "OneByThreeAgainstTwoByThree",
+                    new[]
+                    {
+                        CreateBlockSpec(new Vector2Int(0, 0)),
+                        CreateBlockSpec(new Vector2Int(0, 1)),
+                        CreateBlockSpec(new Vector2Int(0, 2))
+                    },
+                    new[]
+                    {
+                        CreateBlockSpec(new Vector2Int(1, 0)),
+                        CreateBlockSpec(new Vector2Int(1, 1)),
+                        CreateBlockSpec(new Vector2Int(1, 2)),
+                        CreateBlockSpec(new Vector2Int(2, 0)),
+                        CreateBlockSpec(new Vector2Int(2, 1)),
+                        CreateBlockSpec(new Vector2Int(2, 2))
+                    },
+                    expectedDoorCount: 1,
+                    expectedDoorCenter: new Vector2(1f, 1.5f));
+
+                failures += ExpectDoorMerge(
+                    sandbox,
+                    cleanup,
+                    "FourCellSharedEdgeDoesNotCreateDoor",
+                    new[]
+                    {
+                        CreateBlockSpec(new Vector2Int(5, 0)),
+                        CreateBlockSpec(new Vector2Int(5, 1)),
+                        CreateBlockSpec(new Vector2Int(5, 2)),
+                        CreateBlockSpec(new Vector2Int(5, 3))
+                    },
+                    new[]
+                    {
+                        CreateBlockSpec(new Vector2Int(6, 0)),
+                        CreateBlockSpec(new Vector2Int(6, 1)),
+                        CreateBlockSpec(new Vector2Int(6, 2)),
+                        CreateBlockSpec(new Vector2Int(6, 3))
+                    },
+                    expectedDoorCount: 0,
+                    expectedDoorCenter: Vector2.zero);
+            }
+            finally
+            {
+                for (int i = cleanup.Count - 1; i >= 0; i--)
+                {
+                    if (cleanup[i] != null)
+                        UnityEngine.Object.DestroyImmediate(cleanup[i]);
+                }
+            }
+
+            return failures;
+        }
+
+        private static int ExpectDoorMerge(
+            RuntimeTileMeshFusionSandbox sandbox,
+            List<GameObject> cleanup,
+            string name,
+            IEnumerable<BlockSpec> survivorSpecs,
+            IEnumerable<BlockSpec> candidateSpecs,
+            int expectedDoorCount,
+            Vector2 expectedDoorCenter)
+        {
+            RuntimeTileMeshDraggableBlock survivor = CreateSelfTestBlock(name + " Survivor", survivorSpecs, cleanup);
+            RuntimeTileMeshDraggableBlock candidate = CreateSelfTestBlock(name + " Candidate", candidateSpecs, cleanup);
+            List<RuntimeTileMeshDraggableBlock> blocks = new List<RuntimeTileMeshDraggableBlock> { survivor, candidate };
+
+            sandbox.MergeConnectedBlocks(survivor, blocks);
+            RuntimeTileMeshFusionDoor[] doors = survivor.GetComponentsInChildren<RuntimeTileMeshFusionDoor>(true);
+            int failures = 0;
+            if (doors.Length != expectedDoorCount)
+            {
+                Debug.LogError("[RuntimeTileMeshSelfTest] Fusion door rule " + name + " expected " + expectedDoorCount + " door(s), got " + doors.Length + ".");
+                failures++;
+            }
+
+            if (expectedDoorCount > 0 && doors.Length > 0)
+            {
+                RuntimeTileMeshFusionDoor door = doors[0];
+                float distance = Vector2.Distance(door.seamCenter, expectedDoorCenter);
+                if (distance > 0.0001f)
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] Fusion door rule " + name + " expected door center " + expectedDoorCenter + ", got " + door.seamCenter + ".");
+                    failures++;
+                }
+
+                if (!door.TryBlockMovement(new Vector3(0.75f, 0.5f, 0f), new Vector3(1.25f, 0.5f, 0f), 0.05f))
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] Fusion door rule " + name + " expected the lower safe wall segment to block movement.");
+                    failures++;
+                }
+
+                if (!door.TryBlockMovement(new Vector3(0.75f, 1.5f, 0f), new Vector3(1.25f, 1.5f, 0f), 0.05f))
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] Fusion door rule " + name + " expected the closed door segment to block and open.");
+                    failures++;
+                }
+
+                if (!door.IsOpen)
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] Fusion door rule " + name + " expected the door to open after player collision.");
+                    failures++;
+                }
+
+                if (door.TryBlockMovement(new Vector3(0.75f, 1.5f, 0f), new Vector3(1.25f, 1.5f, 0f), 0.05f))
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] Fusion door rule " + name + " expected the open door segment to allow movement.");
+                    failures++;
                 }
             }
 

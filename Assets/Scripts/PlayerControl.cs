@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.Serialization;
 using UnityEngine.UI;
+using DuoCurtain.RuntimeTileMesh;
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -28,6 +29,7 @@ public class PlayerControl : MonoBehaviour
     [Header("References")]
     public Camera targetCamera;
     public TilePlacementGrid roomGrid;
+    public RuntimeTileMeshFusionSandbox runtimeTileWalkableArea;
     [FormerlySerializedAs("uiCursorImage")]
     public Image playerImage;
     [FormerlySerializedAs("uiCursorObjectName")]
@@ -42,6 +44,7 @@ public class PlayerControl : MonoBehaviour
     public bool clampCursorToRoom = true;
     public bool freezeWorldCursorWhenPointerOverUI = true;
     public bool showPlayerAtHeadingPointOverUI = false;
+    public bool spawnAtRandomRuntimeTileBlockCenter = false;
 
     [Header("Player Collision")]
     public bool usePlayerCollisionRadius = true;
@@ -63,6 +66,11 @@ public class PlayerControl : MonoBehaviour
     public float headingPointAlpha = 0.65f;
     [Min(1f)]
     public float headingPointSize = 14f;
+    public bool limitHeadingPointReach = true;
+    [Min(0f)]
+    public float headingPointReachRadius = 2.5f;
+    public bool drawDebugHeadingReach = true;
+    public Color debugHeadingReachColor = new Color(1f, 0.82f, 0.2f, 0.24f);
 
     [Header("Player Movement")]
     public CursorMovementMode movementMode = CursorMovementMode.PointerOffsetVelocity;
@@ -134,6 +142,8 @@ public class PlayerControl : MonoBehaviour
     private Animator playerAnimator;
     private RectTransform headingPointRectTransform;
     private Canvas headingPointCanvas;
+    private Texture2D runtimeCursorTexture;
+    private Sprite runtimeCursorSprite;
     private Texture2D runtimeHeadingPointTexture;
     private Sprite runtimeHeadingPointSprite;
     private Vector3 currentWorldPosition;
@@ -171,7 +181,8 @@ public class PlayerControl : MonoBehaviour
         if (FindFirstObjectByType<PlayerControl>() != null)
             return;
 
-        if (FindFirstObjectByType<TilePlacementGrid>() == null)
+        if (FindFirstObjectByType<TilePlacementGrid>() == null &&
+            FindFirstObjectByType<RuntimeTileMeshFusionSandbox>() == null)
             return;
 
         GameObject controllerObject = new GameObject("Player Control");
@@ -331,6 +342,9 @@ public class PlayerControl : MonoBehaviour
         if (roomGrid == null)
             roomGrid = FindFirstObjectByType<TilePlacementGrid>();
 
+        if (runtimeTileWalkableArea == null)
+            runtimeTileWalkableArea = FindFirstObjectByType<RuntimeTileMeshFusionSandbox>();
+
         if (playerImage == null)
             playerImage = FindUIImageByName(playerObjectName);
 
@@ -355,7 +369,16 @@ public class PlayerControl : MonoBehaviour
 
         Vector3 startWorld = ScreenToWorld(Input.mousePosition);
         if (clampCursorToRoom && roomGrid != null && roomGrid.HasRoomCells)
+        {
             startWorld = roomGrid.ClampPlayerWorldPoint(startWorld, startWorld, PlayerCollisionRadius);
+        }
+        else if (clampCursorToRoom && runtimeTileWalkableArea != null && runtimeTileWalkableArea.HasWalkableCells)
+        {
+            if (spawnAtRandomRuntimeTileBlockCenter && runtimeTileWalkableArea.TryGetRandomBlockCenter(out Vector3 spawnWorld))
+                startWorld = spawnWorld;
+            else
+                startWorld = runtimeTileWalkableArea.ClampPlayerWorldPoint(startWorld, startWorld, PlayerCollisionRadius);
+        }
 
         startWorld.z = 0f;
         currentWorldPosition = startWorld;
@@ -371,8 +394,28 @@ public class PlayerControl : MonoBehaviour
         }
 
         headingScreenPosition = Input.mousePosition;
-        headingWorldPosition = ScreenToWorld(headingScreenPosition);
+        headingWorldPosition = ClampHeadingPointWorldPosition(ScreenToWorld(headingScreenPosition));
+        if (targetCamera != null)
+            headingScreenPosition = targetCamera.WorldToScreenPoint(headingWorldPosition);
         hasHeadingWorldPosition = true;
+    }
+
+    private Vector3 ClampHeadingPointWorldPosition(Vector3 desiredWorldPosition)
+    {
+        desiredWorldPosition.z = 0f;
+        if (!limitHeadingPointReach || !hasWorldPosition)
+            return desiredWorldPosition;
+
+        float radius = Mathf.Max(0f, headingPointReachRadius);
+        if (radius <= 0.0001f)
+            return currentWorldPosition;
+
+        Vector2 offset = (Vector2)(desiredWorldPosition - currentWorldPosition);
+        if (offset.sqrMagnitude <= radius * radius)
+            return desiredWorldPosition;
+
+        Vector2 clamped = (Vector2)currentWorldPosition + offset.normalized * radius;
+        return new Vector3(clamped.x, clamped.y, 0f);
     }
 
     private float UpdateLogicalWorldPosition(bool pointerOverUI, float deltaTime)
@@ -393,11 +436,16 @@ public class PlayerControl : MonoBehaviour
         Vector3 desiredWorld = GetDesiredWorldPosition(deltaTime);
         Vector3 nextWorld = desiredWorld;
 
-        if (clampCursorToRoom && roomGrid != null)
+        if (clampCursorToRoom)
         {
-            if (roomGrid.HasRoomCells)
+            if (roomGrid != null && roomGrid.HasRoomCells)
             {
                 nextWorld = roomGrid.ClampPlayerWorldPoint(desiredWorld, currentWorldPosition, PlayerCollisionRadius);
+                warnedAboutMissingRoomArea = false;
+            }
+            else if (runtimeTileWalkableArea != null && runtimeTileWalkableArea.HasWalkableCells)
+            {
+                nextWorld = runtimeTileWalkableArea.ClampPlayerWorldPoint(desiredWorld, currentWorldPosition, PlayerCollisionRadius);
                 warnedAboutMissingRoomArea = false;
             }
             else if (!warnedAboutMissingRoomArea)
@@ -567,6 +615,8 @@ public class PlayerControl : MonoBehaviour
 
         if (cursorSprite != null)
             playerImage.sprite = cursorSprite;
+        else if (playerImage.sprite == null)
+            playerImage.sprite = GetRuntimeCursorSprite();
 
         playerAnimator = playerImage.GetComponent<Animator>();
         if (cursorVisualMode == CursorVisualMode.Animator || cursorAnimatorController != null)
@@ -729,8 +779,64 @@ public class PlayerControl : MonoBehaviour
         return runtimeHeadingPointSprite;
     }
 
+    private Sprite GetRuntimeCursorSprite()
+    {
+        if (runtimeCursorSprite != null)
+            return runtimeCursorSprite;
+
+        const int size = 64;
+        runtimeCursorTexture = CreateSoftCircleTexture(size, "Runtime Player Cursor");
+        runtimeCursorSprite = Sprite.Create(
+            runtimeCursorTexture,
+            new Rect(0f, 0f, size, size),
+            new Vector2(0.5f, 0.5f),
+            size
+        );
+        runtimeCursorSprite.name = "Runtime Player Cursor";
+        runtimeCursorSprite.hideFlags = HideFlags.HideAndDontSave;
+        return runtimeCursorSprite;
+    }
+
+    private static Texture2D CreateSoftCircleTexture(int size, string textureName)
+    {
+        Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        texture.name = textureName;
+        texture.hideFlags = HideFlags.HideAndDontSave;
+
+        Color[] pixels = new Color[size * size];
+        Vector2 center = new Vector2((size - 1) * 0.5f, (size - 1) * 0.5f);
+        float radius = size * 0.46f;
+        float feather = 2f;
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float distance = Vector2.Distance(new Vector2(x, y), center);
+                float alpha = Mathf.Clamp01((radius - distance) / feather);
+                pixels[y * size + x] = new Color(1f, 1f, 1f, alpha);
+            }
+        }
+
+        texture.SetPixels(pixels);
+        texture.Apply(false, true);
+        return texture;
+    }
+
     private void DestroyRuntimeHeadingPointAssets()
     {
+        if (runtimeCursorSprite != null)
+        {
+            Destroy(runtimeCursorSprite);
+            runtimeCursorSprite = null;
+        }
+
+        if (runtimeCursorTexture != null)
+        {
+            Destroy(runtimeCursorTexture);
+            runtimeCursorTexture = null;
+        }
+
         if (runtimeHeadingPointSprite != null)
         {
             Destroy(runtimeHeadingPointSprite);
@@ -1034,13 +1140,18 @@ public class PlayerControl : MonoBehaviour
 
         Vector3 playerPosition = hasWorldPosition ? currentWorldPosition : transform.position;
         float radius = Mathf.Max(0.05f, PlayerCollisionRadius);
-        bool playerIsInRoom = roomGrid == null || !roomGrid.HasRoomCells || !hasWorldPosition ||
-                              roomGrid.ContainsWorldPoint(playerPosition, PlayerCollisionRadius);
+        bool playerIsInRoom = !hasWorldPosition || IsPlayerInsideCurrentWalkableArea(playerPosition);
 
         Gizmos.color = playerIsInRoom ? debugPlayerColor : debugBlockedPlayerColor;
         Gizmos.DrawWireSphere(playerPosition, radius);
         Gizmos.DrawLine(playerPosition + Vector3.left * radius, playerPosition + Vector3.right * radius);
         Gizmos.DrawLine(playerPosition + Vector3.down * radius, playerPosition + Vector3.up * radius);
+
+        if (drawDebugHeadingReach && limitHeadingPointReach)
+        {
+            Gizmos.color = debugHeadingReachColor;
+            Gizmos.DrawWireSphere(playerPosition, Mathf.Max(0f, headingPointReachRadius));
+        }
 
         if (hasHeadingWorldPosition)
         {
@@ -1081,6 +1192,17 @@ public class PlayerControl : MonoBehaviour
         Handles.Label(headingWorldPosition + Vector3.up * Mathf.Max(0.15f, radius * 0.45f), "Heading Point", headingStyle);
     }
 #endif
+
+    private bool IsPlayerInsideCurrentWalkableArea(Vector3 playerPosition)
+    {
+        if (roomGrid != null && roomGrid.HasRoomCells)
+            return roomGrid.ContainsWorldPoint(playerPosition, PlayerCollisionRadius);
+
+        if (runtimeTileWalkableArea != null && runtimeTileWalkableArea.HasWalkableCells)
+            return runtimeTileWalkableArea.ContainsWorldPoint(playerPosition, PlayerCollisionRadius);
+
+        return true;
+    }
 
     private Vector3 ScreenToWorld(Vector3 screenPosition)
     {
