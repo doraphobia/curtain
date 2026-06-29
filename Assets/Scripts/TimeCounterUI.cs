@@ -30,6 +30,8 @@ public class TimeCounterUI : MonoBehaviour
 
     void Update()
     {
+        DeveloperModeState.TryHandleHotkey();
+
         float dt = Time.deltaTime;
 
         if (countUp)
