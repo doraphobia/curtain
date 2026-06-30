@@ -101,14 +101,18 @@ namespace DuoCurtain.RuntimeTileMesh
             snapshot.worldTileCount = worldCells.Count;
             snapshot.worldTiles = SortTiles(worldCells);
 
-            if (buildResult != null)
-            {
-                for (int i = 0; i < buildResult.warnings.Count; i++)
-                    snapshot.warnings.Add(buildResult.warnings[i]);
+            RuntimeTileMeshBuildResult effectiveBuildResult = buildResult;
+            if (effectiveBuildResult == null && view != null)
+                effectiveBuildResult = view.LastBuildResult;
 
-                for (int i = 0; i < buildResult.components.Count; i++)
+            if (effectiveBuildResult != null)
+            {
+                for (int i = 0; i < effectiveBuildResult.warnings.Count; i++)
+                    snapshot.warnings.Add(effectiveBuildResult.warnings[i]);
+
+                for (int i = 0; i < effectiveBuildResult.components.Count; i++)
                 {
-                    RuntimeTileMeshComponentResult component = buildResult.components[i];
+                    RuntimeTileMeshComponentResult component = effectiveBuildResult.components[i];
                     if (component == null)
                         continue;
 

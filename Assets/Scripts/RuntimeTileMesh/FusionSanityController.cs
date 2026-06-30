@@ -49,6 +49,9 @@ namespace DuoCurtain.RuntimeTileMesh
         public Vector2 restoreButtonSize = new Vector2(360f, 64f);
         public Color restoreButtonColor = new Color(1f, 1f, 1f, 0.16f);
         public Color restoreTextColor = Color.white;
+        public bool liftRestoreUiAboveShop = true;
+        [Min(0f)]
+        public float shopUiClearance = 18f;
 
         [Header("HUD")]
         public bool createHudIfMissing = true;
@@ -98,6 +101,8 @@ namespace DuoCurtain.RuntimeTileMesh
         private Button deathRestartButton;
         private Button restoreButton;
         private TextMeshProUGUI restoreButtonText;
+        private RectTransform sanityTextRectTransform;
+        private RectTransform restoreButtonRectTransform;
         private Texture2D deathBlurTexture;
         private Coroutine deathOverlayRoutine;
 
@@ -157,6 +162,7 @@ namespace DuoCurtain.RuntimeTileMesh
             }
 
             TickSanity(Time.deltaTime);
+            ApplyHudLayout();
             RefreshHud();
             RefreshGreyOverlay();
             UpdateRestoreButtonVisibility();
@@ -327,11 +333,10 @@ namespace DuoCurtain.RuntimeTileMesh
                 GameObject textObject = new GameObject("Sanity TMP", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
                 textObject.transform.SetParent(canvas.transform, false);
                 RectTransform rect = textObject.GetComponent<RectTransform>();
+                sanityTextRectTransform = rect;
                 rect.anchorMin = Vector2.zero;
                 rect.anchorMax = Vector2.zero;
                 rect.pivot = new Vector2(0f, 0f);
-                rect.anchoredPosition = sanityHudAnchoredPosition;
-                rect.sizeDelta = sanityHudSize;
 
                 sanityText = textObject.GetComponent<TextMeshProUGUI>();
                 sanityText.alignment = TextAlignmentOptions.BottomLeft;
@@ -342,6 +347,12 @@ namespace DuoCurtain.RuntimeTileMesh
 
             if (restoreButton == null)
                 CreateRestoreButton(canvas.transform);
+
+            if (sanityText != null && sanityTextRectTransform == null)
+                sanityTextRectTransform = sanityText.rectTransform;
+            if (restoreButton != null && restoreButtonRectTransform == null)
+                restoreButtonRectTransform = restoreButton.GetComponent<RectTransform>();
+            ApplyHudLayout();
         }
 
         private void CreateRestoreButton(Transform parent)
@@ -354,11 +365,10 @@ namespace DuoCurtain.RuntimeTileMesh
                 typeof(Button));
             buttonObject.transform.SetParent(parent, false);
             RectTransform rect = buttonObject.GetComponent<RectTransform>();
+            restoreButtonRectTransform = rect;
             rect.anchorMin = Vector2.zero;
             rect.anchorMax = Vector2.zero;
             rect.pivot = new Vector2(0f, 0f);
-            rect.anchoredPosition = restoreButtonAnchoredPosition;
-            rect.sizeDelta = restoreButtonSize;
 
             Image image = buttonObject.GetComponent<Image>();
             image.color = restoreButtonColor;
@@ -379,6 +389,43 @@ namespace DuoCurtain.RuntimeTileMesh
             restoreButtonText.alignment = TextAlignmentOptions.Center;
             restoreButtonText.fontSize = 24f;
             restoreButtonText.color = restoreTextColor;
+        }
+
+        private void ApplyHudLayout()
+        {
+            float shopLift = 0f;
+            if (liftRestoreUiAboveShop && gameModeController != null)
+            {
+                shopLift = gameModeController.VisibleShopTopInset;
+                if (shopLift > 0.001f)
+                    shopLift += shopUiClearance * gameModeController.ShopSlideProgress;
+            }
+
+            if (sanityText != null)
+            {
+                if (sanityTextRectTransform == null)
+                    sanityTextRectTransform = sanityText.rectTransform;
+
+                sanityTextRectTransform.anchorMin = Vector2.zero;
+                sanityTextRectTransform.anchorMax = Vector2.zero;
+                sanityTextRectTransform.pivot = Vector2.zero;
+                sanityTextRectTransform.sizeDelta = sanityHudSize;
+                sanityTextRectTransform.anchoredPosition =
+                    sanityHudAnchoredPosition + Vector2.up * shopLift;
+            }
+
+            if (restoreButton != null)
+            {
+                if (restoreButtonRectTransform == null)
+                    restoreButtonRectTransform = restoreButton.GetComponent<RectTransform>();
+
+                restoreButtonRectTransform.anchorMin = Vector2.zero;
+                restoreButtonRectTransform.anchorMax = Vector2.zero;
+                restoreButtonRectTransform.pivot = Vector2.zero;
+                restoreButtonRectTransform.sizeDelta = restoreButtonSize;
+                restoreButtonRectTransform.anchoredPosition =
+                    restoreButtonAnchoredPosition + Vector2.up * shopLift;
+            }
         }
 
         private void EnsureGreyOverlay()

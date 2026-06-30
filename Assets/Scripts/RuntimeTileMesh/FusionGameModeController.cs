@@ -205,6 +205,11 @@ namespace DuoCurtain.RuntimeTileMesh
         private bool hasCachedPlayerHeadingState;
 
         public bool IsManagementMode => currentMode == GameMode.Management;
+        public float ShopSlideProgress => Mathf.Clamp01(shopSlideValue);
+        public float ShopBannerHeight => Mathf.Max(120f, shopBannerHeight);
+        public float ShopBottomInset => Mathf.Max(0f, shopBottomInset);
+        public float VisibleShopTopInset =>
+            (ShopBannerHeight + ShopBottomInset) * ShopSlideProgress;
 
         void Awake()
         {

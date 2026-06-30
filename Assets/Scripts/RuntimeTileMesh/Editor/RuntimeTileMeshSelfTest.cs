@@ -1,6 +1,7 @@
 #if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
+using DuoCurtain.Vision;
 using UnityEditor;
 using UnityEngine;
 
@@ -32,6 +33,8 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             failures += ExpectTopologyMapRuntimeFusionFallback();
             failures += ExpectFusionIntegrityMerge();
             failures += ExpectFusionIntegrityTileAccounting();
+            failures += ExpectFusionIntegrityUsesLatestBuild();
+            failures += ExpectVisionConeAndProceduralRenderer();
 
             if (failures == 0)
             {
@@ -1006,6 +1009,124 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                     if (cleanup[i] != null)
                         UnityEngine.Object.DestroyImmediate(cleanup[i]);
                 }
+            }
+        }
+
+        private static int ExpectFusionIntegrityUsesLatestBuild()
+        {
+            List<GameObject> cleanup = new List<GameObject>();
+            Mesh staleMesh = null;
+            try
+            {
+                RuntimeTileMeshDraggableBlock block = CreateSelfTestBlock(
+                    "Integrity Latest Build",
+                    RuntimeTileMeshDemo.CreateShape(RuntimeTileMeshDemo.DemoShape.Z),
+                    cleanup,
+                    Vector2Int.zero);
+
+                GameObject staleVisual = new GameObject("Stale Serialized Visual");
+                staleVisual.transform.SetParent(block.transform, false);
+                cleanup.Add(staleVisual);
+                MeshFilter filter = staleVisual.AddComponent<MeshFilter>();
+                staleMesh = new Mesh { name = "Legacy Six Vertex Mesh" };
+                staleMesh.vertices = new[]
+                {
+                    new Vector3(0f, 0f, 0f),
+                    new Vector3(3f, 0f, 0f),
+                    new Vector3(3f, 1f, 0f),
+                    new Vector3(1f, 1f, 0f),
+                    new Vector3(1f, 3f, 0f),
+                    new Vector3(0f, 3f, 0f)
+                };
+                staleMesh.triangles = new[] { 0, 2, 1, 0, 3, 2, 0, 4, 3, 0, 5, 4 };
+                filter.sharedMesh = staleMesh;
+
+                FusionIntegrityBlockSnapshot snapshot =
+                    RuntimeTileMeshFusionIntegrityAnalyzer.CaptureBlockSnapshot(
+                        block,
+                        1f,
+                        Vector2.zero);
+                int expectedVertices = block.View.tiles.Count * 4;
+                if (snapshot.meshVertexCount == expectedVertices)
+                    return 0;
+
+                Debug.LogError(
+                    "[RuntimeTileMeshSelfTest] Integrity audit should use the latest build result instead of stale child meshes. Expected " +
+                    expectedVertices + " vertices, got " + snapshot.meshVertexCount + ".");
+                return 1;
+            }
+            finally
+            {
+                if (staleMesh != null)
+                    UnityEngine.Object.DestroyImmediate(staleMesh);
+
+                for (int i = cleanup.Count - 1; i >= 0; i--)
+                {
+                    if (cleanup[i] != null)
+                        UnityEngine.Object.DestroyImmediate(cleanup[i]);
+                }
+            }
+        }
+
+        private static int ExpectVisionConeAndProceduralRenderer()
+        {
+            GameObject rendererObject = null;
+            try
+            {
+                VisionSnapshot snapshot = new VisionSnapshot();
+                RadialVisionSampler2D sampler = new RadialVisionSampler2D();
+                sampler.Sample(
+                    snapshot,
+                    Vector2.zero,
+                    Vector2.right,
+                    90f,
+                    5f,
+                    16,
+                    64,
+                    2,
+                    0.35f,
+                    0,
+                    false,
+                    null);
+
+                if (!snapshot.ContainsWorldPoint(new Vector2(2f, 0.1f)) ||
+                    snapshot.ContainsWorldPoint(new Vector2(-1f, 0f)) ||
+                    snapshot.ContainsWorldPoint(new Vector2(1f, 3f)))
+                {
+                    Debug.LogError(
+                        "[RuntimeTileMeshSelfTest] Vision cone containment should include points ahead and reject points behind or outside the cone.");
+                    return 1;
+                }
+
+                rendererObject = new GameObject("Vision Renderer Self Test");
+                ProceduralMeshVisionRenderer visionRenderer =
+                    rendererObject.AddComponent<ProceduralMeshVisionRenderer>();
+                visionRenderer.Initialize(new VisionRendererContext(
+                    rendererObject,
+                    rendererObject.transform,
+                    0,
+                    0,
+                    0f));
+                visionRenderer.Render(snapshot, new VisionRenderParameters());
+
+                Transform output = rendererObject.transform.Find("Procedural Vision Mesh");
+                MeshFilter filter = output != null ? output.GetComponent<MeshFilter>() : null;
+                int expectedVertexCount = snapshot.SampleCount + 1;
+                int actualVertexCount = filter != null && filter.sharedMesh != null
+                    ? filter.sharedMesh.vertexCount
+                    : 0;
+                if (actualVertexCount == expectedVertexCount)
+                    return 0;
+
+                Debug.LogError(
+                    "[RuntimeTileMeshSelfTest] Procedural vision mesh expected " +
+                    expectedVertexCount + " vertices, got " + actualVertexCount + ".");
+                return 1;
+            }
+            finally
+            {
+                if (rendererObject != null)
+                    UnityEngine.Object.DestroyImmediate(rendererObject);
             }
         }
 

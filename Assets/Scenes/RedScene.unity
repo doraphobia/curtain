@@ -1283,7 +1283,7 @@ MonoBehaviour:
   - {x: 0, y: 2}
   - {x: 1, y: 0}
   - {x: 2, y: 0}
-  rebuildOnStart: 0
+  rebuildOnStart: 1
   material: {fileID: 2100000, guid: b624f85efc20d4846b35ff3648e2f130, type: 2}
   buildPolygonCollider2D: 1
   polygonColliderIsTrigger: 1
@@ -3937,7 +3937,7 @@ MonoBehaviour:
   - {x: 0, y: 2}
   - {x: 1, y: 0}
   - {x: 2, y: 0}
-  rebuildOnStart: 0
+  rebuildOnStart: 1
   material: {fileID: 2100000, guid: b624f85efc20d4846b35ff3648e2f130, type: 2}
   buildPolygonCollider2D: 1
   polygonColliderIsTrigger: 1
@@ -6910,7 +6910,7 @@ MonoBehaviour:
   - {x: 0, y: 2}
   - {x: 1, y: 0}
   - {x: 2, y: 0}
-  rebuildOnStart: 0
+  rebuildOnStart: 1
   material: {fileID: 2100000, guid: b624f85efc20d4846b35ff3648e2f130, type: 2}
   buildPolygonCollider2D: 1
   polygonColliderIsTrigger: 1
@@ -8245,7 +8245,7 @@ MonoBehaviour:
   - {x: 0, y: 2}
   - {x: 1, y: 0}
   - {x: 2, y: 0}
-  rebuildOnStart: 0
+  rebuildOnStart: 1
   material: {fileID: 2100000, guid: b624f85efc20d4846b35ff3648e2f130, type: 2}
   buildPolygonCollider2D: 1
   polygonColliderIsTrigger: 1

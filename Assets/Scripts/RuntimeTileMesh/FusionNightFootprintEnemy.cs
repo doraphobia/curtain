@@ -1,4 +1,5 @@
 using UnityEngine;
+using DuoCurtain.Vision;
 
 namespace DuoCurtain.RuntimeTileMesh
 {
@@ -76,6 +77,23 @@ namespace DuoCurtain.RuntimeTileMesh
 
         [Header("Runtime Vision Visual")]
         public bool showVisionInGame = true;
+        public VisionSensor2D visionSensor;
+        public VisionRenderController visionRenderController;
+        [Range(1f, 360f)]
+        public float runtimeVisionAngle = 95f;
+        [Range(2, 512)]
+        public int runtimeVisionRayCount = 72;
+        [Range(2, 1024)]
+        public int runtimeVisionMaxRayCount = 256;
+        [Range(0, 8)]
+        public int runtimeVisionEdgeRefinement = 3;
+        [Min(0f)]
+        public float runtimeVisionEdgeThreshold = 0.35f;
+        public LayerMask runtimeVisionObstacleMask = ~0;
+        public int runtimeVisionSortingOrder = 52;
+        public float runtimeVisionZOffset = -0.2f;
+
+        [Header("Legacy Vision Line Fallback")]
         public bool showWindowProjection = true;
         public Material visionLineMaterial;
         public Color searchingVisionColor = new Color(1f, 0.82f, 0.15f, 0.32f);
@@ -105,6 +123,7 @@ namespace DuoCurtain.RuntimeTileMesh
         private DoorBreakProgressBar doorBreakProgressBar;
         private bool windowSanityDamageApplied;
         private float lastContactDamageTime = -999f;
+        private Vector2 lastMoveDirection = Vector2.up;
 
         public TraceEnemyState CurrentState => currentState;
 
@@ -118,6 +137,7 @@ namespace DuoCurtain.RuntimeTileMesh
 
             footprintTrace.SetTraceState(EnemyTraceState.NormalMoving);
             lastValidOutdoorPosition = transform.position;
+            EnsureVisionSystem();
             PickOutsideWaypoint();
         }
 
@@ -179,6 +199,7 @@ namespace DuoCurtain.RuntimeTileMesh
             footprintTrace.ConfigureFootprintPrefabs(leftFootprintPrefab, rightFootprintPrefab, footprintParent);
             footprintTrace.SetTraceState(EnemyTraceState.NormalMoving);
             lastValidOutdoorPosition = transform.position;
+            EnsureVisionSystem();
         }
 
         public bool HasEnemyEnteredRoom()
@@ -403,6 +424,7 @@ namespace DuoCurtain.RuntimeTileMesh
                 return true;
 
             Vector2 step = delta.normalized * (moveSpeed * Time.deltaTime);
+            lastMoveDirection = delta.normalized;
             if (step.magnitude > distance)
                 step = delta;
 
@@ -556,44 +578,58 @@ namespace DuoCurtain.RuntimeTileMesh
 
         private void UpdateRuntimeVisionVisual()
         {
+            EnsureVisionSystem();
+            SetVisionLinesVisible(false);
+
+            if (visionRenderController == null || visionSensor == null)
+            {
+                return;
+            }
+
+            visionRenderController.SetVisible(showVisionInGame);
             if (!showVisionInGame)
             {
-                SetVisionLinesVisible(false);
                 return;
             }
 
-            EnsureVisionLines();
-            if (visionPrimaryLine == null || playerControl == null || !playerControl.HasPlayerWorldPosition)
-            {
-                SetVisionLinesVisible(false);
-                return;
-            }
+            Color primary = confirmedPlayerByVision ? detectedVisionColor : searchingVisionColor;
+            Color secondary = confirmedPlayerByVision
+                ? new Color(detectedVisionColor.r, detectedVisionColor.g, detectedVisionColor.b, Mathf.Min(1f, detectedVisionColor.a * 1.35f))
+                : new Color(searchingVisionColor.r, searchingVisionColor.g, searchingVisionColor.b, Mathf.Min(1f, searchingVisionColor.a * 1.6f));
+            visionRenderController.renderParameters.primaryColor = primary;
+            visionRenderController.renderParameters.secondaryColor = secondary;
+            visionSensor.SetForward(lastMoveDirection);
+            visionSensor.ForceSample();
+        }
 
-            SetVisionLinesVisible(true);
-            Vector3 origin = transform.position;
-            Vector3 playerPosition = playerControl.PlayerWorldPosition;
-            lastKnownPlayerPosition = playerPosition;
-            Color color = confirmedPlayerByVision ? detectedVisionColor : searchingVisionColor;
+        private void EnsureVisionSystem()
+        {
+            if (visionSensor == null)
+                visionSensor = GetComponent<VisionSensor2D>();
+            if (visionSensor == null)
+                visionSensor = gameObject.AddComponent<VisionSensor2D>();
 
-            if (lastUsedWindow != null)
-            {
-                Vector3 windowPosition = lastUsedWindow.transform.position;
-                ConfigureVisionLine(visionPrimaryLine, origin, windowPosition, color);
-                if (showWindowProjection && visionWindowProjectionLine != null)
-                    ConfigureVisionLine(visionWindowProjectionLine, windowPosition, playerPosition, color);
-                else if (visionWindowProjectionLine != null)
-                    visionWindowProjectionLine.enabled = false;
-            }
-            else
-            {
-                ConfigureVisionLine(
-                    visionPrimaryLine,
-                    origin,
-                    playerPosition,
-                    confirmedPlayerByVision ? detectedVisionColor : blockedVisionColor);
-                if (visionWindowProjectionLine != null)
-                    visionWindowProjectionLine.enabled = false;
-            }
+            visionSensor.forwardSource = VisionSensor2D.ForwardSource.Manual;
+            visionSensor.sampleAutomatically = false;
+            visionSensor.viewDistance = Mathf.Max(0.1f, windowDetectionDistance);
+            visionSensor.viewAngle = Mathf.Clamp(runtimeVisionAngle, 1f, 360f);
+            visionSensor.rayCount = Mathf.Clamp(runtimeVisionRayCount, 2, 512);
+            visionSensor.maxRayCount = Mathf.Clamp(runtimeVisionMaxRayCount, visionSensor.rayCount, 1024);
+            visionSensor.edgeRefinementIterations = Mathf.Clamp(runtimeVisionEdgeRefinement, 0, 8);
+            visionSensor.edgeDistanceThreshold = Mathf.Max(0f, runtimeVisionEdgeThreshold);
+            visionSensor.obstacleMask = runtimeVisionObstacleMask;
+            visionSensor.hitTriggers = false;
+            visionSensor.SetForward(lastMoveDirection);
+
+            if (visionRenderController == null)
+                visionRenderController = GetComponent<VisionRenderController>();
+            if (visionRenderController == null)
+                visionRenderController = gameObject.AddComponent<VisionRenderController>();
+
+            visionRenderController.sensor = visionSensor;
+            visionRenderController.sortingOrder = runtimeVisionSortingOrder;
+            visionRenderController.zOffset = runtimeVisionZOffset;
+            visionRenderController.renderEnabled = showVisionInGame;
         }
 
         private void EnsureVisionLines()
