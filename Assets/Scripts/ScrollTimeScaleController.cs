@@ -34,6 +34,9 @@ public class ScrollTimeScaleController : MonoBehaviour, IPointerEnterHandler, IP
 
     void Update()
     {
+        if (PauseManager.IsGamePaused)
+            return;
+
         if (!affectGlobalTimeScale)
             return;
 

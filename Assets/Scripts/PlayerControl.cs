@@ -30,6 +30,7 @@ public class PlayerControl : MonoBehaviour
     public Camera targetCamera;
     public TilePlacementGrid roomGrid;
     public RuntimeTileMeshFusionSandbox runtimeTileWalkableArea;
+    public bool preferRuntimeTileWalkableArea = true;
     [FormerlySerializedAs("uiCursorImage")]
     public Image playerImage;
     [FormerlySerializedAs("uiCursorObjectName")]
@@ -228,6 +229,13 @@ public class PlayerControl : MonoBehaviour
     void Update()
     {
         DeveloperModeState.TryHandleHotkey();
+        if (PauseManager.IsGamePaused)
+        {
+            currentCursorSpeed = 0f;
+            stepTriggeredThisFrame = false;
+            return;
+        }
+
         ResolveReferences();
 
         lastPointerOverUI = IsPointerOverUI();
@@ -261,6 +269,9 @@ public class PlayerControl : MonoBehaviour
 
     void LateUpdate()
     {
+        if (PauseManager.IsGamePaused)
+            return;
+
         ResolveReferences();
         UpdatePlayerVisual(lastPointerOverUI);
         UpdateHeadingPointVisual();
@@ -404,7 +415,14 @@ public class PlayerControl : MonoBehaviour
             return;
 
         Vector3 startWorld = ScreenToWorld(Input.mousePosition);
-        if (clampCursorToRoom && roomGrid != null && roomGrid.HasRoomCells)
+        if (clampCursorToRoom && ShouldUseRuntimeTileWalkableAreaFirst())
+        {
+            if (spawnAtRandomRuntimeTileBlockCenter && runtimeTileWalkableArea.TryGetRandomBlockCenter(out Vector3 spawnWorld))
+                startWorld = spawnWorld;
+            else
+                startWorld = runtimeTileWalkableArea.ClampPlayerWorldPoint(startWorld, startWorld, PlayerCollisionRadius);
+        }
+        else if (clampCursorToRoom && roomGrid != null && roomGrid.HasRoomCells)
         {
             startWorld = roomGrid.ClampPlayerWorldPoint(startWorld, startWorld, PlayerCollisionRadius);
         }
@@ -474,7 +492,12 @@ public class PlayerControl : MonoBehaviour
 
         if (clampCursorToRoom)
         {
-            if (roomGrid != null && roomGrid.HasRoomCells)
+            if (ShouldUseRuntimeTileWalkableAreaFirst())
+            {
+                nextWorld = runtimeTileWalkableArea.ClampPlayerWorldPoint(desiredWorld, currentWorldPosition, PlayerCollisionRadius);
+                warnedAboutMissingRoomArea = false;
+            }
+            else if (roomGrid != null && roomGrid.HasRoomCells)
             {
                 nextWorld = roomGrid.ClampPlayerWorldPoint(desiredWorld, currentWorldPosition, PlayerCollisionRadius);
                 warnedAboutMissingRoomArea = false;
@@ -1241,6 +1264,9 @@ public class PlayerControl : MonoBehaviour
 
     private bool IsPlayerInsideCurrentWalkableArea(Vector3 playerPosition)
     {
+        if (ShouldUseRuntimeTileWalkableAreaFirst())
+            return runtimeTileWalkableArea.ContainsWorldPoint(playerPosition, PlayerCollisionRadius);
+
         if (roomGrid != null && roomGrid.HasRoomCells)
             return roomGrid.ContainsWorldPoint(playerPosition, PlayerCollisionRadius);
 
@@ -1248,6 +1274,13 @@ public class PlayerControl : MonoBehaviour
             return runtimeTileWalkableArea.ContainsWorldPoint(playerPosition, PlayerCollisionRadius);
 
         return true;
+    }
+
+    private bool ShouldUseRuntimeTileWalkableAreaFirst()
+    {
+        return preferRuntimeTileWalkableArea &&
+               runtimeTileWalkableArea != null &&
+               runtimeTileWalkableArea.HasWalkableCells;
     }
 
     private Vector3 ScreenToWorld(Vector3 screenPosition)

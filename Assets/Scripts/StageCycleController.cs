@@ -106,7 +106,7 @@ public class StageCycleController : MonoBehaviour
         if (stages == null || stages.Count == 0)
             return;
 
-        if (!paused)
+        if (!paused && !PauseManager.IsGamePaused)
         {
             stageTimer += Time.deltaTime;
 

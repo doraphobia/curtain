@@ -32,6 +32,8 @@ namespace DuoCurtain.RuntimeTileMesh
         public int doorSharedEdgeCells = 3;
         [Min(0.01f)]
         public float doorThickness = 0.5f;
+        [Range(1f, 179f)]
+        public float doorOpenAngleDegrees = 90f;
         public Color doorColor = Color.black;
         public bool doorBlocksPlayer = true;
         public bool allowHeadingPointDoorInteraction = true;
@@ -95,6 +97,9 @@ namespace DuoCurtain.RuntimeTileMesh
         void Update()
         {
             if (worldCamera == null)
+                return;
+
+            if (PauseManager.IsGamePaused)
                 return;
 
             if (!managementInputEnabled)
@@ -701,6 +706,7 @@ namespace DuoCurtain.RuntimeTileMesh
                     Mathf.Max(0.0001f, Mathf.Abs(gridSize)),
                     candidate.key,
                     doorThickness,
+                    doorOpenAngleDegrees,
                     doorColor,
                     candidate.edgeCoordinate,
                     candidate.variableStart,

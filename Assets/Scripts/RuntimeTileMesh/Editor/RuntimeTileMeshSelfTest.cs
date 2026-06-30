@@ -383,6 +383,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             sandbox.deactivateAbsorbedBlocksImmediately = true;
             sandbox.generateDoorsOnFusion = true;
             sandbox.doorSharedEdgeCells = 3;
+            sandbox.doorOpenAngleDegrees = 90f;
 
             List<GameObject> cleanup = new List<GameObject> { controllerObject };
             try
@@ -496,6 +497,30 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                 if (sandbox.TryBlockDoorMovement(new Vector3(0.75f, 1.5f, 0f), new Vector3(1.25f, 1.5f, 0f), 0.05f))
                 {
                     Debug.LogError("[RuntimeTileMeshSelfTest] Fusion door rule " + name + " expected the sandbox-level open door segment to allow movement.");
+                    failures++;
+                }
+
+                if (!sandbox.TryBlockDoorMovement(new Vector3(1.5f, 0.65f, 0f), new Vector3(1.5f, 1.05f, 0f), 0.05f))
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] Fusion door rule " + name + " expected collision with the open door panel to close and block movement.");
+                    failures++;
+                }
+
+                if (door.IsOpen)
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] Fusion door rule " + name + " expected the door to be closed after hitting the open panel.");
+                    failures++;
+                }
+
+                if (!sandbox.TryBlockDoorMovement(new Vector3(0.75f, 1.1f, 0f), new Vector3(1.25f, 1.1f, 0f), 0.05f))
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] Fusion door rule " + name + " expected lower-half collision with the closed door to open and block movement.");
+                    failures++;
+                }
+
+                if (door.HingeEnd != RuntimeTileMeshFusionDoor.DoorHingeEnd.Positive)
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] Fusion door rule " + name + " expected lower-half collision to choose the upper wall-connected endpoint as the hinge.");
                     failures++;
                 }
             }
