@@ -17,14 +17,29 @@ namespace DuoCurtain.RuntimeTileMesh
             Management
         }
 
+        public enum ShopItemKind
+        {
+            Block,
+            WallAttachment
+        }
+
         [Serializable]
         public sealed class BlockShopItem
         {
             public string displayName = "Block";
+            public ShopItemKind itemKind = ShopItemKind.Block;
             public RuntimeTileMeshDraggableBlock blockPrefab;
+            public GameObject wallAttachmentPrefab;
             [Min(0)]
             public int price = 10;
             public KeyCode hotkey = KeyCode.Alpha1;
+
+            public bool HasPurchasableContent()
+            {
+                return itemKind == ShopItemKind.Block
+                    ? blockPrefab != null
+                    : itemKind == ShopItemKind.WallAttachment;
+            }
         }
 
         [Header("Mode")]
@@ -90,11 +105,29 @@ namespace DuoCurtain.RuntimeTileMesh
         public Color shopTextColor = Color.white;
         public Color shopPriceColor = new Color(1f, 0.84f, 0.36f, 1f);
 
-        [Header("Fusion Shop Thumbnails")]
+        [Header("Fusion Wall Attachment Shop")]
+        [Min(0.05f)]
+        public float wallAttachmentSnapDistance = 1.25f;
+        [Min(0.01f)]
+        public float windowAttachmentLengthInCells = 0.82f;
+        [Min(0.01f)]
+        public float windowAttachmentThicknessInCells = 0.16f;
+        public Color windowClosedColor = new Color(1f, 0.92f, 0.08f, 1f);
+        public Color windowOpenColor = new Color(0.55f, 0.85f, 1f, 1f);
+        public Color wallAttachmentValidPreviewColor = new Color(1f, 0.92f, 0.08f, 0.72f);
+        public Color wallAttachmentInvalidPreviewColor = new Color(1f, 0.15f, 0.1f, 0.45f);
+
+        [Header("Fusion Shop Thumbnail Settings")]
+        public FusionShopThumbnailRenderer.ThumbnailSettings shopThumbnailSettings =
+            new FusionShopThumbnailRenderer.ThumbnailSettings();
+
+        [HideInInspector]
         [Range(64, 1024)]
         public int shopThumbnailResolution = 256;
+        [HideInInspector]
         [Min(0.05f)]
         public float shopThumbnailFramingPadding = 0.35f;
+        [HideInInspector]
         public Color shopThumbnailBackground = new Color(0f, 0f, 0f, 0f);
 
         [Header("Currency")]
@@ -114,6 +147,12 @@ namespace DuoCurtain.RuntimeTileMesh
         private RuntimeTileMeshFusionSandbox boundSandbox;
         private RuntimeTileMeshDraggableBlock pendingPurchasedBlock;
         private int pendingPurchasedPrice;
+        private BlockShopItem pendingWallAttachmentItem;
+        private int pendingWallAttachmentPrice;
+        private GameObject pendingWallAttachmentPreview;
+        private SpriteRenderer pendingWallAttachmentPreviewRenderer;
+        private bool pendingWallAttachmentHasValidPlacement;
+        private RuntimeTileMeshFusionSandbox.FusionWallEdgePlacement pendingWallAttachmentPlacement;
         private int pendingShopIndex = -1;
         private int shopItemsSignature;
         private float shopSlideValue;
@@ -165,6 +204,7 @@ namespace DuoCurtain.RuntimeTileMesh
 
             HandlePendingConfirmationOutsideClick();
             HandlePurchasedBlockCancellation();
+            HandlePendingWallAttachmentPlacement();
             UpdateShopSlide();
             UpdateShopEdgeScroll();
 
@@ -199,18 +239,23 @@ namespace DuoCurtain.RuntimeTileMesh
 
         public bool TryPurchase(BlockShopItem item)
         {
+            if (item == null || fusionSandbox == null || !item.HasPurchasableContent())
+                return false;
+
+            if (item.itemKind == ShopItemKind.WallAttachment)
+                return TryBeginWallAttachmentPurchase(item);
+
+            return TryPurchaseBlock(item);
+        }
+
+        private bool TryPurchaseBlock(BlockShopItem item)
+        {
             if (item == null || item.blockPrefab == null || fusionSandbox == null)
                 return false;
 
             int paidPrice = 0;
-            if (!allowFreePurchases)
-            {
-                EnsureCurrencySource();
-                if (currencySource == null || !currencySource.TrySpend(item.price))
-                    return false;
-
-                paidPrice = item.price;
-            }
+            if (!TrySpendPurchasePrice(item, out paidPrice))
+                return false;
 
             Vector3 spawnPosition = transform.position;
             if (buyAtPointerPosition && fusionSandbox.worldCamera != null)
@@ -234,6 +279,40 @@ namespace DuoCurtain.RuntimeTileMesh
             pendingPurchasedBlock = spawned;
             pendingPurchasedPrice = paidPrice;
             SetShopExpanded(false, false);
+            return true;
+        }
+
+        private bool TryBeginWallAttachmentPurchase(BlockShopItem item)
+        {
+            if (item == null || fusionSandbox == null)
+                return false;
+
+            int paidPrice = 0;
+            if (!TrySpendPurchasePrice(item, out paidPrice))
+                return false;
+
+            CancelPendingWallAttachment(false);
+            pendingWallAttachmentItem = item;
+            pendingWallAttachmentPrice = paidPrice;
+            SetShopExpanded(false, false);
+            EnsureWallAttachmentPreview();
+            return true;
+        }
+
+        private bool TrySpendPurchasePrice(BlockShopItem item, out int paidPrice)
+        {
+            paidPrice = 0;
+            if (item == null)
+                return false;
+
+            if (allowFreePurchases)
+                return true;
+
+            EnsureCurrencySource();
+            if (currencySource == null || !currencySource.TrySpend(item.price))
+                return false;
+
+            paidPrice = item.price;
             return true;
         }
 
@@ -363,7 +442,7 @@ namespace DuoCurtain.RuntimeTileMesh
                 return;
 
             BlockShopItem item = shopItems[index];
-            if (item == null || item.blockPrefab == null)
+            if (item == null || !item.HasPurchasableContent())
                 return;
 
             if (pendingShopIndex != index)
@@ -414,6 +493,165 @@ namespace DuoCurtain.RuntimeTileMesh
 
             if (Input.GetMouseButtonDown(Mathf.Max(0, fusionSandbox.cancelSelectionMouseButton)))
                 fusionSandbox.CancelSelectedBlock(true);
+        }
+
+        private void HandlePendingWallAttachmentPlacement()
+        {
+            if (pendingWallAttachmentItem == null || fusionSandbox == null)
+            {
+                SetWallAttachmentPreviewVisible(false);
+                return;
+            }
+
+            if (!IsManagementMode)
+            {
+                CancelPendingWallAttachment(true);
+                return;
+            }
+
+            if (Input.GetMouseButtonDown(Mathf.Max(0, fusionSandbox.cancelSelectionMouseButton)))
+            {
+                CancelPendingWallAttachment(true);
+                return;
+            }
+
+            Vector3 pointerWorld;
+            if (!PlayerControl.TryGetInteractionWorldPosition(out pointerWorld))
+                pointerWorld = fusionSandbox.GetPointerWorldPosition();
+
+            pendingWallAttachmentHasValidPlacement = fusionSandbox.TryFindNearestExteriorWallEdge(
+                pointerWorld,
+                wallAttachmentSnapDistance,
+                out pendingWallAttachmentPlacement);
+
+            UpdateWallAttachmentPreview();
+
+            if (!pendingWallAttachmentHasValidPlacement)
+                return;
+
+            if (ignoreShopPlacementClickOverUI() || !Input.GetMouseButtonDown(0))
+                return;
+
+            PlacePendingWallAttachment();
+        }
+
+        private bool ignoreShopPlacementClickOverUI()
+        {
+            return EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+        }
+
+        private void PlacePendingWallAttachment()
+        {
+            if (pendingWallAttachmentItem == null || fusionSandbox == null || !pendingWallAttachmentHasValidPlacement)
+                return;
+
+            GameObject attachmentObject;
+            if (pendingWallAttachmentItem.wallAttachmentPrefab != null)
+            {
+                attachmentObject = Instantiate(pendingWallAttachmentItem.wallAttachmentPrefab);
+                attachmentObject.name = pendingWallAttachmentItem.displayName;
+            }
+            else
+            {
+                attachmentObject = new GameObject(pendingWallAttachmentItem.displayName);
+            }
+
+            FusionWallAttachment attachment = attachmentObject.GetComponent<FusionWallAttachment>();
+            if (attachment == null)
+                attachment = attachmentObject.AddComponent<FusionWallAttachment>();
+
+            attachment.sunlightSide = ResolveSunlightSide(pendingWallAttachmentPlacement.normal);
+            attachment.ConfigureWindow(
+                pendingWallAttachmentPlacement,
+                fusionSandbox.gridSize,
+                windowAttachmentLengthInCells,
+                windowAttachmentThicknessInCells,
+                windowClosedColor,
+                windowOpenColor,
+                false);
+
+            attachmentObject.transform.SetParent(fusionSandbox.transform, true);
+            pendingWallAttachmentItem = null;
+            pendingWallAttachmentPrice = 0;
+            SetWallAttachmentPreviewVisible(false);
+            if (IsManagementMode)
+                SetShopExpanded(true, false);
+        }
+
+        private void CancelPendingWallAttachment(bool refund)
+        {
+            if (pendingWallAttachmentItem == null)
+            {
+                SetWallAttachmentPreviewVisible(false);
+                return;
+            }
+
+            if (refund && pendingWallAttachmentPrice > 0 && currencySource != null)
+                currencySource.AddValue(pendingWallAttachmentPrice);
+
+            pendingWallAttachmentItem = null;
+            pendingWallAttachmentPrice = 0;
+            pendingWallAttachmentHasValidPlacement = false;
+            SetWallAttachmentPreviewVisible(false);
+            if (IsManagementMode)
+                SetShopExpanded(true, false);
+        }
+
+        private void EnsureWallAttachmentPreview()
+        {
+            if (pendingWallAttachmentPreview != null)
+                return;
+
+            pendingWallAttachmentPreview = new GameObject("Pending Fusion Wall Attachment Preview");
+            pendingWallAttachmentPreview.hideFlags = HideFlags.DontSave;
+            pendingWallAttachmentPreviewRenderer = pendingWallAttachmentPreview.AddComponent<SpriteRenderer>();
+            pendingWallAttachmentPreviewRenderer.sprite = FusionWallAttachment.GetDefaultWindowSprite();
+            pendingWallAttachmentPreviewRenderer.sortingOrder = 80;
+            SetWallAttachmentPreviewVisible(false);
+        }
+
+        private void UpdateWallAttachmentPreview()
+        {
+            EnsureWallAttachmentPreview();
+            if (pendingWallAttachmentPreview == null || pendingWallAttachmentPreviewRenderer == null)
+                return;
+
+            SetWallAttachmentPreviewVisible(true);
+            if (!pendingWallAttachmentHasValidPlacement)
+            {
+                pendingWallAttachmentPreviewRenderer.color = wallAttachmentInvalidPreviewColor;
+                return;
+            }
+
+            RuntimeTileMeshFusionSandbox.FusionWallEdgePlacement placement = pendingWallAttachmentPlacement;
+            float grid = fusionSandbox != null ? Mathf.Max(0.01f, fusionSandbox.gridSize) : 1f;
+            Vector2 normal = placement.normal.sqrMagnitude > 0.0001f ? placement.normal.normalized : Vector2.right;
+            Vector2 center = placement.center - normal * (grid * 0.04f);
+            pendingWallAttachmentPreview.transform.position = new Vector3(center.x, center.y, -0.11f);
+            pendingWallAttachmentPreview.transform.rotation = Quaternion.Euler(
+                0f,
+                0f,
+                placement.axis == RuntimeTileMeshFusionDoor.DoorAxis.Vertical ? 90f : 0f);
+            pendingWallAttachmentPreview.transform.localScale = new Vector3(
+                Mathf.Max(0.01f, windowAttachmentLengthInCells * grid),
+                Mathf.Max(0.01f, windowAttachmentThicknessInCells * grid),
+                1f);
+            pendingWallAttachmentPreviewRenderer.color = wallAttachmentValidPreviewColor;
+        }
+
+        private void SetWallAttachmentPreviewVisible(bool visible)
+        {
+            if (pendingWallAttachmentPreview != null)
+                pendingWallAttachmentPreview.SetActive(visible);
+        }
+
+        private static HoverScrollColorLerp2D.SideType ResolveSunlightSide(Vector2 outwardNormal)
+        {
+            if (outwardNormal.x > 0.25f)
+                return HoverScrollColorLerp2D.SideType.Right;
+            if (outwardNormal.x < -0.25f)
+                return HoverScrollColorLerp2D.SideType.Left;
+            return HoverScrollColorLerp2D.SideType.None;
         }
 
         private void ApplyCursorState(bool management)
@@ -761,9 +999,15 @@ namespace DuoCurtain.RuntimeTileMesh
             shopThumbnailRenderer.Rebuild(
                 shopItems,
                 shopThumbnailImages,
-                shopThumbnailResolution,
-                shopThumbnailBackground,
-                shopThumbnailFramingPadding);
+                BuildShopThumbnailSettings());
+        }
+
+        private FusionShopThumbnailRenderer.ThumbnailSettings BuildShopThumbnailSettings()
+        {
+            if (shopThumbnailSettings == null)
+                shopThumbnailSettings = new FusionShopThumbnailRenderer.ThumbnailSettings();
+
+            return shopThumbnailSettings;
         }
 
         private void CreateShopButton(int index)
@@ -920,7 +1164,7 @@ namespace DuoCurtain.RuntimeTileMesh
                     continue;
 
                 BlockShopItem item = i < shopItems.Count ? shopItems[i] : null;
-                button.interactable = shopInteractive && item != null && item.blockPrefab != null &&
+                button.interactable = shopInteractive && item != null && item.HasPurchasableContent() &&
                     (allowFreePurchases || currencySource == null || currencySource.CanAfford(item.price));
 
                 if (i < shopButtonImages.Count && shopButtonImages[i] != null)
@@ -937,6 +1181,7 @@ namespace DuoCurtain.RuntimeTileMesh
             {
                 pendingShopIndex = -1;
                 SetConfirmationText(string.Empty);
+                CancelPendingWallAttachment(true);
             }
 
             bool shouldExpand = (!showShopOnlyInManagementMode || IsManagementMode) && pendingPurchasedBlock == null;
@@ -1126,6 +1371,22 @@ namespace DuoCurtain.RuntimeTileMesh
             unchecked
             {
                 int hash = 17;
+                if (shopThumbnailSettings != null)
+                {
+                    hash = hash * 31 + (int)shopThumbnailSettings.framingMode;
+                    hash = hash * 31 + (int)shopThumbnailSettings.clearMode;
+                    hash = hash * 31 + shopThumbnailSettings.resolution;
+                    hash = hash * 31 + Mathf.RoundToInt(shopThumbnailSettings.framingPadding * 1000f);
+                    hash = hash * 31 + shopThumbnailSettings.backgroundColor.GetHashCode();
+                    hash = hash * 31 + shopThumbnailSettings.antiAliasing;
+                    hash = hash * 31 + Mathf.RoundToInt(shopThumbnailSettings.fixedOrthographicSize * 1000f);
+                    hash = hash * 31 + shopThumbnailSettings.tint.GetHashCode();
+                    hash = hash * 31 + Mathf.RoundToInt(shopThumbnailSettings.opacity * 1000f);
+                    hash = hash * 31 + shopThumbnailSettings.previewRotationEuler.GetHashCode();
+                    hash = hash * 31 + shopThumbnailSettings.previewOffset.GetHashCode();
+                    hash = hash * 31 + Mathf.RoundToInt(shopThumbnailSettings.previewScale * 1000f);
+                    hash = hash * 31 + (shopThumbnailSettings.renderContinuously ? 1 : 0);
+                }
                 hash = hash * 31 + shopItems.Count;
                 for (int i = 0; i < shopItems.Count; i++)
                 {
@@ -1137,7 +1398,9 @@ namespace DuoCurtain.RuntimeTileMesh
                     }
 
                     hash = hash * 31 + (item.displayName != null ? item.displayName.GetHashCode() : 0);
+                    hash = hash * 31 + (int)item.itemKind;
                     hash = hash * 31 + (item.blockPrefab != null ? item.blockPrefab.GetInstanceID() : 0);
+                    hash = hash * 31 + (item.wallAttachmentPrefab != null ? item.wallAttachmentPrefab.GetInstanceID() : 0);
                     hash = hash * 31 + item.price;
                     hash = hash * 31 + (int)item.hotkey;
                 }

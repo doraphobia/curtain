@@ -94,6 +94,34 @@ public class EnemyFootprintTrace : MonoBehaviour
     public int MaxIndividualFootprints => Mathf.Max(1, maxFootprintPairs) * 2;
     public bool PreserveLastPairWhenStopped => preserveLastPairWhenStopped;
 
+    public void ConfigureFootprintPrefabs(GameObject leftPrefab, GameObject rightPrefab, Transform parent = null)
+    {
+        leftFootprintPrefab = leftPrefab;
+        rightFootprintPrefab = rightPrefab;
+        if (parent != null)
+        {
+            footprintParent = parent;
+            runtimeFootprintParent = parent;
+        }
+
+        if (footprintRenderer == null)
+            footprintRenderer = GetComponent<PrefabFootprintRenderer>();
+        if (footprintRenderer == null)
+            footprintRenderer = gameObject.AddComponent<PrefabFootprintRenderer>();
+
+        SyncVisualProfileFromInspector();
+        footprintRenderer.Configure(leftFootprintPrefab, rightFootprintPrefab, visualProfile);
+    }
+
+    public void ConfigureFootprintColors(Color normalColor, Color breakingColor)
+    {
+        normalFootprintColor = normalColor;
+        breakingDoorFootprintColor = breakingColor;
+        SyncVisualProfileFromInspector();
+        if (footprintRenderer != null)
+            footprintRenderer.Configure(leftFootprintPrefab, rightFootprintPrefab, visualProfile);
+    }
+
     void Awake()
     {
         if (enemyController == null)

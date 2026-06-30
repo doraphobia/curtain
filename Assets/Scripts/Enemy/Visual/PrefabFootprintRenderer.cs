@@ -27,6 +27,7 @@ public class PrefabFootprintRenderer : MonoBehaviour, IFootprintRenderer
             return null;
 
         GameObject instanceObject = Instantiate(prefab, data.position, data.rotation, data.parent);
+        instanceObject.SetActive(true);
         FootprintInstance instance = instanceObject.GetComponent<FootprintInstance>();
         if (instance == null)
             instance = instanceObject.AddComponent<FootprintInstance>();

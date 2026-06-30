@@ -99,7 +99,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                 ? AssetDatabase.LoadAssetAtPath<Material>(ProjectionMaterialPath)
                 : null;
             CreateCameras(fusionAssets, out FusionModeCameraRig playerCamera, out FusionModeCameraRig managementCamera);
-            CreateDayNightSystem(playerCamera, managementCamera);
+            StageCycleController stageController = CreateDayNightSystem(playerCamera, managementCamera);
             CreateInstructionText();
             CreateGridOverlay(material);
             RuntimeTileMeshFusionSandbox sandbox = CreateFusionSandboxController();
@@ -116,6 +116,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             CreateBlockInfoOverlay(sandbox, activeCamera);
             CreateTopologyMap(sandbox, playerControl);
             CreateGameModeController(sandbox, playerControl, playerCamera, managementCamera, fusionAssets);
+            CreateNightEnemySpawner(stageController, sandbox, playerControl);
 
             Directory.CreateDirectory(Path.GetDirectoryName(ScenePath));
             EditorSceneManager.SaveScene(scene, ScenePath);
@@ -598,7 +599,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
         private static void CreateInstructionText()
         {
             CreateLabel(
-                "Fusion Sandbox\nEnter toggles Player / Management mode. Tab toggles Block size and Type labels.\nUse 1-4 to buy preset blocks, then drag, snap, place, and merge.",
+                "Fusion Sandbox\nEnter toggles Player / Management mode. Block labels appear in Management.\nUse 1-5 to buy blocks or windows, then drag, snap, place, and merge.",
                 new Vector3(-8.8f, 5.45f, -0.2f),
                 0.09f,
                 TextAnchor.UpperLeft,
@@ -623,6 +624,14 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             sandbox.generateDoorsOnFusion = true;
             sandbox.doorSharedEdgeCells = 3;
             sandbox.doorThickness = 0.25f;
+            sandbox.animateDoors = true;
+            sandbox.doorOpenDuration = 0.25f;
+            sandbox.doorCloseDuration = 0.2f;
+            sandbox.doorPassableOpenAmount = 0.82f;
+            sandbox.useDoorEndWobble = true;
+            sandbox.doorEndWobbleDuration = 0.18f;
+            sandbox.doorEndWobbleAmplitudeDegrees = 6f;
+            sandbox.doorEndWobbleOscillations = 2.5f;
             sandbox.doorColor = Color.black;
             sandbox.doorBlocksPlayer = true;
             sandbox.wallDebugColor = new Color(0.38f, 0.38f, 0.38f, 0.95f);
@@ -796,7 +805,8 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                 CreateShopItem("1x3 Block", assets != null ? assets.oneByThreePrefab : null, 10, KeyCode.Alpha1),
                 CreateShopItem("L Block", assets != null ? assets.lPrefab : null, 16, KeyCode.Alpha2),
                 CreateShopItem("T Block", assets != null ? assets.tPrefab : null, 18, KeyCode.Alpha3),
-                CreateShopItem("Z Block", assets != null ? assets.zPrefab : null, 20, KeyCode.Alpha4)
+                CreateShopItem("Z Block", assets != null ? assets.zPrefab : null, 20, KeyCode.Alpha4),
+                CreateWindowShopItem("Window", 12, KeyCode.Alpha5)
             };
         }
 
@@ -813,6 +823,38 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                 price = price,
                 hotkey = hotkey
             };
+        }
+
+        private static FusionGameModeController.BlockShopItem CreateWindowShopItem(
+            string displayName,
+            int price,
+            KeyCode hotkey)
+        {
+            return new FusionGameModeController.BlockShopItem
+            {
+                displayName = displayName,
+                itemKind = FusionGameModeController.ShopItemKind.WallAttachment,
+                blockPrefab = null,
+                wallAttachmentPrefab = null,
+                price = price,
+                hotkey = hotkey
+            };
+        }
+
+        private static void CreateNightEnemySpawner(
+            StageCycleController stageController,
+            RuntimeTileMeshFusionSandbox sandbox,
+            PlayerControl playerControl)
+        {
+            GameObject spawnerObject = new GameObject("Fusion Night Enemy Spawner");
+            FusionNightEnemySpawner spawner = spawnerObject.AddComponent<FusionNightEnemySpawner>();
+            spawner.stageController = stageController;
+            spawner.fusionSandbox = sandbox;
+            spawner.playerControl = playerControl;
+            spawner.enemiesPerNight = 1;
+            spawner.maxActiveEnemies = 5;
+            spawner.requireOpenWindow = true;
+            spawner.footprintColor = new Color(0f, 0f, 0f, 0.72f);
         }
 
         private static Image CreateControlImage(Transform parent, string name, Vector2 size, Color color)

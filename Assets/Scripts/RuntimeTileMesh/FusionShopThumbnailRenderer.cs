@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -7,6 +8,59 @@ namespace DuoCurtain.RuntimeTileMesh
     [DisallowMultipleComponent]
     public sealed class FusionShopThumbnailRenderer : MonoBehaviour
     {
+        public enum ThumbnailFramingMode
+        {
+            FitBounds,
+            FixedOrthographicSize
+        }
+
+        public enum ThumbnailClearMode
+        {
+            Transparent,
+            SolidColor
+        }
+
+        [Serializable]
+        public sealed class ThumbnailSettings
+        {
+            [Header("Camera")]
+            [Tooltip("FitBounds frames each block from its renderer bounds. FixedOrthographicSize keeps every item at the same camera size.")]
+            public ThumbnailFramingMode framingMode = ThumbnailFramingMode.FitBounds;
+            [Tooltip("Transparent keeps the UI card background visible. SolidColor renders a fixed thumbnail background.")]
+            public ThumbnailClearMode clearMode = ThumbnailClearMode.Transparent;
+            [Tooltip("Square render texture resolution used by each shop thumbnail.")]
+            [Range(64, 1024)]
+            public int resolution = 256;
+            [Tooltip("Extra camera padding around the item when Framing Mode is Fit Bounds.")]
+            [Min(0.05f)]
+            public float framingPadding = 0.35f;
+            [Tooltip("Camera orthographic size when Framing Mode is Fixed Orthographic Size.")]
+            [Min(0.1f)]
+            public float fixedOrthographicSize = 2f;
+            [Tooltip("Render texture anti-aliasing level. Unity normalizes unsupported values to 1, 2, 4, or 8.")]
+            [Range(1, 8)]
+            public int antiAliasing = 2;
+            [Tooltip("Background color used when Clear Mode is Solid Color. Alpha is also respected for Transparent mode.")]
+            public Color backgroundColor = new Color(0f, 0f, 0f, 0f);
+            [Header("Appearance")]
+            [Tooltip("Multiplies the final thumbnail image color.")]
+            public Color tint = Color.white;
+            [Tooltip("Final UI thumbnail opacity.")]
+            [Range(0f, 1f)]
+            public float opacity = 1f;
+            [Header("Transform")]
+            [Tooltip("Preview object rotation before rendering.")]
+            public Vector3 previewRotationEuler = Vector3.zero;
+            [Tooltip("Preview object local offset before rendering.")]
+            public Vector2 previewOffset = Vector2.zero;
+            [Tooltip("Preview object local scale before rendering.")]
+            [Min(0.01f)]
+            public float previewScale = 1f;
+            [Header("Refresh")]
+            [Tooltip("When enabled, thumbnail cameras stay active so animated materials/sprites can keep moving in the shop.")]
+            public bool renderContinuously = true;
+        }
+
         private sealed class PreviewEntry
         {
             public GameObject stage;
@@ -24,19 +78,36 @@ namespace DuoCurtain.RuntimeTileMesh
             Color backgroundColor,
             float framingPadding)
         {
+            ThumbnailSettings settings = new ThumbnailSettings
+            {
+                resolution = resolution,
+                backgroundColor = backgroundColor,
+                framingPadding = framingPadding
+            };
+            Rebuild(items, targets, settings);
+        }
+
+        public void Rebuild(
+            IList<FusionGameModeController.BlockShopItem> items,
+            IList<RawImage> targets,
+            ThumbnailSettings settings)
+        {
             Cleanup();
             if (items == null || targets == null)
                 return;
+
+            if (settings == null)
+                settings = new ThumbnailSettings();
 
             int count = Mathf.Min(items.Count, targets.Count);
             for (int i = 0; i < count; i++)
             {
                 FusionGameModeController.BlockShopItem item = items[i];
                 RawImage target = targets[i];
-                if (item == null || item.blockPrefab == null || target == null)
+                if (item == null || !item.HasPurchasableContent() || target == null)
                     continue;
 
-                CreatePreview(item, target, i, resolution, backgroundColor, framingPadding);
+                CreatePreview(item, target, i, settings);
             }
         }
 
@@ -49,22 +120,20 @@ namespace DuoCurtain.RuntimeTileMesh
             FusionGameModeController.BlockShopItem item,
             RawImage target,
             int index,
-            int resolution,
-            Color backgroundColor,
-            float framingPadding)
+            ThumbnailSettings settings)
         {
-            resolution = Mathf.Clamp(resolution, 64, 1024);
+            int resolution = Mathf.Clamp(settings.resolution, 64, 1024);
             Vector3 stagePosition = new Vector3(10000f + index * 64f, 10000f, 0f);
 
             GameObject stage = new GameObject("Shop Preview Stage - " + item.displayName);
             stage.hideFlags = HideFlags.HideAndDontSave;
             stage.transform.position = stagePosition;
 
-            GameObject clone = Instantiate(item.blockPrefab.gameObject, stage.transform);
+            GameObject clone = CreateItemPreviewObject(item, stage.transform);
             clone.name = "Visual - " + item.displayName;
-            clone.transform.localPosition = Vector3.zero;
-            clone.transform.localRotation = Quaternion.identity;
-            clone.transform.localScale = Vector3.one;
+            clone.transform.localPosition = new Vector3(settings.previewOffset.x, settings.previewOffset.y, 0f);
+            clone.transform.localRotation = Quaternion.Euler(settings.previewRotationEuler);
+            clone.transform.localScale = Vector3.one * Mathf.Max(0.01f, settings.previewScale);
             SetHideFlagsRecursively(clone, HideFlags.HideAndDontSave);
             StripGameplayComponents(clone);
 
@@ -85,7 +154,7 @@ namespace DuoCurtain.RuntimeTileMesh
             RenderTexture texture = new RenderTexture(resolution, resolution, 16, RenderTextureFormat.ARGB32)
             {
                 name = "Shop Thumbnail - " + item.displayName,
-                antiAliasing = 2,
+                antiAliasing = NormalizeAntiAliasing(settings.antiAliasing),
                 hideFlags = HideFlags.HideAndDontSave
             };
             texture.Create();
@@ -96,21 +165,29 @@ namespace DuoCurtain.RuntimeTileMesh
 
             Camera previewCamera = cameraObject.GetComponent<Camera>();
             previewCamera.orthographic = true;
-            previewCamera.clearFlags = CameraClearFlags.SolidColor;
-            previewCamera.backgroundColor = backgroundColor;
+            previewCamera.clearFlags = settings.clearMode == ThumbnailClearMode.Transparent
+                ? CameraClearFlags.SolidColor
+                : CameraClearFlags.SolidColor;
+            previewCamera.backgroundColor = settings.clearMode == ThumbnailClearMode.Transparent
+                ? new Color(settings.backgroundColor.r, settings.backgroundColor.g, settings.backgroundColor.b, 0f)
+                : settings.backgroundColor;
             previewCamera.allowHDR = false;
             previewCamera.allowMSAA = true;
             previewCamera.nearClipPlane = 0.1f;
             previewCamera.farClipPlane = 50f;
             previewCamera.depth = -100f - index;
             previewCamera.targetTexture = texture;
+            previewCamera.enabled = settings.renderContinuously;
             previewCamera.transform.position = new Vector3(bounds.center.x, bounds.center.y, stagePosition.z - 10f);
-            previewCamera.orthographicSize = Mathf.Max(
-                0.5f,
-                Mathf.Max(bounds.extents.x, bounds.extents.y) + Mathf.Max(0.05f, framingPadding));
+            previewCamera.orthographicSize = settings.framingMode == ThumbnailFramingMode.FixedOrthographicSize
+                ? Mathf.Max(0.1f, settings.fixedOrthographicSize)
+                : Mathf.Max(
+                    0.5f,
+                    Mathf.Max(bounds.extents.x, bounds.extents.y) + Mathf.Max(0.05f, settings.framingPadding));
+            previewCamera.Render();
 
             target.texture = texture;
-            target.color = Color.white;
+            target.color = new Color(settings.tint.r, settings.tint.g, settings.tint.b, Mathf.Clamp01(settings.opacity));
             target.uvRect = new Rect(0f, 0f, 1f, 1f);
             target.raycastTarget = false;
 
@@ -121,6 +198,36 @@ namespace DuoCurtain.RuntimeTileMesh
                 camera = previewCamera,
                 target = target
             });
+        }
+
+        private static GameObject CreateItemPreviewObject(
+            FusionGameModeController.BlockShopItem item,
+            Transform parent)
+        {
+            if (item.itemKind == FusionGameModeController.ShopItemKind.Block && item.blockPrefab != null)
+                return Instantiate(item.blockPrefab.gameObject, parent);
+
+            if (item.wallAttachmentPrefab != null)
+                return Instantiate(item.wallAttachmentPrefab, parent);
+
+            GameObject attachment = new GameObject("Default Window Attachment Preview");
+            attachment.transform.SetParent(parent, false);
+            SpriteRenderer sprite = attachment.AddComponent<SpriteRenderer>();
+            sprite.sprite = FusionWallAttachment.GetDefaultWindowSprite();
+            sprite.color = new Color(1f, 0.92f, 0.08f, 1f);
+            attachment.transform.localScale = new Vector3(1f, 0.18f, 1f);
+            return attachment;
+        }
+
+        private static int NormalizeAntiAliasing(int requested)
+        {
+            if (requested >= 8)
+                return 8;
+            if (requested >= 4)
+                return 4;
+            if (requested >= 2)
+                return 2;
+            return 1;
         }
 
         private static void StripGameplayComponents(GameObject clone)

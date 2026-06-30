@@ -39,6 +39,22 @@ namespace DuoCurtain.RuntimeTileMesh
         public float doorThickness = 0.25f;
         [Range(1f, 179f)]
         public float doorOpenAngleDegrees = 90f;
+        [Header("Fusion Door Animation")]
+        public bool animateDoors = true;
+        [Min(0f)]
+        public float doorOpenDuration = 0.25f;
+        [Min(0f)]
+        public float doorCloseDuration = 0.2f;
+        public AnimationCurve doorSwingCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+        [Range(0f, 1f)]
+        public float doorPassableOpenAmount = 0.82f;
+        public bool useDoorEndWobble = true;
+        [Min(0f)]
+        public float doorEndWobbleDuration = 0.18f;
+        [Min(0f)]
+        public float doorEndWobbleAmplitudeDegrees = 6f;
+        [Min(0.5f)]
+        public float doorEndWobbleOscillations = 2.5f;
         public Color doorColor = Color.black;
         public bool doorBlocksPlayer = true;
         public bool allowHeadingPointDoorInteraction = true;
@@ -93,6 +109,18 @@ namespace DuoCurtain.RuntimeTileMesh
 
         public event Action<RuntimeTileMeshDraggableBlock> BlockPlaced;
         public event Action<RuntimeTileMeshDraggableBlock, bool> BlockSelectionCancelled;
+
+        public struct FusionWallEdgePlacement
+        {
+            public RuntimeTileMeshFusionDoor.DoorAxis axis;
+            public Vector2 center;
+            public Vector2 normal;
+            public Vector2 tangent;
+            public Vector2Int ownerCell;
+            public int edgeCoordinate;
+            public int variable;
+            public float distance;
+        }
 
         void Awake()
         {
@@ -864,6 +892,88 @@ namespace DuoCurtain.RuntimeTileMesh
             return true;
         }
 
+        public bool TryFindNearestExteriorWallEdge(
+            Vector3 worldPoint,
+            float maxDistance,
+            out FusionWallEdgePlacement placement)
+        {
+            placement = default;
+            HashSet<Vector2Int> walkableCells = CollectWalkableCells();
+            if (walkableCells.Count == 0)
+                return false;
+
+            float safeGridSize = Mathf.Max(0.0001f, Mathf.Abs(gridSize));
+            float maxDistanceSqr = maxDistance > 0f ? maxDistance * maxDistance : float.PositiveInfinity;
+            bool found = false;
+            float bestDistanceSqr = float.MaxValue;
+            Vector2 point = worldPoint;
+
+            foreach (Vector2Int cell in walkableCells)
+            {
+                TryConsiderExteriorEdge(
+                    cell,
+                    Vector2Int.right,
+                    RuntimeTileMeshFusionDoor.DoorAxis.Vertical,
+                    cell.x + 1,
+                    cell.y,
+                    Vector2.right,
+                    safeGridSize,
+                    point,
+                    walkableCells,
+                    maxDistanceSqr,
+                    ref found,
+                    ref bestDistanceSqr,
+                    ref placement);
+
+                TryConsiderExteriorEdge(
+                    cell,
+                    Vector2Int.left,
+                    RuntimeTileMeshFusionDoor.DoorAxis.Vertical,
+                    cell.x,
+                    cell.y,
+                    Vector2.left,
+                    safeGridSize,
+                    point,
+                    walkableCells,
+                    maxDistanceSqr,
+                    ref found,
+                    ref bestDistanceSqr,
+                    ref placement);
+
+                TryConsiderExteriorEdge(
+                    cell,
+                    Vector2Int.up,
+                    RuntimeTileMeshFusionDoor.DoorAxis.Horizontal,
+                    cell.y + 1,
+                    cell.x,
+                    Vector2.up,
+                    safeGridSize,
+                    point,
+                    walkableCells,
+                    maxDistanceSqr,
+                    ref found,
+                    ref bestDistanceSqr,
+                    ref placement);
+
+                TryConsiderExteriorEdge(
+                    cell,
+                    Vector2Int.down,
+                    RuntimeTileMeshFusionDoor.DoorAxis.Horizontal,
+                    cell.y,
+                    cell.x,
+                    Vector2.down,
+                    safeGridSize,
+                    point,
+                    walkableCells,
+                    maxDistanceSqr,
+                    ref found,
+                    ref bestDistanceSqr,
+                    ref placement);
+            }
+
+            return found;
+        }
+
         private List<RuntimeTileMeshFusionDoor> DetachGroupDoors(HashSet<RuntimeTileMeshDraggableBlock> group)
         {
             List<RuntimeTileMeshFusionDoor> doors = new List<RuntimeTileMeshFusionDoor>();
@@ -935,6 +1045,15 @@ namespace DuoCurtain.RuntimeTileMesh
                     wallVisualPrefab,
                     wallDebugColor,
                     wallDebugLineWidth);
+                door.animateDoor = animateDoors;
+                door.openDuration = doorOpenDuration;
+                door.closeDuration = doorCloseDuration;
+                door.swingCurve = doorSwingCurve;
+                door.doorwayPassableOpenAmount = doorPassableOpenAmount;
+                door.useEndWobble = useDoorEndWobble;
+                door.endWobbleDuration = doorEndWobbleDuration;
+                door.endWobbleAmplitudeDegrees = doorEndWobbleAmplitudeDegrees;
+                door.endWobbleOscillations = doorEndWobbleOscillations;
             }
         }
 
@@ -1300,6 +1419,72 @@ namespace DuoCurtain.RuntimeTileMesh
             }
 
             return bestPoint;
+        }
+
+        private void TryConsiderExteriorEdge(
+            Vector2Int ownerCell,
+            Vector2Int neighborOffset,
+            RuntimeTileMeshFusionDoor.DoorAxis axis,
+            int edgeCoordinate,
+            int variable,
+            Vector2 normal,
+            float safeGridSize,
+            Vector2 point,
+            HashSet<Vector2Int> walkableCells,
+            float maxDistanceSqr,
+            ref bool found,
+            ref float bestDistanceSqr,
+            ref FusionWallEdgePlacement placement)
+        {
+            if (walkableCells.Contains(ownerCell + neighborOffset))
+                return;
+
+            Vector2 start;
+            Vector2 end;
+            if (axis == RuntimeTileMeshFusionDoor.DoorAxis.Vertical)
+            {
+                float x = gridOrigin.x + edgeCoordinate * safeGridSize;
+                float y = gridOrigin.y + variable * safeGridSize;
+                start = new Vector2(x, y);
+                end = new Vector2(x, y + safeGridSize);
+            }
+            else
+            {
+                float x = gridOrigin.x + variable * safeGridSize;
+                float y = gridOrigin.y + edgeCoordinate * safeGridSize;
+                start = new Vector2(x, y);
+                end = new Vector2(x + safeGridSize, y);
+            }
+
+            Vector2 closest = ClosestPointOnSegment(point, start, end);
+            float distanceSqr = (point - closest).sqrMagnitude;
+            if (distanceSqr > maxDistanceSqr || distanceSqr >= bestDistanceSqr)
+                return;
+
+            found = true;
+            bestDistanceSqr = distanceSqr;
+            placement = new FusionWallEdgePlacement
+            {
+                axis = axis,
+                center = (start + end) * 0.5f,
+                normal = normal.sqrMagnitude > 0.0001f ? normal.normalized : Vector2.up,
+                tangent = axis == RuntimeTileMeshFusionDoor.DoorAxis.Vertical ? Vector2.up : Vector2.right,
+                ownerCell = ownerCell,
+                edgeCoordinate = edgeCoordinate,
+                variable = variable,
+                distance = Mathf.Sqrt(distanceSqr)
+            };
+        }
+
+        private static Vector2 ClosestPointOnSegment(Vector2 point, Vector2 start, Vector2 end)
+        {
+            Vector2 segment = end - start;
+            float lengthSqr = segment.sqrMagnitude;
+            if (lengthSqr <= 0.000001f)
+                return start;
+
+            float t = Mathf.Clamp01(Vector2.Dot(point - start, segment) / lengthSqr);
+            return start + segment * t;
         }
 
         private Bounds GetCellWorldBounds(Vector2Int cell)

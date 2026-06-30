@@ -38,6 +38,23 @@ namespace DuoCurtain.RuntimeTileMesh
         public Color closedColor = Color.black;
         public Color openColor = new Color(0f, 0f, 0f, 0.82f);
 
+        [Header("Door Animation")]
+        public bool animateDoor = true;
+        [Min(0f)]
+        public float openDuration = 0.25f;
+        [Min(0f)]
+        public float closeDuration = 0.2f;
+        public AnimationCurve swingCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+        [Range(0f, 1f)]
+        public float doorwayPassableOpenAmount = 0.82f;
+        public bool useEndWobble = true;
+        [Min(0f)]
+        public float endWobbleDuration = 0.18f;
+        [Min(0f)]
+        public float endWobbleAmplitudeDegrees = 6f;
+        [Min(0.5f)]
+        public float endWobbleOscillations = 2.5f;
+
         [Header("Wall Edge")]
         public int wallEdgeCoordinate;
         public int wallVariableStart;
@@ -79,6 +96,14 @@ namespace DuoCurtain.RuntimeTileMesh
         private Mesh runtimeMesh;
         private Transform wallVisualRoot;
         private float lastToggleTime = -999f;
+        private float currentOpenAmount;
+        private float animationStartAmount;
+        private float animationTargetAmount;
+        private float animationStartTime;
+        private float animationDuration;
+        private float wobbleStartTime;
+        private bool isAnimating;
+        private bool isWobbling;
         private readonly HashSet<int> supportedWallVariables = new HashSet<int>();
         private readonly Dictionary<int, Vector2> wallVisualOffsetsByVariable = new Dictionary<int, Vector2>();
 
@@ -93,8 +118,15 @@ namespace DuoCurtain.RuntimeTileMesh
             if (supportedWallVariables.Count == 0)
                 CacheDefaultWallSupport();
 
+            currentOpenAmount = isOpen ? 1f : 0f;
             EnsureVisual();
             ApplyVisualState();
+        }
+
+        void Update()
+        {
+            if (UpdateDoorAnimation())
+                ApplyVisualState();
         }
 
         void OnValidate()
@@ -104,6 +136,12 @@ namespace DuoCurtain.RuntimeTileMesh
             doorLength = Mathf.Max(0.01f, doorLength);
             toggleCooldown = Mathf.Max(0f, toggleCooldown);
             openAngleDegrees = Mathf.Clamp(openAngleDegrees, 1f, 179f);
+            openDuration = Mathf.Max(0f, openDuration);
+            closeDuration = Mathf.Max(0f, closeDuration);
+            doorwayPassableOpenAmount = Mathf.Clamp01(doorwayPassableOpenAmount);
+            endWobbleDuration = Mathf.Max(0f, endWobbleDuration);
+            endWobbleAmplitudeDegrees = Mathf.Max(0f, endWobbleAmplitudeDegrees);
+            endWobbleOscillations = Mathf.Max(0.5f, endWobbleOscillations);
             wallCellLength = Mathf.Max(1, wallCellLength);
             doorVariableOffset = Mathf.Clamp(doorVariableOffset, 0, Mathf.Max(0, wallCellLength - 1));
             wallLineWidth = Mathf.Max(0.005f, wallLineWidth);
@@ -117,6 +155,8 @@ namespace DuoCurtain.RuntimeTileMesh
                 if (supportedWallVariables.Count == 0)
                     CacheDefaultWallSupport();
 
+                if (!isAnimating && !isWobbling)
+                    currentOpenAmount = isOpen ? 1f : 0f;
                 ApplyVisualState();
             }
         }
@@ -180,6 +220,9 @@ namespace DuoCurtain.RuntimeTileMesh
             isOpen = false;
             openDirection = axis == DoorAxis.Vertical ? Vector2.right : Vector2.up;
             hingeEnd = DoorHingeEnd.Negative;
+            currentOpenAmount = 0f;
+            isAnimating = false;
+            isWobbling = false;
 
             CacheDefaultWallSupport();
             EnsureVisual();
@@ -247,7 +290,7 @@ namespace DuoCurtain.RuntimeTileMesh
                 return false;
 
             Vector2 point = interactionWorldPoint;
-            DoorPanelPose panelPose = isOpen ? GetOpenPanelPose() : GetClosedPanelPose();
+            DoorPanelPose panelPose = GetCurrentPanelPose();
             if (!PointTouchesPanel(point, panelPose, interactionRadius))
                 return false;
 
@@ -267,7 +310,7 @@ namespace DuoCurtain.RuntimeTileMesh
 
         public bool IsPointTouchingCurrentPanel(Vector3 worldPoint, float radius)
         {
-            DoorPanelPose panelPose = isOpen ? GetOpenPanelPose() : GetClosedPanelPose();
+            DoorPanelPose panelPose = GetCurrentPanelPose();
             return PointTouchesPanel(worldPoint, panelPose, radius);
         }
 
@@ -298,7 +341,6 @@ namespace DuoCurtain.RuntimeTileMesh
             if (motion.sqrMagnitude <= 0.000001f)
                 return false;
 
-            bool crossedOpenDoorway = false;
             if (TryGetWallCrossingAlongCoordinate(from, to, out float alongCoordinate) &&
                 TryGetWallSegmentIndex(alongCoordinate, out int segmentIndex))
             {
@@ -313,18 +355,20 @@ namespace DuoCurtain.RuntimeTileMesh
                     return true;
                 }
 
-                crossedOpenDoorway = true;
+                if (!IsDoorwayPassable())
+                    return true;
             }
 
+            DoorPanelPose currentPose = GetCurrentPanelPose();
             if (!isOpen && CanToggleNow() &&
-                SegmentTouchesPanel(from, to, GetClosedPanelPose(), playerRadius, out Vector2 closedHitPoint))
+                SegmentTouchesPanel(from, to, currentPose, playerRadius, out Vector2 closedHitPoint))
             {
                 OpenToward(motion, closedHitPoint);
                 return true;
             }
 
-            if (isOpen && !crossedOpenDoorway && CanToggleNow() &&
-                SegmentTouchesPanel(from, to, GetOpenPanelPose(), playerRadius, out _))
+            if (isOpen && CanToggleNow() &&
+                SegmentTouchesPanel(from, to, currentPose, playerRadius, out _))
             {
                 Close();
                 return true;
@@ -347,19 +391,76 @@ namespace DuoCurtain.RuntimeTileMesh
             hingeEnd = GetHingeEndFarthestFrom(impactPoint);
             isOpen = true;
             lastToggleTime = Time.time;
-            ApplyVisualState();
+            StartDoorTransition(1f, openDuration);
         }
 
         public void Close()
         {
             isOpen = false;
             lastToggleTime = Time.time;
-            ApplyVisualState();
+            StartDoorTransition(0f, closeDuration);
         }
 
         private bool CanToggleNow()
         {
-            return Time.time >= lastToggleTime + toggleCooldown;
+            return !isAnimating && !isWobbling && Time.time >= lastToggleTime + toggleCooldown;
+        }
+
+        private bool IsDoorwayPassable()
+        {
+            return isOpen && currentOpenAmount >= doorwayPassableOpenAmount;
+        }
+
+        private void StartDoorTransition(float targetAmount, float duration)
+        {
+            targetAmount = Mathf.Clamp01(targetAmount);
+            if (!Application.isPlaying || !animateDoor || duration <= 0.0001f)
+            {
+                currentOpenAmount = targetAmount;
+                isAnimating = false;
+                isWobbling = false;
+                ApplyVisualState();
+                return;
+            }
+
+            animationStartAmount = Mathf.Clamp01(currentOpenAmount);
+            animationTargetAmount = targetAmount;
+            animationStartTime = Time.time;
+            animationDuration = Mathf.Max(0.0001f, duration);
+            isAnimating = true;
+            isWobbling = false;
+        }
+
+        private bool UpdateDoorAnimation()
+        {
+            bool changed = false;
+            if (isAnimating)
+            {
+                float normalized = Mathf.Clamp01((Time.time - animationStartTime) / Mathf.Max(0.0001f, animationDuration));
+                float eased = swingCurve != null ? swingCurve.Evaluate(normalized) : normalized;
+                currentOpenAmount = Mathf.LerpUnclamped(animationStartAmount, animationTargetAmount, eased);
+                changed = true;
+
+                if (normalized >= 1f)
+                {
+                    currentOpenAmount = animationTargetAmount;
+                    isAnimating = false;
+                    if (useEndWobble && endWobbleDuration > 0.0001f && endWobbleAmplitudeDegrees > 0.0001f)
+                    {
+                        isWobbling = true;
+                        wobbleStartTime = Time.time;
+                    }
+                }
+            }
+
+            if (isWobbling)
+            {
+                changed = true;
+                if (Time.time - wobbleStartTime >= Mathf.Max(0.0001f, endWobbleDuration))
+                    isWobbling = false;
+            }
+
+            return changed;
         }
 
         private Vector2 GetAxisOpenDirection(Vector2 movement)
@@ -470,6 +571,53 @@ namespace DuoCurtain.RuntimeTileMesh
                 length = length,
                 thickness = GetWorldDoorThickness()
             };
+        }
+
+        private DoorPanelPose GetCurrentPanelPose()
+        {
+            float amount = Mathf.Clamp01(currentOpenAmount);
+            if (!Application.isPlaying && !isAnimating && !isWobbling)
+                amount = isOpen ? 1f : 0f;
+
+            Vector2 hinge = GetHingePoint(hingeEnd);
+            Vector2 closedVector = GetClosedFreeVector(hingeEnd);
+            if (closedVector.sqrMagnitude <= 0.000001f)
+                closedVector = GetClosedLengthDirection() * GetWorldDoorLength();
+
+            float signedOpenAngle = GetSignedOpenAngle(hingeEnd, openDirection);
+            float wobble = GetCurrentWobbleDegrees();
+            Vector2 freeVector = Rotate(closedVector, signedOpenAngle * amount + wobble);
+            if (freeVector.sqrMagnitude <= 0.000001f)
+                freeVector = closedVector;
+
+            return new DoorPanelPose
+            {
+                center = hinge + freeVector * 0.5f,
+                lengthDirection = freeVector.normalized,
+                length = GetWorldDoorLength(),
+                thickness = GetWorldDoorThickness()
+            };
+        }
+
+        private float GetSignedOpenAngle(DoorHingeEnd hinge, Vector2 desiredOpenDirection)
+        {
+            Vector2 closedVector = GetClosedFreeVector(hinge);
+            Vector2 openVector = GetOpenFreeVector(hinge, desiredOpenDirection);
+            if (closedVector.sqrMagnitude <= 0.000001f || openVector.sqrMagnitude <= 0.000001f)
+                return 0f;
+
+            return Vector2.SignedAngle(closedVector, openVector);
+        }
+
+        private float GetCurrentWobbleDegrees()
+        {
+            if (!isWobbling || endWobbleDuration <= 0.0001f || endWobbleAmplitudeDegrees <= 0.0001f)
+                return 0f;
+
+            float normalized = Mathf.Clamp01((Time.time - wobbleStartTime) / Mathf.Max(0.0001f, endWobbleDuration));
+            float envelope = 1f - normalized;
+            float wave = Mathf.Sin(normalized * Mathf.PI * 2f * Mathf.Max(0.5f, endWobbleOscillations));
+            return wave * endWobbleAmplitudeDegrees * envelope;
         }
 
         private float GetWorldDoorLength()
@@ -596,7 +744,7 @@ namespace DuoCurtain.RuntimeTileMesh
 
             meshRenderer.sharedMaterial = GetDoorMaterial();
             meshRenderer.sortingOrder = 30;
-            boxCollider.isTrigger = true;
+            boxCollider.isTrigger = false;
             boxCollider.size = Vector2.one;
             boxCollider.offset = Vector2.zero;
         }
@@ -710,7 +858,7 @@ namespace DuoCurtain.RuntimeTileMesh
         {
             EnsureVisual();
 
-            DoorPanelPose pose = isOpen ? GetOpenPanelPose() : GetClosedPanelPose();
+            DoorPanelPose pose = GetCurrentPanelPose();
             Vector2 localCenter = pose.center - seamCenter;
             float angle = Mathf.Atan2(pose.lengthDirection.y, pose.lengthDirection.x) * Mathf.Rad2Deg;
 
@@ -721,7 +869,7 @@ namespace DuoCurtain.RuntimeTileMesh
             if (propertyBlock == null)
                 propertyBlock = new MaterialPropertyBlock();
 
-            Color color = isOpen ? openColor : closedColor;
+            Color color = Color.Lerp(closedColor, openColor, Mathf.Clamp01(currentOpenAmount));
             meshRenderer.GetPropertyBlock(propertyBlock);
             propertyBlock.SetColor("_BaseColor", color);
             propertyBlock.SetColor("_Color", color);
