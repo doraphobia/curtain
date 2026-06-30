@@ -68,6 +68,7 @@ public class PlayerControl : MonoBehaviour
     public float headingPointAlpha = 0.65f;
     [Min(1f)]
     public float headingPointSize = 14f;
+    public bool invertHeadingPointColorWhenPlayerInputDisabled = true;
     public bool limitHeadingPointReach = true;
     [Min(0f)]
     public float headingPointReachRadius = 2.5f;
@@ -761,7 +762,7 @@ public class PlayerControl : MonoBehaviour
         if (sprite != null)
             headingPointImage.sprite = sprite;
 
-        Color color = headingPointColor;
+        Color color = ShouldInvertHeadingPointColor() ? InvertColor(headingPointColor) : headingPointColor;
         color.a = Mathf.Clamp01(color.a * headingPointAlpha);
         headingPointImage.color = color;
 
@@ -773,6 +774,16 @@ public class PlayerControl : MonoBehaviour
             float size = Mathf.Max(1f, headingPointSize);
             headingPointRectTransform.sizeDelta = new Vector2(size, size);
         }
+    }
+
+    private bool ShouldInvertHeadingPointColor()
+    {
+        return invertHeadingPointColorWhenPlayerInputDisabled && !playerInputEnabled;
+    }
+
+    private static Color InvertColor(Color color)
+    {
+        return new Color(1f - color.r, 1f - color.g, 1f - color.b, color.a);
     }
 
     private Sprite GetRuntimeHeadingPointSprite()

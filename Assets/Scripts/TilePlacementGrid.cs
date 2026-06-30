@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using DuoCurtain.RuntimeTileMesh;
 using UnityEngine;
@@ -89,6 +90,10 @@ public class TilePlacementGrid : MonoBehaviour
     private readonly Dictionary<Vector2Int, string> roomCellNames = new Dictionary<Vector2Int, string>();
     private bool connectedPlanesDirty;
     private Material runtimeConnectedPlaneMaterial;
+
+    public event Action<TilePlacementGrid> TopologyChanged;
+
+    public int TopologyVersion { get; private set; }
 
     void OnValidate()
     {
@@ -188,19 +193,20 @@ public class TilePlacementGrid : MonoBehaviour
             return;
 
         bool isRoomPiece = definition.placementLayer == TilePieceDefinition.PlacementLayer.Tile;
+        bool changed = false;
         for (int i = 0; i < definition.Cells.Count; i++)
-            RegisterCell(anchorCell + definition.Cells[i], isRoomPiece, definition, GetDefinitionDisplayName(definition));
+            changed |= RegisterCellInternal(anchorCell + definition.Cells[i], isRoomPiece, definition, GetDefinitionDisplayName(definition));
 
-        if (isRoomPiece)
-            QueueConnectedRoomPlaneRebuild();
+        if (changed)
+            MarkTopologyChanged(isRoomPiece);
     }
 
     public void RegisterCell(Vector2Int cell, bool isRoomCell = true)
     {
-        RegisterCell(cell, isRoomCell, null, null);
+        bool changed = RegisterCellInternal(cell, isRoomCell, null, null);
 
-        if (isRoomCell)
-            QueueConnectedRoomPlaneRebuild();
+        if (changed)
+            MarkTopologyChanged(isRoomCell);
     }
 
     public void RegisterWorldBounds(Bounds worldBounds)
@@ -218,6 +224,7 @@ public class TilePlacementGrid : MonoBehaviour
         int minY = Mathf.Min(minCell.y, maxCell.y) - 1;
         int maxY = Mathf.Max(minCell.y, maxCell.y) + 1;
         bool registeredAny = false;
+        bool changed = false;
 
         for (int x = minX; x <= maxX; x++)
         {
@@ -228,15 +235,16 @@ public class TilePlacementGrid : MonoBehaviour
                 if (!ContainsPoint2D(worldBounds, center))
                     continue;
 
-                RegisterCell(cell, true, null, sourceName);
+                changed |= RegisterCellInternal(cell, true, null, sourceName);
                 registeredAny = true;
             }
         }
 
         if (!registeredAny)
-            RegisterCell(WorldToCell(worldBounds.center), true, null, sourceName);
+            changed |= RegisterCellInternal(WorldToCell(worldBounds.center), true, null, sourceName);
 
-        QueueConnectedRoomPlaneRebuild();
+        if (changed)
+            MarkTopologyChanged(true);
     }
 
     public int OccupiedCount()
@@ -246,6 +254,7 @@ public class TilePlacementGrid : MonoBehaviour
 
     public bool HasOccupiedCells => occupiedCells.Count > 0;
     public bool HasRoomCells => roomCells.Count > 0;
+    public int RoomCellCount => roomCells.Count;
 
     public bool IsCellOccupied(Vector2Int cell)
     {
@@ -255,6 +264,114 @@ public class TilePlacementGrid : MonoBehaviour
     public bool IsRoomCell(Vector2Int cell)
     {
         return roomCells.Contains(cell);
+    }
+
+    public void CopyRoomCells(List<Vector2Int> results)
+    {
+        if (results == null)
+            return;
+
+        results.Clear();
+        foreach (Vector2Int cell in roomCells)
+            results.Add(cell);
+    }
+
+    public bool TryGetRoomCellBounds(out RectInt bounds)
+    {
+        if (roomCells.Count == 0)
+        {
+            bounds = default(RectInt);
+            return false;
+        }
+
+        bool hasCell = false;
+        Vector2Int min = Vector2Int.zero;
+        Vector2Int max = Vector2Int.zero;
+
+        foreach (Vector2Int cell in roomCells)
+        {
+            if (!hasCell)
+            {
+                min = cell;
+                max = cell;
+                hasCell = true;
+                continue;
+            }
+
+            min = Vector2Int.Min(min, cell);
+            max = Vector2Int.Max(max, cell);
+        }
+
+        bounds = new RectInt(
+            min.x,
+            min.y,
+            max.x - min.x + 1,
+            max.y - min.y + 1);
+        return true;
+    }
+
+    public bool TryGetRoomWorldBounds(out Bounds bounds)
+    {
+        if (roomCells.Count == 0)
+        {
+            bounds = default(Bounds);
+            return false;
+        }
+
+        bool hasBounds = false;
+        bounds = default(Bounds);
+        foreach (Vector2Int cell in roomCells)
+        {
+            Bounds cellBounds = GetCellWorldBounds(cell);
+            if (!hasBounds)
+            {
+                bounds = cellBounds;
+                hasBounds = true;
+            }
+            else
+            {
+                bounds.Encapsulate(cellBounds);
+            }
+        }
+
+        return true;
+    }
+
+    public bool UnregisterPiece(TilePieceDefinition definition, Vector2Int anchorCell)
+    {
+        if (definition == null || definition.Cells == null)
+            return false;
+
+        bool removedAny = false;
+        bool isRoomPiece = definition.placementLayer == TilePieceDefinition.PlacementLayer.Tile;
+        for (int i = 0; i < definition.Cells.Count; i++)
+            removedAny |= UnregisterCellInternal(anchorCell + definition.Cells[i], isRoomPiece);
+
+        if (removedAny)
+            MarkTopologyChanged(isRoomPiece);
+
+        return removedAny;
+    }
+
+    public bool UnregisterCell(Vector2Int cell, bool isRoomCell = true)
+    {
+        bool removed = UnregisterCellInternal(cell, isRoomCell);
+        if (removed)
+            MarkTopologyChanged(isRoomCell);
+
+        return removed;
+    }
+
+    public void ClearRegisteredCells()
+    {
+        if (occupiedCells.Count == 0 && roomCells.Count == 0)
+            return;
+
+        occupiedCells.Clear();
+        roomCells.Clear();
+        roomCellDefinitions.Clear();
+        roomCellNames.Clear();
+        MarkTopologyChanged(true);
     }
 
     public bool TryGetRoomCell(Vector3 worldPosition, out Vector2Int cell)
@@ -578,20 +695,55 @@ public class TilePlacementGrid : MonoBehaviour
         }
     }
 
-    private void RegisterCell(Vector2Int cell, bool isRoomCell, TilePieceDefinition definition, string sourceName)
+    private bool RegisterCellInternal(Vector2Int cell, bool isRoomCell, TilePieceDefinition definition, string sourceName)
     {
-        occupiedCells.Add(cell);
+        bool changed = occupiedCells.Add(cell);
 
         if (!isRoomCell)
-            return;
+            return changed;
 
-        roomCells.Add(cell);
+        changed |= roomCells.Add(cell);
 
         if (definition != null)
+        {
+            changed |= !roomCellDefinitions.TryGetValue(cell, out TilePieceDefinition existingDefinition) || existingDefinition != definition;
             roomCellDefinitions[cell] = definition;
+        }
 
         if (!string.IsNullOrWhiteSpace(sourceName))
+        {
+            changed |= !roomCellNames.TryGetValue(cell, out string existingName) || existingName != sourceName;
             roomCellNames[cell] = sourceName;
+        }
+
+        return changed;
+    }
+
+    private bool UnregisterCellInternal(Vector2Int cell, bool isRoomCell)
+    {
+        if (!isRoomCell)
+        {
+            if (roomCells.Contains(cell))
+                return false;
+
+            return occupiedCells.Remove(cell);
+        }
+
+        bool removed = occupiedCells.Remove(cell);
+        removed |= roomCells.Remove(cell);
+        roomCellDefinitions.Remove(cell);
+        roomCellNames.Remove(cell);
+        return removed;
+    }
+
+    private void MarkTopologyChanged(bool affectsRoomTopology)
+    {
+        if (!affectsRoomTopology)
+            return;
+
+        TopologyVersion++;
+        QueueConnectedRoomPlaneRebuild();
+        TopologyChanged?.Invoke(this);
     }
 
     private void NormalizeGridSettings()

@@ -7984,6 +7984,112 @@ Canvas:
   m_SortingLayerID: 0
   m_SortingOrder: 1000
   m_TargetDisplay: 0
+--- !u!1 &2143000000
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2143000001}
+  - component: {fileID: 2143000002}
+  - component: {fileID: 2143000003}
+  m_Layer: 0
+  m_Name: Topology Map System
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2143000001
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2143000000}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2143000002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2143000000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4cf5cf4f2f5048bc86e56e0a95bf9634, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::TopologyMapDataProvider
+  topologyGrid: {fileID: 0}
+  autoFindSource: 1
+  refreshOnEnable: 1
+  pollForExternalChanges: 1
+--- !u!114 &2143000003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2143000000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3729162a44134c20bf6767c6c8f92739, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::TopologyMapRenderer
+  dataProvider: {fileID: 2143000002}
+  placementGrid: {fileID: 0}
+  playerControl: {fileID: 0}
+  autoBindReferences: 1
+  createProviderIfMissing: 1
+  targetCanvas: {fileID: 0}
+  mapRoot: {fileID: 0}
+  createCanvasIfMissing: 1
+  visible: 1
+  rebuildOnEnable: 1
+  renderMode: 0
+  localZoomDistance: 5
+  defaultMapSize: {x: 220, y: 180}
+  defaultAnchoredPosition: {x: -32, y: -32}
+  padding: 18
+  cellSpacing: 1.5
+  mapCenterOffset: {x: 0, y: 0}
+  backgroundColor: {r: 0.68, g: 0.68, b: 0.68, a: 0.82}
+  roomColor: {r: 1, g: 1, b: 1, a: 1}
+  currentRoomColor: {r: 1, g: 0.94, b: 0.42, a: 1}
+  frameColor: {r: 0, g: 0, b: 0, a: 1}
+  showPlayerMarker: 1
+  playerMarkerColor: {r: 0, g: 0, b: 0, a: 1}
+  playerMarkerSize: 9
+  highlightCurrentRoom: 1
+  useUnscaledTime: 0
+  roomAppearDuration: 0.18
+  highlightFadeDuration: 0.16
+  markerSmoothTime: 0.08
+  topologyScaleSmoothTime: 0.2
+  localScrollSmoothTime: 0.12
+  minimumCellPixelSize: 2
+  localMaximumCellPixelSize: 48
+  showBackground: 1
+  showFrame: 1
+  frameLineThickness: 1.5
+  frameCornerLength: 26
+  showFullBorder: 1
+  showCornerMarkers: 1
+  autoRefreshWhenTopologyChanges: 1
+  initialPoolSize: 32
+  showDebugOverlay: 0
+  createDebugTextIfMissing: 0
+  logRebuilds: 0
+  debugText: {fileID: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -8001,3 +8107,4 @@ SceneRoots:
   - {fileID: 2142057924}
   - {fileID: 73730045}
   - {fileID: 708456760}
+  - {fileID: 2143000001}

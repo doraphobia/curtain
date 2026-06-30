@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace DuoCurtain.RuntimeTileMesh
@@ -431,11 +432,18 @@ namespace DuoCurtain.RuntimeTileMesh
         private void EnsureShopPanel()
         {
             if (shopPanelRoot != null || !createShopPanelIfMissing)
+            {
+                EnsureCanvasCanReceiveClicks(shopPanelRoot != null ? shopPanelRoot.GetComponentInParent<Canvas>() : null);
+                EnsureEventSystem();
                 return;
+            }
 
             Canvas canvas = FindFirstObjectByType<Canvas>();
             if (canvas == null)
                 canvas = CreateOverlayCanvas("Fusion UI Canvas", 1200);
+            else
+                EnsureCanvasCanReceiveClicks(canvas);
+            EnsureEventSystem();
 
             GameObject panelObject = new GameObject("Fusion Block Shop Panel", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
             panelObject.transform.SetParent(canvas.transform, false);
@@ -490,7 +498,8 @@ namespace DuoCurtain.RuntimeTileMesh
                 name,
                 typeof(RectTransform),
                 typeof(Canvas),
-                typeof(CanvasScaler));
+                typeof(CanvasScaler),
+                typeof(GraphicRaycaster));
             Canvas canvas = canvasObject.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = sortingOrder;
@@ -500,6 +509,27 @@ namespace DuoCurtain.RuntimeTileMesh
             scaler.referenceResolution = new Vector2(1920f, 1080f);
             scaler.matchWidthOrHeight = 0.5f;
             return canvas;
+        }
+
+        private void EnsureCanvasCanReceiveClicks(Canvas canvas)
+        {
+            if (canvas == null)
+                return;
+
+            if (canvas.GetComponent<GraphicRaycaster>() == null)
+                canvas.gameObject.AddComponent<GraphicRaycaster>();
+        }
+
+        private void EnsureEventSystem()
+        {
+            if (FindFirstObjectByType<EventSystem>() != null)
+                return;
+
+            GameObject eventSystemObject = new GameObject(
+                "EventSystem",
+                typeof(EventSystem),
+                typeof(StandaloneInputModule));
+            eventSystemObject.transform.SetParent(transform, false);
         }
 
         private void RebuildShopButtons()
