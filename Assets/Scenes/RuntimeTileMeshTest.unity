@@ -2172,7 +2172,7 @@ MonoBehaviour:
   letterSpacingPercent: -5
   textColor: {r: 0, g: 0, b: 0, a: 1}
   labelSize: {x: 82, y: 51}
-  topRightInset: {x: -8, y: -8}
+  topRightInset: {x: 8, y: -8}
   defaultBlockType: DEFAULT
   unitSuffix: UNIT
   uppercaseType: 1

@@ -222,6 +222,7 @@ namespace DuoCurtain.RuntimeTileMesh
             {
                 targetCamera.enabled = true;
                 targetCamera.tag = "MainCamera";
+                SyncAudioListeners(targetCamera);
                 UpdateCameraReferences(targetCamera);
                 return;
             }
@@ -237,6 +238,7 @@ namespace DuoCurtain.RuntimeTileMesh
 
             DisableOtherModeCamera(targetRig);
             activeCamera = targetCamera;
+            SyncAudioListeners(targetCamera);
             UpdateCameraReferences(targetCamera);
         }
 
@@ -261,6 +263,29 @@ namespace DuoCurtain.RuntimeTileMesh
 
             if (fusionSandbox != null)
                 fusionSandbox.worldCamera = camera;
+        }
+
+        private void SyncAudioListeners(Camera targetCamera)
+        {
+            if (targetCamera == null)
+                return;
+
+            SetCameraAudioListener(playerCamera != null ? playerCamera.Camera : null, targetCamera);
+            SetCameraAudioListener(managementCamera != null ? managementCamera.Camera : null, targetCamera);
+            SetCameraAudioListener(targetCamera, targetCamera);
+        }
+
+        private static void SetCameraAudioListener(Camera camera, Camera targetCamera)
+        {
+            if (camera == null)
+                return;
+
+            AudioListener listener = camera.GetComponent<AudioListener>();
+            if (listener == null && camera == targetCamera)
+                listener = camera.gameObject.AddComponent<AudioListener>();
+
+            if (listener != null)
+                listener.enabled = camera == targetCamera;
         }
 
         private void HandleShopHotkeys()

@@ -734,6 +734,9 @@ namespace DuoCurtain.Editor
             if (changedScenePaths.Count == 0)
                 return true;
 
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+                return true;
+
             SceneSetup[] setup = EditorSceneManager.GetSceneManagerSetup();
             bool reloadOpenScenes = false;
             for (int i = 0; i < setup.Length; i++)

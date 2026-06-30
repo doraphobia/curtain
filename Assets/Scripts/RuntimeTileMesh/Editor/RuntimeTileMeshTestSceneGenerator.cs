@@ -279,7 +279,10 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
         {
             FusionModeCameraRig existing = AssetDatabase.LoadAssetAtPath<FusionModeCameraRig>(path);
             if (existing != null)
+            {
+                EnsureCameraPrefabAudioListener(path, mode == FusionModeCameraRig.RigMode.PlayerFollow);
                 return existing;
+            }
 
             GameObject root = new GameObject(name);
             Camera camera = root.AddComponent<Camera>();
@@ -289,6 +292,8 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             camera.backgroundColor = Color.black;
             camera.enabled = false;
             root.transform.position = new Vector3(0f, 0f, -10f);
+            AudioListener listener = root.AddComponent<AudioListener>();
+            listener.enabled = mode == FusionModeCameraRig.RigMode.PlayerFollow;
 
             FusionModeCameraRig rig = root.AddComponent<FusionModeCameraRig>();
             rig.mode = mode;
@@ -314,6 +319,27 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                 .GetComponent<FusionModeCameraRig>();
             Object.DestroyImmediate(root);
             return prefab;
+        }
+
+        private static void EnsureCameraPrefabAudioListener(string path, bool enabled)
+        {
+            GameObject root = PrefabUtility.LoadPrefabContents(path);
+            if (root == null)
+                return;
+
+            try
+            {
+                AudioListener listener = root.GetComponent<AudioListener>();
+                if (listener == null)
+                    listener = root.AddComponent<AudioListener>();
+
+                listener.enabled = enabled;
+                PrefabUtility.SaveAsPrefabAsset(root, path);
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(root);
+            }
         }
 
         private static void CreateWhiteMaterial()
@@ -414,6 +440,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                 playerCamera.Camera.enabled = true;
                 playerCamera.Camera.tag = "MainCamera";
                 playerCamera.transform.position = new Vector3(0f, 0f, -10f);
+                SetSceneCameraAudioListener(playerCamera, true);
             }
 
             if (managementCamera != null)
@@ -421,7 +448,20 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                 managementCamera.Camera.enabled = false;
                 managementCamera.Camera.tag = "Untagged";
                 managementCamera.transform.position = new Vector3(0f, 0f, -10f);
+                SetSceneCameraAudioListener(managementCamera, false);
             }
+        }
+
+        private static void SetSceneCameraAudioListener(FusionModeCameraRig rig, bool enabled)
+        {
+            if (rig == null || rig.Camera == null)
+                return;
+
+            AudioListener listener = rig.GetComponent<AudioListener>();
+            if (listener == null)
+                listener = rig.gameObject.AddComponent<AudioListener>();
+
+            listener.enabled = enabled;
         }
 
         private static FusionModeCameraRig InstantiateCameraPrefab(
@@ -574,6 +614,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             overlay.lineHeight = 30f;
             overlay.letterSpacingPercent = -5f;
             overlay.labelSize = new Vector2(82f, 51f);
+            overlay.topRightInset = new Vector2(8f, -8f);
             overlay.textColor = Color.black;
         }
 

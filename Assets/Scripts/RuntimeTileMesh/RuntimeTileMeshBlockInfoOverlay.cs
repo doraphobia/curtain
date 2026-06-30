@@ -2,12 +2,17 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 namespace DuoCurtain.RuntimeTileMesh
 {
     [DisallowMultipleComponent]
     public sealed class RuntimeTileMeshBlockInfoOverlay : MonoBehaviour
     {
+        private const float DisplayToggleDebounceSeconds = 0.12f;
+
         public enum TabDisplayMode
         {
             ToggleOnPress,
@@ -34,7 +39,7 @@ namespace DuoCurtain.RuntimeTileMesh
         public float letterSpacingPercent = -5f;
         public Color textColor = Color.black;
         public Vector2 labelSize = new Vector2(82f, 51f);
-        public Vector2 topRightInset = new Vector2(-8f, -8f);
+        public Vector2 topRightInset = new Vector2(8f, -8f);
         public string defaultBlockType = "DEFAULT";
         public string unitSuffix = "UNIT";
         public bool uppercaseType = true;
@@ -58,6 +63,8 @@ namespace DuoCurtain.RuntimeTileMesh
         private RectTransform labelRoot;
         private float nextRefreshTime;
         private bool isVisible;
+        private int lastDisplayToggleFrame = -1;
+        private float lastDisplayToggleTime = -100f;
 
         public bool IsVisible => isVisible;
 
@@ -86,6 +93,38 @@ namespace DuoCurtain.RuntimeTileMesh
                 return;
 
             UpdateLabelPositions();
+        }
+
+        void OnGUI()
+        {
+            if (displayKey == KeyCode.None)
+                return;
+
+            Event currentEvent = Event.current;
+            if (currentEvent == null || currentEvent.keyCode != displayKey)
+                return;
+
+            if (displayMode == TabDisplayMode.HoldToShow)
+            {
+                if (currentEvent.type == EventType.KeyDown)
+                {
+                    SetVisible(true, false);
+                    currentEvent.Use();
+                }
+                else if (currentEvent.type == EventType.KeyUp)
+                {
+                    SetVisible(false, false);
+                    currentEvent.Use();
+                }
+
+                return;
+            }
+
+            if (currentEvent.type == EventType.KeyDown)
+            {
+                ToggleVisibleFromInput();
+                currentEvent.Use();
+            }
         }
 
         void OnDestroy()
@@ -134,13 +173,88 @@ namespace DuoCurtain.RuntimeTileMesh
         {
             if (displayMode == TabDisplayMode.HoldToShow)
             {
-                SetVisible(Input.GetKey(displayKey), false);
+                SetVisible(IsDisplayKeyHeld(), false);
                 return;
             }
 
-            if (Input.GetKeyDown(displayKey))
-                SetVisible(!isVisible, false);
+            if (WasDisplayKeyPressedThisFrame())
+                ToggleVisibleFromInput();
         }
+
+        private void ToggleVisibleFromInput()
+        {
+            if (lastDisplayToggleFrame == Time.frameCount)
+                return;
+
+            if (Time.unscaledTime - lastDisplayToggleTime < DisplayToggleDebounceSeconds)
+                return;
+
+            lastDisplayToggleFrame = Time.frameCount;
+            lastDisplayToggleTime = Time.unscaledTime;
+            SetVisible(!isVisible, false);
+        }
+
+        private bool WasDisplayKeyPressedThisFrame()
+        {
+            if (displayKey == KeyCode.None)
+                return false;
+
+            bool pressed = Input.GetKeyDown(displayKey);
+#if ENABLE_INPUT_SYSTEM
+            pressed |= IsInputSystemDisplayKeyPressed();
+#endif
+            return pressed;
+        }
+
+        private bool IsDisplayKeyHeld()
+        {
+            if (displayKey == KeyCode.None)
+                return false;
+
+            bool held = Input.GetKey(displayKey);
+#if ENABLE_INPUT_SYSTEM
+            held |= IsInputSystemDisplayKeyHeld();
+#endif
+            return held;
+        }
+
+#if ENABLE_INPUT_SYSTEM
+        private bool IsInputSystemDisplayKeyPressed()
+        {
+            Keyboard keyboard = Keyboard.current;
+            if (keyboard == null)
+                return false;
+
+            if (displayKey == KeyCode.Tab)
+                return keyboard.tabKey.wasPressedThisFrame;
+            if (displayKey == KeyCode.Space)
+                return keyboard.spaceKey.wasPressedThisFrame;
+            if (displayKey == KeyCode.Return)
+                return keyboard.enterKey.wasPressedThisFrame;
+            if (displayKey == KeyCode.Escape)
+                return keyboard.escapeKey.wasPressedThisFrame;
+
+            return false;
+        }
+
+        private bool IsInputSystemDisplayKeyHeld()
+        {
+            Keyboard keyboard = Keyboard.current;
+            if (keyboard == null)
+                return false;
+
+            if (displayKey == KeyCode.Tab)
+                return keyboard.tabKey.isPressed;
+            if (displayKey == KeyCode.Space)
+                return keyboard.spaceKey.isPressed;
+            if (displayKey == KeyCode.Return)
+                return keyboard.enterKey.isPressed;
+            if (displayKey == KeyCode.Escape)
+                return keyboard.escapeKey.isPressed;
+
+            return false;
+        }
+#endif
 
         private void SetVisible(bool visible, bool force)
         {
@@ -262,7 +376,7 @@ namespace DuoCurtain.RuntimeTileMesh
             RectTransform rect = labelObject.GetComponent<RectTransform>();
             rect.anchorMin = new Vector2(0.5f, 0.5f);
             rect.anchorMax = new Vector2(0.5f, 0.5f);
-            rect.pivot = new Vector2(1f, 1f);
+            rect.pivot = new Vector2(0f, 1f);
             rect.sizeDelta = labelSize;
 
             TextMeshProUGUI label = labelObject.GetComponent<TextMeshProUGUI>();
@@ -313,13 +427,13 @@ namespace DuoCurtain.RuntimeTileMesh
                 if (block == null || label == null)
                     continue;
 
-                if (!TryGetBlockTopRightWorld(block, out Vector3 worldCorner))
+                if (!TryGetBlockLabelAnchorWorld(block, out Vector3 worldAnchor))
                 {
                     label.enabled = false;
                     continue;
                 }
 
-                Vector3 screen = worldCamera.WorldToScreenPoint(worldCorner);
+                Vector3 screen = worldCamera.WorldToScreenPoint(worldAnchor);
                 bool inFront = screen.z >= 0f;
                 bool onScreen = screen.x >= 0f && screen.x <= Screen.width &&
                                 screen.y >= 0f && screen.y <= Screen.height;
@@ -339,11 +453,11 @@ namespace DuoCurtain.RuntimeTileMesh
             }
         }
 
-        private bool TryGetBlockTopRightWorld(
+        private bool TryGetBlockLabelAnchorWorld(
             RuntimeTileMeshDraggableBlock block,
-            out Vector3 worldCorner)
+            out Vector3 worldAnchor)
         {
-            worldCorner = Vector3.zero;
+            worldAnchor = Vector3.zero;
             if (block == null || fusionSandbox == null)
                 return false;
 
@@ -354,17 +468,19 @@ namespace DuoCurtain.RuntimeTileMesh
                 return false;
 
             bool hasCell = false;
-            Vector2Int maximum = Vector2Int.zero;
+            Vector2Int anchorCell = Vector2Int.zero;
             foreach (Vector2Int cell in cells)
             {
-                maximum = hasCell ? Vector2Int.Max(maximum, cell) : cell;
+                if (!hasCell || cell.y > anchorCell.y || (cell.y == anchorCell.y && cell.x > anchorCell.x))
+                    anchorCell = cell;
+
                 hasCell = true;
             }
 
             float gridSize = Mathf.Max(0.0001f, Mathf.Abs(fusionSandbox.gridSize));
-            worldCorner = new Vector3(
-                fusionSandbox.gridOrigin.x + (maximum.x + 1) * gridSize,
-                fusionSandbox.gridOrigin.y + (maximum.y + 1) * gridSize,
+            worldAnchor = new Vector3(
+                fusionSandbox.gridOrigin.x + anchorCell.x * gridSize,
+                fusionSandbox.gridOrigin.y + (anchorCell.y + 1) * gridSize,
                 block.transform.position.z);
             return true;
         }
