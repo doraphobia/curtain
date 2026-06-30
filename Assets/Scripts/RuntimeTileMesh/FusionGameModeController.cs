@@ -47,7 +47,9 @@ namespace DuoCurtain.RuntimeTileMesh
         public bool hideSystemCursorInPlayerMode = true;
 
         [Header("Management Mode")]
-        public bool showSystemCursorInManagementMode = true;
+        public bool showSystemCursorInManagementMode = false;
+        public bool showHeadingPointInManagementMode = true;
+        public bool releaseHeadingPointRadiusInManagement = true;
         public bool placeSelectedBlockWhenLeavingManagement = true;
 
         [Header("Fusion Shop")]
@@ -55,6 +57,22 @@ namespace DuoCurtain.RuntimeTileMesh
         public bool buyAtPointerPosition = true;
         public bool dragPurchasedBlockImmediately = true;
         public List<BlockShopItem> shopItems = new List<BlockShopItem>();
+
+        [Header("Fusion Shop UI")]
+        public bool createShopPanelIfMissing = true;
+        public bool showShopOnlyInManagementMode = true;
+        public RectTransform shopPanelRoot;
+        public RectTransform shopContentRoot;
+        public TextMeshProUGUI shopConfirmationText;
+        public string confirmPurchaseFormat = "你是否要购买 {0}? 再次点击确认";
+        public string cannotAffordFormat = "金钱不足: {0}";
+        public Vector2 shopPanelSize = new Vector2(360f, 460f);
+        public Vector2 shopPanelAnchoredPosition = new Vector2(-32f, -112f);
+        public Color shopPanelColor = new Color(0f, 0f, 0f, 0.72f);
+        public Color shopButtonColor = new Color(1f, 1f, 1f, 0.12f);
+        public Color shopPendingButtonColor = new Color(0.1f, 0.38f, 1f, 0.35f);
+        public Color shopTextColor = Color.white;
+        public Color shopPriceColor = new Color(1f, 0.84f, 0.36f, 1f);
 
         [Header("Currency")]
         public TimeCounterUI currencySource;
@@ -65,6 +83,11 @@ namespace DuoCurtain.RuntimeTileMesh
         public float defaultStartingMoney = 100f;
 
         private Camera activeCamera;
+        private readonly List<Button> shopButtons = new List<Button>();
+        private readonly List<Image> shopButtonImages = new List<Image>();
+        private int pendingShopIndex = -1;
+        private bool cachedPlayerHeadingLimit;
+        private bool hasCachedPlayerHeadingState;
 
         public bool IsManagementMode => currentMode == GameMode.Management;
 
@@ -73,6 +96,7 @@ namespace DuoCurtain.RuntimeTileMesh
             ResolveReferences();
             EnsureCurrencySource();
             EnsureMoneyHud();
+            EnsureShopPanel();
 
             if (applyStartModeOnAwake)
                 SetMode(startMode, false);
@@ -105,6 +129,7 @@ namespace DuoCurtain.RuntimeTileMesh
                 HandleShopHotkeys();
 
             RefreshMoneyHud();
+            RefreshShopPanel();
         }
 
         public void ToggleMode()
@@ -165,15 +190,20 @@ namespace DuoCurtain.RuntimeTileMesh
             bool management = IsManagementMode;
             if (playerControl != null)
             {
+                CachePlayerHeadingState();
                 playerControl.playerInputEnabled = !management;
-                playerControl.headingPointInputEnabled = !management;
-                playerControl.showHeadingPoint = !management && showHeadingPointInPlayerMode;
+                playerControl.headingPointInputEnabled = management ? showHeadingPointInManagementMode : showHeadingPointInPlayerMode;
+                playerControl.showHeadingPoint = management ? showHeadingPointInManagementMode : showHeadingPointInPlayerMode;
+                playerControl.LimitHeadingPointReach = management && releaseHeadingPointRadiusInManagement
+                    ? false
+                    : cachedPlayerHeadingLimit;
             }
 
             if (fusionSandbox != null)
                 fusionSandbox.SetManagementInputEnabled(management, placeSelectedBlockWhenLeavingManagement);
 
             ApplyCursorState(management);
+            ApplyShopVisibility();
             SwitchCamera(management ? managementCamera : playerCamera, smoothCamera);
         }
 
@@ -241,7 +271,42 @@ namespace DuoCurtain.RuntimeTileMesh
                     continue;
 
                 if (Input.GetKeyDown(item.hotkey))
-                    TryPurchase(item);
+                    HandleShopItemClicked(i);
+            }
+        }
+
+        public void HandleShopItemClicked(int index)
+        {
+            if (!IsManagementMode)
+                return;
+
+            if (index < 0 || index >= shopItems.Count)
+                return;
+
+            BlockShopItem item = shopItems[index];
+            if (item == null || item.blockPrefab == null)
+                return;
+
+            if (pendingShopIndex != index)
+            {
+                pendingShopIndex = index;
+                SetConfirmationText(string.Format(confirmPurchaseFormat, item.displayName));
+                RefreshShopPanel();
+                return;
+            }
+
+            if (!allowFreePurchases && currencySource != null && !currencySource.CanAfford(item.price))
+            {
+                SetConfirmationText(string.Format(cannotAffordFormat, item.displayName));
+                RefreshShopPanel();
+                return;
+            }
+
+            if (TryPurchase(item))
+            {
+                pendingShopIndex = -1;
+                SetConfirmationText(string.Empty);
+                RefreshShopPanel();
             }
         }
 
@@ -301,6 +366,15 @@ namespace DuoCurtain.RuntimeTileMesh
                 rig.fusionSandbox = fusionSandbox;
         }
 
+        private void CachePlayerHeadingState()
+        {
+            if (hasCachedPlayerHeadingState || playerControl == null)
+                return;
+
+            cachedPlayerHeadingLimit = playerControl.LimitHeadingPointReach;
+            hasCachedPlayerHeadingState = true;
+        }
+
         private void EnsureCurrencySource()
         {
             if (currencySource != null)
@@ -354,6 +428,153 @@ namespace DuoCurtain.RuntimeTileMesh
             moneyText.raycastTarget = false;
         }
 
+        private void EnsureShopPanel()
+        {
+            if (shopPanelRoot != null || !createShopPanelIfMissing)
+                return;
+
+            Canvas canvas = FindFirstObjectByType<Canvas>();
+            if (canvas == null)
+                canvas = CreateOverlayCanvas("Fusion UI Canvas", 1200);
+
+            GameObject panelObject = new GameObject("Fusion Block Shop Panel", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            panelObject.transform.SetParent(canvas.transform, false);
+            shopPanelRoot = panelObject.GetComponent<RectTransform>();
+            shopPanelRoot.anchorMin = new Vector2(1f, 1f);
+            shopPanelRoot.anchorMax = new Vector2(1f, 1f);
+            shopPanelRoot.pivot = new Vector2(1f, 1f);
+            shopPanelRoot.anchoredPosition = shopPanelAnchoredPosition;
+            shopPanelRoot.sizeDelta = shopPanelSize;
+
+            Image panelImage = panelObject.GetComponent<Image>();
+            panelImage.color = shopPanelColor;
+            panelImage.raycastTarget = true;
+
+            VerticalLayoutGroup panelLayout = panelObject.AddComponent<VerticalLayoutGroup>();
+            panelLayout.padding = new RectOffset(16, 16, 14, 16);
+            panelLayout.spacing = 10f;
+            panelLayout.childControlWidth = true;
+            panelLayout.childControlHeight = false;
+            panelLayout.childForceExpandWidth = true;
+            panelLayout.childForceExpandHeight = false;
+
+            GameObject titleObject = CreateTmpTextObject("Shop Title", panelObject.transform, "Blocks", 30f, shopTextColor, TextAlignmentOptions.TopLeft);
+            LayoutElement titleLayout = titleObject.AddComponent<LayoutElement>();
+            titleLayout.preferredHeight = 42f;
+
+            GameObject confirmObject = CreateTmpTextObject("Shop Confirmation", panelObject.transform, string.Empty, 22f, shopPriceColor, TextAlignmentOptions.TopLeft);
+            shopConfirmationText = confirmObject.GetComponent<TextMeshProUGUI>();
+            LayoutElement confirmLayout = confirmObject.AddComponent<LayoutElement>();
+            confirmLayout.preferredHeight = 64f;
+
+            GameObject contentObject = new GameObject("Shop Content", typeof(RectTransform), typeof(VerticalLayoutGroup));
+            contentObject.transform.SetParent(panelObject.transform, false);
+            shopContentRoot = contentObject.GetComponent<RectTransform>();
+            VerticalLayoutGroup contentLayout = contentObject.GetComponent<VerticalLayoutGroup>();
+            contentLayout.spacing = 8f;
+            contentLayout.childControlWidth = true;
+            contentLayout.childControlHeight = false;
+            contentLayout.childForceExpandWidth = true;
+            contentLayout.childForceExpandHeight = false;
+
+            LayoutElement contentLayoutElement = contentObject.AddComponent<LayoutElement>();
+            contentLayoutElement.flexibleHeight = 1f;
+
+            RebuildShopButtons();
+            ApplyShopVisibility();
+        }
+
+        private Canvas CreateOverlayCanvas(string name, int sortingOrder)
+        {
+            GameObject canvasObject = new GameObject(
+                name,
+                typeof(RectTransform),
+                typeof(Canvas),
+                typeof(CanvasScaler));
+            Canvas canvas = canvasObject.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = sortingOrder;
+
+            CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.matchWidthOrHeight = 0.5f;
+            return canvas;
+        }
+
+        private void RebuildShopButtons()
+        {
+            shopButtons.Clear();
+            shopButtonImages.Clear();
+            if (shopContentRoot == null)
+                return;
+
+            for (int i = shopContentRoot.childCount - 1; i >= 0; i--)
+                Destroy(shopContentRoot.GetChild(i).gameObject);
+
+            for (int i = 0; i < shopItems.Count; i++)
+                CreateShopButton(i);
+        }
+
+        private void CreateShopButton(int index)
+        {
+            BlockShopItem item = shopItems[index];
+            GameObject buttonObject = new GameObject("Shop Item - " + (item != null ? item.displayName : index.ToString()), typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+            buttonObject.transform.SetParent(shopContentRoot, false);
+
+            RectTransform rect = buttonObject.GetComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(0f, 64f);
+
+            Image image = buttonObject.GetComponent<Image>();
+            image.color = shopButtonColor;
+            image.raycastTarget = true;
+
+            Button button = buttonObject.GetComponent<Button>();
+            int capturedIndex = index;
+            button.onClick.AddListener(() => HandleShopItemClicked(capturedIndex));
+
+            LayoutElement layout = buttonObject.AddComponent<LayoutElement>();
+            layout.preferredHeight = 64f;
+
+            HorizontalLayoutGroup row = buttonObject.AddComponent<HorizontalLayoutGroup>();
+            row.padding = new RectOffset(14, 14, 8, 8);
+            row.spacing = 10f;
+            row.childControlWidth = true;
+            row.childControlHeight = true;
+            row.childForceExpandWidth = false;
+            row.childForceExpandHeight = true;
+
+            GameObject nameText = CreateTmpTextObject("Name", buttonObject.transform, item != null ? item.displayName : "Block", 24f, shopTextColor, TextAlignmentOptions.MidlineLeft);
+            LayoutElement nameLayout = nameText.AddComponent<LayoutElement>();
+            nameLayout.flexibleWidth = 1f;
+
+            GameObject priceText = CreateTmpTextObject("Price", buttonObject.transform, item != null ? item.price.ToString() : "0", 22f, shopPriceColor, TextAlignmentOptions.MidlineRight);
+            LayoutElement priceLayout = priceText.AddComponent<LayoutElement>();
+            priceLayout.preferredWidth = 88f;
+
+            shopButtons.Add(button);
+            shopButtonImages.Add(image);
+        }
+
+        private GameObject CreateTmpTextObject(
+            string name,
+            Transform parent,
+            string text,
+            float fontSize,
+            Color color,
+            TextAlignmentOptions alignment)
+        {
+            GameObject textObject = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+            textObject.transform.SetParent(parent, false);
+            TextMeshProUGUI tmp = textObject.GetComponent<TextMeshProUGUI>();
+            tmp.text = text;
+            tmp.fontSize = fontSize;
+            tmp.color = color;
+            tmp.alignment = alignment;
+            tmp.raycastTarget = false;
+            return textObject;
+        }
+
         private void HandleCurrencyChanged(float _)
         {
             RefreshMoneyHud();
@@ -366,6 +587,49 @@ namespace DuoCurtain.RuntimeTileMesh
 
             int value = currencySource != null ? currencySource.CurrentWholeValue : Mathf.FloorToInt(defaultStartingMoney);
             moneyText.text = string.Format(moneyFormat, value);
+        }
+
+        private void RefreshShopPanel()
+        {
+            if (shopPanelRoot == null)
+                return;
+
+            if (shopButtons.Count != shopItems.Count)
+                RebuildShopButtons();
+
+            for (int i = 0; i < shopButtons.Count; i++)
+            {
+                Button button = shopButtons[i];
+                if (button == null)
+                    continue;
+
+                BlockShopItem item = i < shopItems.Count ? shopItems[i] : null;
+                button.interactable = IsManagementMode && item != null && item.blockPrefab != null &&
+                    (allowFreePurchases || currencySource == null || currencySource.CanAfford(item.price));
+
+                if (i < shopButtonImages.Count && shopButtonImages[i] != null)
+                    shopButtonImages[i].color = i == pendingShopIndex ? shopPendingButtonColor : shopButtonColor;
+            }
+        }
+
+        private void ApplyShopVisibility()
+        {
+            if (shopPanelRoot == null)
+                return;
+
+            if (!IsManagementMode)
+            {
+                pendingShopIndex = -1;
+                SetConfirmationText(string.Empty);
+            }
+
+            shopPanelRoot.gameObject.SetActive(!showShopOnlyInManagementMode || IsManagementMode);
+        }
+
+        private void SetConfirmationText(string text)
+        {
+            if (shopConfirmationText != null)
+                shopConfirmationText.text = text;
         }
     }
 }

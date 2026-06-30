@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 namespace DuoCurtain.RuntimeTileMesh
 {
@@ -10,6 +11,7 @@ namespace DuoCurtain.RuntimeTileMesh
         public Camera worldCamera;
         public LayerMask blockLayerMask = ~0;
         public bool managementInputEnabled = true;
+        public bool ignorePointerOverUI = true;
         public bool preserveGrabOffset = true;
         public bool snapExistingBlocksOnAwake = true;
         public bool mergeExistingBlocksOnAwake = true;
@@ -89,12 +91,19 @@ namespace DuoCurtain.RuntimeTileMesh
 
             selectedThisFrame = false;
             Vector3 mouseWorld = ScreenToWorld(Input.mousePosition);
+            bool pointerOverUI = ignorePointerOverUI && EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
 
             if (selectedBlock != null)
             {
                 MoveSelectedBlock(mouseWorld);
-                if (Input.GetMouseButtonDown(0) && !selectedThisFrame)
+                if (!pointerOverUI && Input.GetMouseButtonDown(0) && !selectedThisFrame)
                     PlaceSelectedBlock();
+                return;
+            }
+
+            if (pointerOverUI)
+            {
+                ClearHover();
                 return;
             }
 

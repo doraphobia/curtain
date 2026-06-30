@@ -174,6 +174,11 @@ public class PlayerControl : MonoBehaviour
     public bool HasHeadingWorldPosition => hasHeadingWorldPosition;
     public float PlayerCollisionRadius => usePlayerCollisionRadius ? Mathf.Max(0f, playerCollisionRadius) : 0f;
     public float CurrentCursorSpeed => currentCursorSpeed;
+    public bool LimitHeadingPointReach
+    {
+        get => limitHeadingPointReach;
+        set => limitHeadingPointReach = value;
+    }
 
     public static bool IsRunning => Active != null && Active.isActiveAndEnabled;
     public static bool HasActive => IsRunning && Active.hasWorldPosition;
