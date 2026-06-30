@@ -7,6 +7,10 @@ namespace DuoCurtain.RuntimeTileMesh
     [DisallowMultipleComponent]
     public class RuntimeTileMeshDraggableBlock : MonoBehaviour
     {
+        [Header("Block Metadata")]
+        public string blockType = "DEFAULT";
+
+        [Header("Interaction Colors")]
         public Color placedColor = Color.white;
         public Color hoverColor = new Color(1f, 0.08f, 0.04f, 1f);
         public Color selectedColor = new Color(0.1f, 0.38f, 1f, 1f);
@@ -29,6 +33,10 @@ namespace DuoCurtain.RuntimeTileMesh
                 return view;
             }
         }
+
+        public string DisplayBlockType => string.IsNullOrWhiteSpace(blockType)
+            ? "DEFAULT"
+            : blockType.Trim();
 
         void Awake()
         {
@@ -143,6 +151,33 @@ namespace DuoCurtain.RuntimeTileMesh
                 worldCells.Add(rootCell + view.tiles[i]);
 
             return worldCells;
+        }
+
+        public bool TryGetLogicalBounds(
+            out Vector2Int minimumCell,
+            out Vector2Int maximumCell,
+            out Vector2Int size)
+        {
+            ResolveView();
+            if (view == null || view.tiles == null || view.tiles.Count == 0)
+            {
+                minimumCell = Vector2Int.zero;
+                maximumCell = Vector2Int.zero;
+                size = Vector2Int.zero;
+                return false;
+            }
+
+            minimumCell = view.tiles[0];
+            maximumCell = view.tiles[0];
+            for (int i = 1; i < view.tiles.Count; i++)
+            {
+                Vector2Int cell = view.tiles[i];
+                minimumCell = Vector2Int.Min(minimumCell, cell);
+                maximumCell = Vector2Int.Max(maximumCell, cell);
+            }
+
+            size = maximumCell - minimumCell + Vector2Int.one;
+            return true;
         }
 
         public void SnapRootToGrid(float gridSize, Vector2 gridOrigin)
