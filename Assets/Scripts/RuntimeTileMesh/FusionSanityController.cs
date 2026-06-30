@@ -45,13 +45,14 @@ namespace DuoCurtain.RuntimeTileMesh
         public int restoreCost = 100;
         [Min(0f)]
         public float restoreAmount = 20f;
-        public Vector2 restoreButtonAnchoredPosition = new Vector2(32f, 160f);
-        public Vector2 restoreButtonSize = new Vector2(360f, 64f);
+        public Vector2 restoreButtonAnchoredPosition = new Vector2(32f, 24f);
+        public Vector2 restoreButtonSize = new Vector2(260f, 48f);
         public Color restoreButtonColor = new Color(1f, 1f, 1f, 0.16f);
         public Color restoreTextColor = Color.white;
         public bool liftRestoreUiAboveShop = true;
         [Min(0f)]
         public float shopUiClearance = 18f;
+        public bool forceRestoreButtonAboveShopInManagement = true;
 
         [Header("HUD")]
         public bool createHudIfMissing = true;
@@ -387,7 +388,7 @@ namespace DuoCurtain.RuntimeTileMesh
             restoreButtonText = textObject.GetComponent<TextMeshProUGUI>();
             restoreButtonText.raycastTarget = false;
             restoreButtonText.alignment = TextAlignmentOptions.Center;
-            restoreButtonText.fontSize = 24f;
+            restoreButtonText.fontSize = 20f;
             restoreButtonText.color = restoreTextColor;
         }
 
@@ -397,8 +398,19 @@ namespace DuoCurtain.RuntimeTileMesh
             if (liftRestoreUiAboveShop && gameModeController != null)
             {
                 shopLift = gameModeController.VisibleShopTopInset;
+                if (forceRestoreButtonAboveShopInManagement && gameModeController.IsManagementMode)
+                {
+                    float expectedShopTop = gameModeController.ShopBannerHeight + gameModeController.ShopBottomInset;
+                    shopLift = Mathf.Max(shopLift, expectedShopTop);
+                }
+
                 if (shopLift > 0.001f)
-                    shopLift += shopUiClearance * gameModeController.ShopSlideProgress;
+                {
+                    float progress = forceRestoreButtonAboveShopInManagement && gameModeController.IsManagementMode
+                        ? Mathf.Max(gameModeController.ShopSlideProgress, 1f)
+                        : gameModeController.ShopSlideProgress;
+                    shopLift += shopUiClearance * progress;
+                }
             }
 
             if (sanityText != null)

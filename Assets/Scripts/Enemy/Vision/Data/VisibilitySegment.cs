@@ -9,6 +9,7 @@ namespace DuoCurtain.Vision
         OpenDoor,
         ClosedWindow,
         OpenWindow,
+        Portal,
         Unknown
     }
 
@@ -22,6 +23,8 @@ namespace DuoCurtain.Vision
         public int sourceId;
 
         public bool BlocksVision => VisibilityWorld.IsBlockingType(type);
+        public bool BlocksMovement => VisibilityWorld.IsMovementBlockingType(type);
+        public bool IsPortal => VisibilityWorld.IsPortalType(type);
 
         public VisibilitySegment(
             Vector2 start,

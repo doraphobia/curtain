@@ -24,6 +24,8 @@ namespace DuoCurtain.RuntimeTileMesh
         [Header("Movement")]
         [Min(0f)]
         public float moveSpeed = 2.1f;
+        [Min(0f)]
+        public float enemyCollisionRadius = 0.22f;
         [Min(0.1f)]
         public float waypointStopDistance = 0.2f;
         [Min(0.5f)]
@@ -93,6 +95,17 @@ namespace DuoCurtain.RuntimeTileMesh
         public int runtimeVisionSortingOrder = 52;
         public float runtimeVisionZOffset = -0.2f;
 
+        [Header("Runtime Vision Portals")]
+        public bool allowWindowVisionPortals = true;
+        [Min(0.001f)]
+        public float visionPortalExitOffset = 0.05f;
+        [Min(0.01f)]
+        public float visionPortalContinuationDistance = 4f;
+        [Range(1f, 179f)]
+        public float visionPortalSpreadAngle = 45f;
+        [Min(0)]
+        public int visionMaxPortalDepth = 1;
+
         [Header("Vision Alert Feedback")]
         public bool useVisionAlertColorProgress = true;
         [Min(0.05f)]
@@ -133,6 +146,7 @@ namespace DuoCurtain.RuntimeTileMesh
         private float lastContactDamageTime = -999f;
         private Vector2 lastMoveDirection = Vector2.up;
         private float visionAlertProgress;
+        private VisionDetectionSource lastDetectionSource;
 
         public TraceEnemyState CurrentState => currentState;
 
@@ -254,7 +268,7 @@ namespace DuoCurtain.RuntimeTileMesh
                 if (debugEnemyFlow)
                 {
                     Debug.Log(
-                        "[EnemyVision] CanSeePlayer=true Source=OpenWindow Window=" +
+                        "[EnemyVision] CanSeePlayer=true Source=" + lastDetectionSource + " Window=" +
                         (usedWindow != null ? usedWindow.name : "unknown"),
                         this);
                 }
@@ -276,6 +290,7 @@ namespace DuoCurtain.RuntimeTileMesh
             {
                 confirmedPlayerByVision = false;
                 lastUsedWindow = null;
+                lastDetectionSource = VisionDetectionSource.None;
                 windowSanityDamageApplied = false;
                 SetState(TraceEnemyState.WanderOutside);
             }
@@ -375,33 +390,38 @@ namespace DuoCurtain.RuntimeTileMesh
         private bool CanDetectPlayerThroughOpenWindow(out WindowPortal usedWindow)
         {
             usedWindow = null;
+            lastDetectionSource = VisionDetectionSource.None;
             if (playerControl == null || !playerControl.HasPlayerWorldPosition)
                 return false;
 
             Vector2 playerPosition = playerControl.PlayerWorldPosition;
             lastKnownPlayerPosition = playerPosition;
-            WindowPortal[] windows = FindObjectsByType<WindowPortal>(FindObjectsSortMode.None);
-            for (int i = 0; i < windows.Length; i++)
+
+            EnsureVisionSystem();
+            if (visionSensor == null)
+                return false;
+
+            visionSensor.SetForward(lastMoveDirection);
+            visionSensor.ForceSample();
+            if (!visionSensor.LatestSnapshot.TryGetDetectionInfo(
+                    playerPosition,
+                    out VisionDetectionSource detectionSource,
+                    out PortalVisionPolygon portalPolygon))
             {
-                WindowPortal window = windows[i];
-                if (window == null || !window.isActiveAndEnabled)
-                    continue;
-
-                if (requireOpenWindow && !window.IsOpen)
-                    continue;
-
-                Vector2 windowPosition = window.transform.position;
-                if (Vector2.Distance(transform.position, windowPosition) > windowDetectionDistance)
-                    continue;
-
-                if (Vector2.Distance(windowPosition, playerPosition) > playerWindowDistance)
-                    continue;
-
-                usedWindow = window;
-                return true;
+                return false;
             }
 
-            return false;
+            if (requireOpenWindow &&
+                detectionSource != VisionDetectionSource.OpenWindowPortal &&
+                detectionSource != VisionDetectionSource.Direct)
+            {
+                return false;
+            }
+
+            lastDetectionSource = detectionSource;
+            if (portalPolygon != null)
+                usedWindow = portalPolygon.portal as WindowPortal;
+            return true;
         }
 
         private void PickOutsideWaypoint()
@@ -438,6 +458,15 @@ namespace DuoCurtain.RuntimeTileMesh
                 step = delta;
 
             Vector3 nextPosition = transform.position + new Vector3(step.x, step.y, 0f);
+            if (allowIndoor && fusionSandbox != null)
+            {
+                nextPosition = fusionSandbox.ResolvePlayerWorldPoint(
+                    nextPosition,
+                    transform.position,
+                    enemyCollisionRadius,
+                    true);
+            }
+
             if (!allowIndoor && IsInsideAnyFusionRoom(nextPosition))
             {
                 transform.position = lastValidOutdoorPosition;
@@ -624,6 +653,11 @@ namespace DuoCurtain.RuntimeTileMesh
 
             visionRenderController.renderParameters.primaryColor = primary;
             visionRenderController.renderParameters.secondaryColor = secondary;
+            visionRenderController.renderParameters.portalColor = new Color(
+                primary.r,
+                primary.g,
+                primary.b,
+                Mathf.Clamp01(primary.a * 0.72f));
             visionRenderController.Render(visionSensor.LatestSnapshot);
         }
 
@@ -678,6 +712,11 @@ namespace DuoCurtain.RuntimeTileMesh
             visionSensor.edgeDistanceThreshold = Mathf.Max(0f, runtimeVisionEdgeThreshold);
             visionSensor.obstacleMask = runtimeVisionObstacleMask;
             visionSensor.hitTriggers = false;
+            visionSensor.allowWindowPortals = allowWindowVisionPortals;
+            visionSensor.portalExitOffset = Mathf.Max(0.001f, visionPortalExitOffset);
+            visionSensor.portalContinuationDistance = Mathf.Max(0.01f, visionPortalContinuationDistance);
+            visionSensor.portalSpreadAngle = Mathf.Clamp(visionPortalSpreadAngle, 1f, 179f);
+            visionSensor.maxPortalDepth = Mathf.Max(0, visionMaxPortalDepth);
             visionSensor.SetForward(lastMoveDirection);
 
             if (visionRenderController == null)

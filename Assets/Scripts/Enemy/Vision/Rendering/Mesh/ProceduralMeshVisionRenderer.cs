@@ -136,6 +136,22 @@ namespace DuoCurtain.Vision
             uv1.Clear();
             colors.Clear();
 
+            AddPrimaryFan(snapshot, parameters);
+            for (int i = 0; i < snapshot.PortalPolygons.Count; i++)
+                AddPortalFan(snapshot, snapshot.PortalPolygons[i], parameters);
+
+            mesh.Clear(false);
+            mesh.SetVertices(vertices);
+            mesh.SetTriangles(triangles, 0, true);
+            mesh.SetUVs(0, uv0);
+            mesh.SetUVs(1, uv1);
+            mesh.SetColors(colors);
+            mesh.RecalculateBounds();
+        }
+
+        private void AddPrimaryFan(VisionSnapshot snapshot, VisionRenderParameters parameters)
+        {
+            int baseIndex = vertices.Count;
             Vector3 localOrigin = outputTransform.InverseTransformPoint(
                 new Vector3(snapshot.origin.x, snapshot.origin.y, rendererContext.zOffset));
             vertices.Add(localOrigin);
@@ -162,20 +178,56 @@ namespace DuoCurtain.Vision
                     sample.normalizedDistance));
             }
 
-            for (int i = 1; i < vertices.Count - 1; i++)
+            AddFanTriangles(baseIndex, samples.Count);
+        }
+
+        private void AddPortalFan(
+            VisionSnapshot snapshot,
+            PortalVisionPolygon portalPolygon,
+            VisionRenderParameters parameters)
+        {
+            if (portalPolygon == null || !portalPolygon.IsValid)
+                return;
+
+            int baseIndex = vertices.Count;
+            Color portalColor = WithOpacity(parameters.portalColor, parameters.opacity * parameters.portalOpacity);
+            Vector2 origin = portalPolygon.portalExitOrigin;
+            Vector3 localOrigin = outputTransform.InverseTransformPoint(
+                new Vector3(origin.x, origin.y, rendererContext.zOffset));
+            vertices.Add(localOrigin);
+            uv0.Add(new Vector2(0.5f, 0.5f));
+            uv1.Add(new Vector4(0f, 0.5f, origin.x, origin.y));
+            colors.Add(portalColor);
+
+            IReadOnlyList<Vector2> points = portalPolygon.Polygon;
+            float maxDistance = Mathf.Max(0.0001f, snapshot.viewDistance);
+            for (int i = 0; i < points.Count; i++)
             {
-                triangles.Add(0);
-                triangles.Add(i + 1);
-                triangles.Add(i);
+                Vector2 point = points[i];
+                float normalizedIndex = points.Count > 1 ? i / (float)(points.Count - 1) : 0.5f;
+                float normalizedDistance = Mathf.Clamp01(Vector2.Distance(origin, point) / maxDistance);
+                Vector3 localPoint = outputTransform.InverseTransformPoint(
+                    new Vector3(point.x, point.y, rendererContext.zOffset));
+                vertices.Add(localPoint);
+                uv0.Add(BuildUV(point, snapshot.bounds, parameters.uvMode, normalizedIndex, normalizedDistance));
+                uv1.Add(new Vector4(normalizedDistance, normalizedIndex, point.x, point.y));
+                colors.Add(portalColor);
             }
 
-            mesh.Clear(false);
-            mesh.SetVertices(vertices);
-            mesh.SetTriangles(triangles, 0, true);
-            mesh.SetUVs(0, uv0);
-            mesh.SetUVs(1, uv1);
-            mesh.SetColors(colors);
-            mesh.RecalculateBounds();
+            AddFanTriangles(baseIndex, points.Count);
+        }
+
+        private void AddFanTriangles(int baseIndex, int outerPointCount)
+        {
+            if (outerPointCount < 2)
+                return;
+
+            for (int i = 1; i < outerPointCount; i++)
+            {
+                triangles.Add(baseIndex);
+                triangles.Add(baseIndex + i + 1);
+                triangles.Add(baseIndex + i);
+            }
         }
 
         private static Vector2 BuildUV(
@@ -197,6 +249,29 @@ namespace DuoCurtain.Vision
                     return new Vector2(
                         0.5f + Mathf.Cos(radians) * sample.normalizedDistance * 0.5f,
                         0.5f + Mathf.Sin(radians) * sample.normalizedDistance * 0.5f);
+            }
+        }
+
+        private static Vector2 BuildUV(
+            Vector2 point,
+            Bounds bounds,
+            VisionUVMode mode,
+            float normalizedAngle,
+            float normalizedDistance)
+        {
+            switch (mode)
+            {
+                case VisionUVMode.WorldSpace:
+                    return point;
+                case VisionUVMode.LocalBounds:
+                    return new Vector2(
+                        Mathf.InverseLerp(bounds.min.x, bounds.max.x, point.x),
+                        Mathf.InverseLerp(bounds.min.y, bounds.max.y, point.y));
+                default:
+                    float radians = normalizedAngle * Mathf.PI * 2f;
+                    return new Vector2(
+                        0.5f + Mathf.Cos(radians) * normalizedDistance * 0.5f,
+                        0.5f + Mathf.Sin(radians) * normalizedDistance * 0.5f);
             }
         }
 

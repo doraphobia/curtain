@@ -83,15 +83,39 @@ namespace DuoCurtain.Vision
             switch (type)
             {
                 case VisibilitySegmentType.OpenDoor:
-                case VisibilitySegmentType.OpenWindow:
                     return false;
                 case VisibilitySegmentType.Wall:
                 case VisibilitySegmentType.ClosedDoor:
                 case VisibilitySegmentType.ClosedWindow:
+                case VisibilitySegmentType.OpenWindow:
+                case VisibilitySegmentType.Portal:
                 case VisibilitySegmentType.Unknown:
                 default:
                     return true;
             }
+        }
+
+        public static bool IsMovementBlockingType(VisibilitySegmentType type)
+        {
+            switch (type)
+            {
+                case VisibilitySegmentType.OpenDoor:
+                    return false;
+                case VisibilitySegmentType.Wall:
+                case VisibilitySegmentType.ClosedDoor:
+                case VisibilitySegmentType.ClosedWindow:
+                case VisibilitySegmentType.OpenWindow:
+                case VisibilitySegmentType.Portal:
+                case VisibilitySegmentType.Unknown:
+                default:
+                    return true;
+            }
+        }
+
+        public static bool IsPortalType(VisibilitySegmentType type)
+        {
+            return type == VisibilitySegmentType.OpenWindow ||
+                   type == VisibilitySegmentType.Portal;
         }
 
         public void RegisterSource(IVisibilitySegmentSource source)

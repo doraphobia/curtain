@@ -7,13 +7,17 @@ namespace DuoCurtain.Vision
     {
         public VisionSensor2D sensor;
         public bool showRays;
+        public bool showPortalRays = true;
         public bool showPolygon = true;
+        public bool showPortalPolygons = true;
         public bool showVertices;
         public bool showBounds;
         public bool showVisibilityWorldSegments;
         public bool showHitPoints;
         public Color rayColor = new Color(1f, 0.65f, 0.1f, 0.35f);
+        public Color portalRayColor = new Color(0f, 0.85f, 1f, 0.55f);
         public Color polygonColor = new Color(1f, 0.2f, 0.1f, 0.9f);
+        public Color portalPolygonColor = new Color(0f, 0.9f, 0.85f, 0.9f);
         public Color vertexColor = Color.cyan;
         public Color boundsColor = Color.magenta;
         public Color wallSegmentColor = Color.white;
@@ -58,6 +62,42 @@ namespace DuoCurtain.Vision
                 }
 
                 Gizmos.DrawLine(previous, snapshot.origin);
+
+                if (showPortalPolygons)
+                {
+                    Gizmos.color = portalPolygonColor;
+                    for (int portalIndex = 0; portalIndex < snapshot.PortalPolygons.Count; portalIndex++)
+                    {
+                        PortalVisionPolygon portal = snapshot.PortalPolygons[portalIndex];
+                        if (portal == null || !portal.IsValid)
+                            continue;
+
+                        Vector2 portalPrevious = portal.portalExitOrigin;
+                        for (int pointIndex = 0; pointIndex < portal.Polygon.Count; pointIndex++)
+                        {
+                            Vector2 point = portal.Polygon[pointIndex];
+                            Gizmos.DrawLine(portalPrevious, point);
+                            portalPrevious = point;
+                        }
+
+                        Gizmos.DrawLine(portalPrevious, portal.portalExitOrigin);
+                    }
+                }
+            }
+
+            if (showPortalRays)
+            {
+                Gizmos.color = portalRayColor;
+                for (int portalIndex = 0; portalIndex < snapshot.PortalPolygons.Count; portalIndex++)
+                {
+                    PortalVisionPolygon portal = snapshot.PortalPolygons[portalIndex];
+                    if (portal == null || !portal.IsValid)
+                        continue;
+
+                    Gizmos.DrawLine(snapshot.origin, portal.portalHitPoint);
+                    for (int pointIndex = 0; pointIndex < portal.Polygon.Count; pointIndex++)
+                        Gizmos.DrawLine(portal.portalExitOrigin, portal.Polygon[pointIndex]);
+                }
             }
 
             if (showVertices)
@@ -115,6 +155,8 @@ namespace DuoCurtain.Vision
                 case VisibilitySegmentType.ClosedWindow:
                     return closedWindowSegmentColor;
                 case VisibilitySegmentType.OpenWindow:
+                    return openWindowSegmentColor;
+                case VisibilitySegmentType.Portal:
                     return openWindowSegmentColor;
                 default:
                     return unknownSegmentColor;

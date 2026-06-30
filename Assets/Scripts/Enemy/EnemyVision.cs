@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using DuoCurtain.Vision;
 using UnityEngine;
 
 /// <summary>
@@ -18,6 +19,37 @@ public class EnemyVision : MonoBehaviour
 
     private readonly List<Vector2> sampleBuffer = new List<Vector2>(8);
     private readonly RaycastHit2D[] hitBuffer = new RaycastHit2D[8];
+    private readonly VisionSnapshot visibilitySnapshot = new VisionSnapshot();
+    private readonly RadialVisionSampler2D visibilitySampler = new RadialVisionSampler2D();
+
+    [Header("Segment Visibility")]
+    public bool useVisibilityWorld = true;
+    public bool requireActualVisibilityPolygonContainment = true;
+    [Range(2, 512)]
+    public int baseRayCount = 96;
+    [Range(2, 1024)]
+    public int maxRayCount = 384;
+    [Range(0, 8)]
+    public int edgeRefinementIterations = 2;
+    [Min(0f)]
+    public float edgeDistanceThreshold = 0.35f;
+
+    [Header("Vision Portals")]
+    public bool allowWindowPortals = true;
+    [Min(0.001f)]
+    public float portalExitOffset = 0.05f;
+    [Min(0.01f)]
+    public float portalContinuationDistance = 4f;
+    [Range(1f, 179f)]
+    public float portalSpreadAngle = 45f;
+    [Min(0)]
+    public int maxPortalDepth = 1;
+
+    [Header("Segment Movement")]
+    public bool useVisibilityWorldMovementBlocking = true;
+
+    [Header("Debug")]
+    public bool debugLogDetectionSource;
 
     public VisionResult EvaluateVisibility(
         Vector2 observerPosition,
@@ -36,6 +68,23 @@ public class EnemyVision : MonoBehaviour
     {
         VisionResult result = new VisionResult();
         if (playerRoot == null)
+            return result;
+
+        if (useVisibilityWorld &&
+            TryEvaluateVisibilityWorld(
+                observerPosition,
+                observerForward,
+                playerPosition,
+                viewDistance,
+                viewAngleDegrees,
+                wallLayer,
+                requireOpenWindow,
+                out result))
+        {
+            return result;
+        }
+
+        if (useVisibilityWorld && requireActualVisibilityPolygonContainment)
             return result;
 
         Vector2 toPlayer = playerPosition - observerPosition;
@@ -98,6 +147,12 @@ public class EnemyVision : MonoBehaviour
         if (distance <= 0.0001f)
             return true;
 
+        if (useVisibilityWorldMovementBlocking &&
+            TryHasClearVisibilityWorldMovementLine(from, to, ignoredCollider, out bool visibilityWorldClear))
+        {
+            return visibilityWorldClear;
+        }
+
         int hitCount = Physics2D.RaycastNonAlloc(from, delta.normalized, hitBuffer, distance, wallLayer);
         if (hitCount <= 0)
             return true;
@@ -116,6 +171,150 @@ public class EnemyVision : MonoBehaviour
         }
 
         return true;
+    }
+
+    private bool TryEvaluateVisibilityWorld(
+        Vector2 observerPosition,
+        Vector2 observerForward,
+        Vector2 playerPosition,
+        float viewDistance,
+        float viewAngleDegrees,
+        LayerMask obstacleMask,
+        bool requireOpenWindow,
+        out VisionResult result)
+    {
+        result = new VisionResult();
+        VisibilityWorld world = VisibilityWorld.GetOrCreate();
+        if (world == null)
+            return false;
+
+        world.RebuildIfDirty();
+        if (world.Segments.Count == 0)
+            return false;
+
+        visibilitySampler.Sample(
+            visibilitySnapshot,
+            observerPosition,
+            observerForward,
+            viewAngleDegrees,
+            viewDistance,
+            Mathf.Max(2, baseRayCount),
+            Mathf.Max(baseRayCount, maxRayCount),
+            edgeRefinementIterations,
+            edgeDistanceThreshold,
+            obstacleMask,
+            false,
+            transform,
+            world,
+            false,
+            allowWindowPortals,
+            portalExitOffset,
+            portalContinuationDistance,
+            portalSpreadAngle,
+            maxPortalDepth);
+
+        if (!visibilitySnapshot.TryGetDetectionInfo(
+                playerPosition,
+                out VisionDetectionSource source,
+                out PortalVisionPolygon portalPolygon))
+        {
+            if (debugLogDetectionSource)
+                Debug.Log("[EnemyVision] Segment detection=false Source=None", this);
+            return true;
+        }
+
+        if (requireOpenWindow &&
+            source != VisionDetectionSource.Direct &&
+            source != VisionDetectionSource.OpenWindowPortal)
+        {
+            if (debugLogDetectionSource)
+                Debug.Log("[EnemyVision] Segment detection=false Source=" + source, this);
+            return true;
+        }
+
+        result.isVisible = true;
+        result.usedWindowPortal = source == VisionDetectionSource.OpenWindowPortal;
+        result.detectedRoom = RoomManager.GetRoomAtPosition(playerPosition);
+        if (portalPolygon != null)
+        {
+            result.usedWindow = portalPolygon.portal as WindowPortal;
+            result.samplePoint = portalPolygon.portalHitPoint;
+            if (result.usedWindow != null && result.usedWindow.ownerRoom != null)
+                result.detectedRoom = result.usedWindow.ownerRoom;
+        }
+
+        if (debugLogDetectionSource)
+            Debug.Log("[EnemyVision] Segment detection=true Source=" + source, this);
+
+        return true;
+    }
+
+    private bool TryHasClearVisibilityWorldMovementLine(
+        Vector2 from,
+        Vector2 to,
+        Collider2D ignoredCollider,
+        out bool isClear)
+    {
+        isClear = true;
+        VisibilityWorld world = VisibilityWorld.Instance != null ? VisibilityWorld.Instance : VisibilityWorld.GetOrCreate();
+        if (world == null)
+            return false;
+
+        world.RebuildIfDirty();
+        if (world.Segments.Count == 0)
+            return false;
+
+        for (int i = 0; i < world.Segments.Count; i++)
+        {
+            VisibilitySegment segment = world.Segments[i];
+            if (!segment.BlocksMovement)
+                continue;
+            if (ignoredCollider != null &&
+                segment.sourceObject != null &&
+                segment.sourceObject == ignoredCollider.gameObject)
+            {
+                continue;
+            }
+
+            if (TryLineSegmentIntersection(from, to, segment.a, segment.b, out float pathT, out float wallT) &&
+                pathT > 0.001f &&
+                pathT < 0.999f &&
+                wallT >= -0.001f &&
+                wallT <= 1.001f)
+            {
+                isClear = false;
+                return true;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool TryLineSegmentIntersection(
+        Vector2 a,
+        Vector2 b,
+        Vector2 c,
+        Vector2 d,
+        out float abT,
+        out float cdT)
+    {
+        abT = 0f;
+        cdT = 0f;
+        Vector2 r = b - a;
+        Vector2 s = d - c;
+        float denominator = Cross(r, s);
+        if (Mathf.Abs(denominator) <= 0.000001f)
+            return false;
+
+        Vector2 difference = c - a;
+        abT = Cross(difference, s) / denominator;
+        cdT = Cross(difference, r) / denominator;
+        return abT >= -0.001f && abT <= 1.001f && cdT >= -0.001f && cdT <= 1.001f;
+    }
+
+    private static float Cross(Vector2 left, Vector2 right)
+    {
+        return left.x * right.y - left.y * right.x;
     }
 
     public bool HasClearLineToTarget(

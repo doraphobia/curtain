@@ -11,6 +11,8 @@ namespace DuoCurtain.Vision
         private readonly List<VisionRaySample> coarseSamples = new List<VisionRaySample>(128);
         private readonly List<float> candidateAngles = new List<float>(256);
         private readonly List<VisibilitySegment> relevantSegments = new List<VisibilitySegment>(256);
+        private readonly List<VisibilitySegment> portalRelevantSegments = new List<VisibilitySegment>(256);
+        private readonly List<int> portalSourceIds = new List<int>(16);
         private readonly RaycastHit2D[] hitBuffer = new RaycastHit2D[32];
         private ContactFilter2D contactFilter;
 
@@ -28,7 +30,12 @@ namespace DuoCurtain.Vision
             bool hitTriggers,
             Transform ignoredRoot,
             VisibilityWorld visibilityWorld,
-            bool fallbackToPhysicsWhenNoSegments)
+            bool fallbackToPhysicsWhenNoSegments,
+            bool allowWindowPortals = true,
+            float portalExitOffset = 0.05f,
+            float portalContinuationDistance = 4f,
+            float portalSpreadAngle = 45f,
+            int maxPortalDepth = 1)
         {
             if (visibilityWorld != null)
             {
@@ -39,7 +46,8 @@ namespace DuoCurtain.Vision
                     forward,
                     viewAngleDegrees,
                     viewDistance,
-                    ignoredRoot);
+                    ignoredRoot,
+                    relevantSegments);
 
                 if (relevantSegments.Count > 0)
                 {
@@ -52,6 +60,17 @@ namespace DuoCurtain.Vision
                         rayCount,
                         maxRayCount,
                         relevantSegments);
+                    BuildPortalContinuations(
+                        snapshot,
+                        visibilityWorld.Segments,
+                        ignoredRoot,
+                        rayCount,
+                        maxRayCount,
+                        allowWindowPortals,
+                        portalExitOffset,
+                        portalContinuationDistance,
+                        portalSpreadAngle,
+                        maxPortalDepth);
                     return;
                 }
             }
@@ -282,8 +301,22 @@ namespace DuoCurtain.Vision
                     continue;
                 }
 
-                if (distanceAlongRay < 0f || distanceAlongRay > viewDistance || distanceAlongRay >= nearestDistance)
+                if (distanceAlongRay < 0f || distanceAlongRay > viewDistance)
                     continue;
+
+                bool tiedWithCurrent = hasHit && Mathf.Abs(distanceAlongRay - nearestDistance) <= 0.0005f;
+                if (hasHit && distanceAlongRay > nearestDistance && !tiedWithCurrent)
+                    continue;
+
+                if (tiedWithCurrent)
+                {
+                    if (!ShouldPreferSegment(segment, nearestSegment))
+                        continue;
+                }
+                else if (hasHit && distanceAlongRay >= nearestDistance)
+                {
+                    continue;
+                }
 
                 nearestDistance = distanceAlongRay;
                 nearestPoint = origin + direction * distanceAlongRay;
@@ -326,9 +359,11 @@ namespace DuoCurtain.Vision
             Vector2 forward,
             float viewAngleDegrees,
             float viewDistance,
-            Transform ignoredRoot)
+            Transform ignoredRoot,
+            List<VisibilitySegment> results,
+            int ignoredSegmentSourceId = 0)
         {
-            relevantSegments.Clear();
+            results.Clear();
             if (worldSegments == null)
                 return;
 
@@ -341,6 +376,8 @@ namespace DuoCurtain.Vision
             {
                 VisibilitySegment segment = worldSegments[i];
                 if (!segment.BlocksVision)
+                    continue;
+                if (ignoredSegmentSourceId != 0 && segment.sourceId == ignoredSegmentSourceId)
                     continue;
 
                 if (ignoredRoot != null &&
@@ -357,8 +394,137 @@ namespace DuoCurtain.Vision
                     continue;
                 }
 
-                relevantSegments.Add(segment);
+                results.Add(segment);
             }
+        }
+
+        private void BuildPortalContinuations(
+            VisionSnapshot snapshot,
+            IReadOnlyList<VisibilitySegment> worldSegments,
+            Transform ignoredRoot,
+            int rayCount,
+            int maxRayCount,
+            bool allowWindowPortals,
+            float portalExitOffset,
+            float portalContinuationDistance,
+            float portalSpreadAngle,
+            int maxPortalDepth)
+        {
+            if (snapshot == null ||
+                worldSegments == null ||
+                maxPortalDepth <= 0 ||
+                !allowWindowPortals)
+            {
+                return;
+            }
+
+            portalSourceIds.Clear();
+            bool addedPortal = false;
+            for (int i = 0; i < snapshot.RaySamples.Count; i++)
+            {
+                VisionRaySample sample = snapshot.RaySamples[i];
+                if (!sample.hit || !VisibilityWorld.IsPortalType(sample.visibilitySegmentType))
+                    continue;
+                if (sample.visibilitySegmentType != VisibilitySegmentType.OpenWindow &&
+                    sample.visibilitySegmentType != VisibilitySegmentType.Portal)
+                    continue;
+                if (sample.visibilitySegmentSourceId != 0 &&
+                    portalSourceIds.Contains(sample.visibilitySegmentSourceId))
+                {
+                    continue;
+                }
+
+                IVisionPortal portal = ResolvePortal(sample);
+                if (portal == null || !portal.IsPortalOpen)
+                    continue;
+                if (!portal.CanPassVision(snapshot.origin, sample.direction))
+                    continue;
+
+                VisionPortalExit portalExit = portal.GetExit(snapshot.origin, sample.direction);
+                Vector2 exitNormal = portalExit.origin - sample.point;
+                if (exitNormal.sqrMagnitude <= 0.000001f)
+                    exitNormal = portalExit.forward;
+                exitNormal = exitNormal.sqrMagnitude > 0.000001f
+                    ? exitNormal.normalized
+                    : sample.direction.normalized;
+                float effectiveExitOffset = Mathf.Max(
+                    Mathf.Max(0.001f, portalExitOffset),
+                    Vector2.Distance(sample.point, portalExit.origin));
+                Vector2 exitOrigin = sample.point + exitNormal * effectiveExitOffset;
+                Vector2 exitForward = portalExit.forward.sqrMagnitude > 0.000001f
+                    ? portalExit.forward.normalized
+                    : sample.direction.normalized;
+                float distance = Mathf.Min(
+                    Mathf.Max(0.01f, portalExit.maxDistance),
+                    Mathf.Max(0.01f, portalContinuationDistance));
+                float angle = Mathf.Clamp(portalSpreadAngle, 1f, 179f);
+
+                CollectRelevantBlockingSegments(
+                    worldSegments,
+                    exitOrigin,
+                    exitForward,
+                    angle,
+                    distance,
+                    ignoredRoot,
+                    portalRelevantSegments,
+                    sample.visibilitySegmentSourceId);
+
+                VisionSnapshot portalSnapshot = new VisionSnapshot();
+                SampleSegments(
+                    portalSnapshot,
+                    exitOrigin,
+                    exitForward,
+                    angle,
+                    distance,
+                    Mathf.Max(4, rayCount / 2),
+                    Mathf.Max(8, maxRayCount / 2),
+                    portalRelevantSegments);
+
+                if (portalSnapshot.IsValid)
+                {
+                    snapshot.AddPortalPolygon(
+                        portal,
+                        sample.point,
+                        exitOrigin,
+                        portalSnapshot.VisibilityPolygon,
+                        portalExit.targetRoomId,
+                        sample.visibilitySegmentType == VisibilitySegmentType.OpenWindow
+                            ? VisionDetectionSource.OpenWindowPortal
+                            : VisionDetectionSource.OpenDoorPortal);
+                    addedPortal = true;
+                }
+
+                if (sample.visibilitySegmentSourceId != 0)
+                    portalSourceIds.Add(sample.visibilitySegmentSourceId);
+            }
+
+            if (addedPortal)
+                snapshot.Complete();
+        }
+
+        private static IVisionPortal ResolvePortal(VisionRaySample sample)
+        {
+            if (sample.visibilitySourceComponent is IVisionPortal componentPortal)
+                return componentPortal;
+            if (sample.visibilitySourceObject == null)
+                return null;
+            return sample.visibilitySourceObject.GetComponent<IVisionPortal>();
+        }
+
+        private static bool ShouldPreferSegment(VisibilitySegment candidate, VisibilitySegment current)
+        {
+            if (candidate.IsPortal != current.IsPortal)
+                return candidate.IsPortal;
+
+            if (current.type == VisibilitySegmentType.Wall)
+            {
+                return candidate.type == VisibilitySegmentType.OpenWindow ||
+                       candidate.type == VisibilitySegmentType.ClosedWindow ||
+                       candidate.type == VisibilitySegmentType.ClosedDoor ||
+                       candidate.type == VisibilitySegmentType.Portal;
+            }
+
+            return false;
         }
 
         private static bool SegmentCouldIntersectCone(

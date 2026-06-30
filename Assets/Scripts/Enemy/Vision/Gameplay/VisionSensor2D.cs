@@ -43,6 +43,17 @@ namespace DuoCurtain.Vision
         public VisibilityWorld visibilityWorld;
         public bool fallbackToPhysicsWhenNoVisibilitySegments = true;
 
+        [Header("Portals")]
+        public bool allowWindowPortals = true;
+        [Min(0.001f)]
+        public float portalExitOffset = 0.05f;
+        [Min(0.01f)]
+        public float portalContinuationDistance = 4f;
+        [Range(1f, 179f)]
+        public float portalSpreadAngle = 45f;
+        [Min(0)]
+        public int maxPortalDepth = 1;
+
         private readonly VisionSnapshot latestSnapshot = new VisionSnapshot();
         private readonly RadialVisionSampler2D sampler = new RadialVisionSampler2D();
         private float nextSampleTime;
@@ -97,7 +108,12 @@ namespace DuoCurtain.Vision
                     hitTriggers,
                     transform,
                     resolvedWorld,
-                    fallbackToPhysicsWhenNoVisibilitySegments);
+                    fallbackToPhysicsWhenNoVisibilitySegments,
+                    allowWindowPortals,
+                    portalExitOffset,
+                    portalContinuationDistance,
+                    portalSpreadAngle,
+                    maxPortalDepth);
             }
             else
             {
@@ -156,6 +172,10 @@ namespace DuoCurtain.Vision
             edgeRefinementIterations = Mathf.Clamp(edgeRefinementIterations, 0, 8);
             edgeDistanceThreshold = Mathf.Max(0f, edgeDistanceThreshold);
             updateFrequency = Mathf.Max(0f, updateFrequency);
+            portalExitOffset = Mathf.Max(0.001f, portalExitOffset);
+            portalContinuationDistance = Mathf.Max(0.01f, portalContinuationDistance);
+            portalSpreadAngle = Mathf.Clamp(portalSpreadAngle, 1f, 179f);
+            maxPortalDepth = Mathf.Max(0, maxPortalDepth);
         }
     }
 }

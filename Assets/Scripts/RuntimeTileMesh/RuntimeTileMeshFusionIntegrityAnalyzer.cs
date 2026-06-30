@@ -203,13 +203,13 @@ namespace DuoCurtain.RuntimeTileMesh
                     snapshot.worldTiles);
             }
 
-            int expectedVertices = snapshot.worldTileCount * 4;
+            int expectedVertices = GetExpectedMeshVertexCount(snapshot, settings);
             if (snapshot.worldTileCount > 0 &&
                 snapshot.meshVertexCount > 0 &&
                 snapshot.meshVertexCount != expectedVertices)
             {
                 AddIssue(issues, IssueMeshVertexMismatch,
-                    snapshot.blockName + " expected " + expectedVertices + " grid vertices for " +
+                    snapshot.blockName + " expected " + expectedVertices + " optimized mesh vertices for " +
                     snapshot.worldTileCount + " tile(s), got " + snapshot.meshVertexCount + ".",
                     snapshot.worldTiles);
             }
@@ -262,7 +262,6 @@ namespace DuoCurtain.RuntimeTileMesh
 
             report.expectedTileCount = report.tileAccounting.expectedUnionTileCount;
             report.actualTileCount = report.tileAccounting.actualMergedTileCount;
-            report.expectedVertexCount = report.expectedTileCount * 4;
 
             for (int i = 0; i < groupBlocks.Count; i++)
             {
@@ -276,6 +275,8 @@ namespace DuoCurtain.RuntimeTileMesh
                 FusionIntegrityBlockSnapshot after = CaptureBlockSnapshot(seed, gridSize, gridOrigin, seedBuildResult);
                 report.afterBlocks.Add(after);
                 report.actualVertexCount = after.meshVertexCount;
+                if (seed.View != null)
+                    report.expectedVertexCount = GetExpectedMeshVertexCount(after, seed.View.CreateSettings());
             }
 
             ApplyTileAccountingIssues(report.tileAccounting, seed != null ? seed.name : "seed", report.issues);
@@ -471,11 +472,13 @@ namespace DuoCurtain.RuntimeTileMesh
             report.afterBlocks.Add(snapshot);
             report.expectedTileCount = snapshot.worldTileCount;
             report.actualTileCount = snapshot.worldTileCount;
-            report.expectedVertexCount = snapshot.worldTileCount * 4;
             report.actualVertexCount = snapshot.meshVertexCount;
 
             if (block != null && block.View != null)
+            {
+                report.expectedVertexCount = GetExpectedMeshVertexCount(snapshot, block.View.CreateSettings());
                 AnalyzeBlockSnapshot(snapshot, block.View.CreateSettings(), report.issues);
+            }
 
             report.issueCount = report.issues.Count;
             return report;
@@ -519,7 +522,6 @@ namespace DuoCurtain.RuntimeTileMesh
 
             report.expectedTileCount = union.Count;
             report.actualTileCount = union.Count;
-            report.expectedVertexCount = union.Count * 4;
             report.issueCount = report.issues.Count;
             return report;
         }
@@ -692,6 +694,23 @@ namespace DuoCurtain.RuntimeTileMesh
             RuntimeTileMeshData meshData = new RuntimeTileMeshData();
             TileGridMeshGenerator.TryBuild(tiles, settings, meshData, out _);
             return meshData;
+        }
+
+        private static int GetExpectedMeshVertexCount(
+            FusionIntegrityBlockSnapshot snapshot,
+            RuntimeTileMeshSettings settings)
+        {
+            if (snapshot == null || snapshot.worldTileCount <= 0)
+                return 0;
+
+            if (snapshot.worldTiles != null && snapshot.worldTiles.Count > 0)
+            {
+                RuntimeTileMeshData probe = BuildProbeMesh(snapshot.worldTiles, settings);
+                if (probe != null && probe.vertices.Count > 0)
+                    return probe.vertices.Count;
+            }
+
+            return snapshot.worldTileCount * 4;
         }
 
         private static List<Vector2Int> SortTiles(IEnumerable<Vector2Int> tiles)

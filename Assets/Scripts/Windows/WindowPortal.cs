@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using DuoCurtain.Vision;
 using UnityEngine;
 
 /// <summary>
@@ -6,7 +7,7 @@ using UnityEngine;
 /// Windows are visibility-only; enemies do not path through them.
 /// </summary>
 [DisallowMultipleComponent]
-public class WindowPortal : MonoBehaviour
+public class WindowPortal : MonoBehaviour, IVisionPortal
 {
     [Header("Room")]
     public Room ownerRoom;
@@ -20,6 +21,19 @@ public class WindowPortal : MonoBehaviour
     public Collider2D windowCollider;
     public Transform[] optionalVisionPoints;
 
+    [Header("Vision Portal")]
+    public Vector2 portalCenter;
+    public Vector2 portalTangent = Vector2.up;
+    public Vector2 outwardNormal = Vector2.right;
+    [Min(0.01f)]
+    public float portalLength = 0.82f;
+    [Min(0.001f)]
+    public float portalExitOffset = 0.05f;
+    [Min(0.01f)]
+    public float portalContinuationDistance = 4f;
+    [Range(1f, 179f)]
+    public float portalSpreadAngle = 45f;
+
     public bool IsOpen
     {
         get
@@ -29,6 +43,14 @@ public class WindowPortal : MonoBehaviour
             return manualIsOpen;
         }
     }
+
+    public bool IsPortalOpen => IsOpen;
+    public Vector2 PortalA => GetPortalCenter() - GetPortalTangent() * (Mathf.Max(0.01f, portalLength) * 0.5f);
+    public Vector2 PortalB => GetPortalCenter() + GetPortalTangent() * (Mathf.Max(0.01f, portalLength) * 0.5f);
+    public Vector2 ForwardNormal => GetPortalNormal();
+    public Vector2 BackwardNormal => -GetPortalNormal();
+    public int FrontRoomId => ownerRoom != null ? ownerRoom.GetInstanceID() : 0;
+    public int BackRoomId => 0;
 
     void Awake()
     {
@@ -43,6 +65,43 @@ public class WindowPortal : MonoBehaviour
     {
         if (windowCollider == null)
             windowCollider = GetComponent<Collider2D>();
+        portalLength = Mathf.Max(0.01f, portalLength);
+        portalExitOffset = Mathf.Max(0.001f, portalExitOffset);
+        portalContinuationDistance = Mathf.Max(0.01f, portalContinuationDistance);
+        portalSpreadAngle = Mathf.Clamp(portalSpreadAngle, 1f, 179f);
+    }
+
+    public void ConfigurePortal(Vector2 center, Vector2 tangent, Vector2 normal, float length)
+    {
+        portalCenter = center;
+        portalTangent = tangent.sqrMagnitude > 0.000001f ? tangent.normalized : Vector2.up;
+        outwardNormal = normal.sqrMagnitude > 0.000001f ? normal.normalized : Vector2.right;
+        portalLength = Mathf.Max(0.01f, length);
+    }
+
+    public bool CanPassVision(Vector2 incomingOrigin, Vector2 incomingDirection)
+    {
+        if (!IsOpen || incomingDirection.sqrMagnitude <= 0.000001f)
+            return false;
+
+        return TryGetPortalHitPoint(incomingOrigin, incomingDirection.normalized, out _);
+    }
+
+    public VisionPortalExit GetExit(Vector2 incomingOrigin, Vector2 incomingDirection)
+    {
+        Vector2 safeDirection = incomingDirection.sqrMagnitude > 0.000001f
+            ? incomingDirection.normalized
+            : Vector2.up;
+        Vector2 hitPoint = TryGetPortalHitPoint(incomingOrigin, safeDirection, out Vector2 rayHit)
+            ? rayHit
+            : GetClosestPointOnPortal(incomingOrigin);
+        Vector2 normal = GetExitNormal(incomingOrigin);
+        Vector2 exitOrigin = hitPoint + normal * Mathf.Max(0.001f, portalExitOffset);
+        return new VisionPortalExit(
+            exitOrigin,
+            safeDirection,
+            portalContinuationDistance,
+            GetTargetRoomId(incomingOrigin));
     }
 
     public void CollectVisionSamplePoints(List<Vector2> results, float padding)
@@ -82,5 +141,82 @@ public class WindowPortal : MonoBehaviour
         results.Add(center + new Vector2(extents.x, extents.y));
         results.Add(center + new Vector2(-extents.x, -extents.y));
         results.Add(center + new Vector2(extents.x, -extents.y));
+    }
+
+    private Vector2 GetPortalCenter()
+    {
+        if (portalCenter.sqrMagnitude > 0.000001f)
+            return portalCenter;
+        if (windowCollider != null)
+            return windowCollider.bounds.center;
+        return transform.position;
+    }
+
+    private Vector2 GetPortalTangent()
+    {
+        if (portalTangent.sqrMagnitude > 0.000001f)
+            return portalTangent.normalized;
+        return transform.up;
+    }
+
+    private Vector2 GetPortalNormal()
+    {
+        if (outwardNormal.sqrMagnitude > 0.000001f)
+            return outwardNormal.normalized;
+        return transform.right;
+    }
+
+    private Vector2 GetExitNormal(Vector2 incomingOrigin)
+    {
+        Vector2 center = GetPortalCenter();
+        Vector2 normal = GetPortalNormal();
+        float side = Vector2.Dot(incomingOrigin - center, normal);
+        return side >= 0f ? -normal : normal;
+    }
+
+    private int GetTargetRoomId(Vector2 incomingOrigin)
+    {
+        Vector2 center = GetPortalCenter();
+        Vector2 normal = GetPortalNormal();
+        float side = Vector2.Dot(incomingOrigin - center, normal);
+        return side >= 0f ? BackRoomId : FrontRoomId;
+    }
+
+    private bool TryGetPortalHitPoint(Vector2 origin, Vector2 direction, out Vector2 hitPoint)
+    {
+        hitPoint = Vector2.zero;
+        Vector2 a = PortalA;
+        Vector2 b = PortalB;
+        Vector2 segment = b - a;
+        float denominator = Cross(direction, segment);
+        if (Mathf.Abs(denominator) <= 0.000001f)
+            return false;
+
+        Vector2 difference = a - origin;
+        float rayDistance = Cross(difference, segment) / denominator;
+        float segmentT = Cross(difference, direction) / denominator;
+        if (rayDistance < 0f || segmentT < -0.0001f || segmentT > 1.0001f)
+            return false;
+
+        hitPoint = origin + direction * rayDistance;
+        return true;
+    }
+
+    private Vector2 GetClosestPointOnPortal(Vector2 point)
+    {
+        Vector2 a = PortalA;
+        Vector2 b = PortalB;
+        Vector2 segment = b - a;
+        float lengthSqr = segment.sqrMagnitude;
+        if (lengthSqr <= 0.000001f)
+            return a;
+
+        float t = Mathf.Clamp01(Vector2.Dot(point - a, segment) / lengthSqr);
+        return a + segment * t;
+    }
+
+    private static float Cross(Vector2 a, Vector2 b)
+    {
+        return a.x * b.y - a.y * b.x;
     }
 }

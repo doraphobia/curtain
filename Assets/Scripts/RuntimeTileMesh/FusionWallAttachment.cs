@@ -213,6 +213,11 @@ namespace DuoCurtain.RuntimeTileMesh
                 windowPortal.curtain = hoverScroll;
                 windowPortal.windowCollider = windowCollider;
                 windowPortal.manualIsOpen = startsOpen;
+                windowPortal.ConfigurePortal(
+                    edgeCenter,
+                    tangent,
+                    outwardNormal,
+                    Mathf.Max(0.01f, lengthInCells) * Mathf.Max(0.01f, gridSize));
             }
 
             MarkVisibilityDirty();
