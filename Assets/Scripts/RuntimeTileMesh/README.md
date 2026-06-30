@@ -40,15 +40,20 @@ Triangulation:
 
 Testing:
 
-Use `Assets/Scenes/RuntimeTileMeshTest.unity` as the main manual test scene. It contains
-an interactive fusion sandbox for dragging white connected planes on a `1x1`
-test grid. Hover fades a block red, click selects it blue, movement snaps to
-the grid, and clicking again places it. Placed blocks merge into one new block
-when their occupied cells overlap or share an edge. Diagonal corner-only contact
-stays separate. The blocks use `WorldTile` projection, so the procedural tile
-continues in world space while the runtime mesh changes shape.
+Use `Assets/Scenes/RedScene.unity` as the main development and manual test scene.
+It contains an interactive fusion sandbox for dragging white connected planes on a
+`1x1` test grid. Hover fades a block red, click selects it blue, movement snaps to
+the grid, and clicking again places it. Placed blocks merge into one new block when
+their occupied cells overlap or share an edge. Diagonal corner-only contact stays
+separate. The blocks use `WorldTile` projection, so the procedural tile continues
+in world space while the runtime mesh changes shape.
 
-To rebuild that scene, use `Tools/Duo Curtain/Runtime Tile Mesh/Create Test Scene`.
+Do not use legacy room scenes such as `LogicalCursorIntegration`, `SampleScene`, or
+`newstuff` as the default reference for Fusion gameplay, topology map, camera,
+player, shop, footsteps, or day-night work unless a task explicitly asks for a
+legacy comparison.
+
+To rebuild that scene, use `Tools/Duo Curtain/Runtime Tile Mesh/Create RedScene`.
 To verify the mesh and fusion rules, use `Tools/Duo Curtain/Runtime Tile Mesh/Run Self Test`.
 
 To make a new manual test object:

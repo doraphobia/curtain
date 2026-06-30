@@ -51,6 +51,11 @@ namespace DuoCurtain.RuntimeTileMesh
         public Color wallColor = new Color(0f, 0f, 0f, 0.9f);
         [Min(0.005f)]
         public float wallLineWidth = 0.08f;
+        public bool useWallContrastOutline = true;
+        [Min(1f)]
+        public float wallOutlineWidthMultiplier = 2.35f;
+        [Range(0f, 1f)]
+        public float wallOutlineAlpha = 0.95f;
         [Min(0.01f)]
         public float wallDashLength = 0.28f;
         [Min(0.01f)]
@@ -95,6 +100,8 @@ namespace DuoCurtain.RuntimeTileMesh
             wallCellLength = Mathf.Max(1, wallCellLength);
             doorVariableOffset = Mathf.Clamp(doorVariableOffset, 0, Mathf.Max(0, wallCellLength - 1));
             wallLineWidth = Mathf.Max(0.005f, wallLineWidth);
+            wallOutlineWidthMultiplier = Mathf.Max(1f, wallOutlineWidthMultiplier);
+            wallOutlineAlpha = Mathf.Clamp01(wallOutlineAlpha);
             wallDashLength = Mathf.Max(0.01f, wallDashLength);
             wallGapLength = Mathf.Max(0.01f, wallGapLength);
 
@@ -650,7 +657,9 @@ namespace DuoCurtain.RuntimeTileMesh
             while (cursor < segmentEnd - 0.0001f)
             {
                 float dashEnd = Mathf.Min(segmentEnd, cursor + wallDashLength * safeGridSize);
-                CreateWallDash(startCellOffset, cursor, dashEnd, dashIndex);
+                CreateWallDash(startCellOffset, cursor, dashEnd, dashIndex, true);
+                if (useWallContrastOutline)
+                    CreateWallDash(startCellOffset, cursor, dashEnd, dashIndex, false);
                 cursor = dashEnd + wallGapLength * safeGridSize;
                 dashIndex++;
             }
@@ -660,21 +669,28 @@ namespace DuoCurtain.RuntimeTileMesh
             int startCellOffset,
             float dashStart,
             float dashEnd,
-            int dashIndex)
+            int dashIndex,
+            bool foreground)
         {
-            GameObject dashObject = new GameObject("Wall Dash " + startCellOffset + "-" + dashIndex);
+            GameObject dashObject = new GameObject(
+                foreground
+                    ? "Wall Dash " + startCellOffset + "-" + dashIndex
+                    : "Wall Dash Contrast " + startCellOffset + "-" + dashIndex);
             dashObject.transform.SetParent(wallVisualRoot, false);
 
             LineRenderer line = dashObject.AddComponent<LineRenderer>();
             line.sharedMaterial = GetDoorMaterial();
             line.positionCount = 2;
             line.useWorldSpace = false;
-            line.widthMultiplier = wallLineWidth;
+            line.widthMultiplier = foreground
+                ? wallLineWidth
+                : wallLineWidth * Mathf.Max(1f, wallOutlineWidthMultiplier);
             line.numCapVertices = 0;
             line.numCornerVertices = 0;
-            line.startColor = wallColor;
-            line.endColor = wallColor;
-            line.sortingOrder = 28;
+            Color color = foreground ? wallColor : GetContrastWallColor(wallColor);
+            line.startColor = color;
+            line.endColor = color;
+            line.sortingOrder = foreground ? 29 : 28;
 
             if (axis == DoorAxis.Vertical)
             {
@@ -686,6 +702,14 @@ namespace DuoCurtain.RuntimeTileMesh
                 line.SetPosition(0, new Vector3(dashStart, 0f, 0f));
                 line.SetPosition(1, new Vector3(dashEnd, 0f, 0f));
             }
+        }
+
+        private Color GetContrastWallColor(Color source)
+        {
+            float luminance = source.r * 0.2126f + source.g * 0.7152f + source.b * 0.0722f;
+            Color contrast = luminance > 0.55f ? Color.black : Color.white;
+            contrast.a = wallOutlineAlpha;
+            return contrast;
         }
 
         private struct DoorPanelPose

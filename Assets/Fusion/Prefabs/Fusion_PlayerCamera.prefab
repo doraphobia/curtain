@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 1325904535094284622}
   - component: {fileID: 6347394077563675358}
   - component: {fileID: 4368580785274303087}
+  - component: {fileID: 6910111444082670689}
   m_Layer: 0
   m_Name: Fusion_PlayerCamera
   m_TagString: Untagged
@@ -94,7 +95,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1e8f3d4610ce54c5aa0af3d32f455b56, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DuoCurtain.RuntimeTileMesh.FusionModeCameraRig
   mode: 0
   playerControl: {fileID: 0}
@@ -139,3 +140,11 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!81 &6910111444082670689
+AudioListener:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8790665192844793161}
+  m_Enabled: 1

@@ -1,13 +1,32 @@
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class DayNightCameraWeather : MonoBehaviour
 {
+    [Serializable]
+    public class StageCameraColor
+    {
+        public string stageId = "Day";
+        public Color color = Color.white;
+    }
+
     [Header("Target")]
     public Camera targetCamera;
+
+    [Header("Stage Source")]
+    public StageCycleController stageController;
 
     [Header("Colors")]
     public Color dayColor = Color.white;
     public Color nightColor = Color.black;
+    public List<StageCameraColor> stageColors = new List<StageCameraColor>
+    {
+        new StageCameraColor { stageId = StageIds.DayTop, color = new Color(0.83f, 0.83f, 0.83f, 1f) },
+        new StageCameraColor { stageId = StageIds.DayBottom, color = new Color(0.61f, 0.61f, 0.61f, 1f) },
+        new StageCameraColor { stageId = StageIds.BeforeNight, color = new Color(0.18f, 0.18f, 0.2f, 1f) },
+        new StageCameraColor { stageId = StageIds.Night, color = Color.black }
+    };
 
     [Header("Timing (seconds)")]
     [Tooltip("每次白天/黑夜状态持续多久（包含渐变时间）")]
@@ -23,8 +42,14 @@ public class DayNightCameraWeather : MonoBehaviour
     {
         if (targetCamera == null) targetCamera = Camera.main;
 
-        // 初始设为白天
-        ApplyColorImmediate(dayColor);
+        if (stageController == null)
+            stageController = FindFirstObjectByType<StageCycleController>();
+
+        if (stageController != null)
+            ApplyColorImmediate(ResolveStageColor(stageController.CurrentStageId, dayColor));
+        else
+            ApplyColorImmediate(dayColor);
+
         timer = 0f;
         isDay = true;
     }
@@ -33,6 +58,28 @@ public class DayNightCameraWeather : MonoBehaviour
     {
         if (targetCamera == null) return;
 
+        if (stageController != null)
+        {
+            UpdateFromStageController();
+            return;
+        }
+
+        UpdateFallbackCycle();
+    }
+
+    private void UpdateFromStageController()
+    {
+        Color currentColor = ResolveStageColor(stageController.CurrentStageId, targetCamera.backgroundColor);
+        Color nextColor = ResolveStageColor(stageController.NextStageId, currentColor);
+
+        if (stageController.IsTransitioning)
+            targetCamera.backgroundColor = Color.Lerp(currentColor, nextColor, stageController.TransitionProgress);
+        else
+            ApplyColorImmediate(currentColor);
+    }
+
+    private void UpdateFallbackCycle()
+    {
         // 防呆：避免除以0或负数
         float cd = Mathf.Max(0.01f, cycleDuration);
         float td = Mathf.Clamp(transitionDuration, 0f, cd);
@@ -65,6 +112,21 @@ public class DayNightCameraWeather : MonoBehaviour
             float t = Mathf.InverseLerp(transitionStart, cd, timer); // 0->1
             targetCamera.backgroundColor = Color.Lerp(holdColor, nextColor, t);
         }
+    }
+
+    private Color ResolveStageColor(string stageId, Color fallback)
+    {
+        if (stageColors == null)
+            return fallback;
+
+        for (int i = 0; i < stageColors.Count; i++)
+        {
+            StageCameraColor stageColor = stageColors[i];
+            if (stageColor != null && StageIds.Matches(stageColor.stageId, stageId))
+                return stageColor.color;
+        }
+
+        return fallback;
     }
 
     private void ApplyColorImmediate(Color c)

@@ -27,6 +27,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             failures += ExpectFusionDoorRules();
             failures += ExpectSelectedBlockCarriesPlayer();
             failures += ExpectBlockInfoDescription();
+            failures += ExpectTopologyMapRuntimeFusionFallback();
 
             if (failures == 0)
             {
@@ -355,6 +356,74 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                     Debug.LogError(
                         "[RuntimeTileMeshSelfTest] Block info typed description was incorrect: " +
                         typedDescription);
+                    return 1;
+                }
+
+                return 0;
+            }
+            finally
+            {
+                for (int i = cleanup.Count - 1; i >= 0; i--)
+                {
+                    if (cleanup[i] != null)
+                        UnityEngine.Object.DestroyImmediate(cleanup[i]);
+                }
+            }
+        }
+
+        private static int ExpectTopologyMapRuntimeFusionFallback()
+        {
+            List<GameObject> cleanup = new List<GameObject>();
+            try
+            {
+                GameObject controllerObject = new GameObject("RuntimeTileMeshSelfTest Topology Provider");
+                cleanup.Add(controllerObject);
+                RuntimeTileMeshFusionSandbox sandbox = controllerObject.AddComponent<RuntimeTileMeshFusionSandbox>();
+                sandbox.gridSize = 1f;
+                sandbox.gridOrigin = Vector2.zero;
+
+                CreateSelfTestBlock(
+                    "Topology Runtime Block A",
+                    new[]
+                    {
+                        CreateBlockSpec(new Vector2Int(111, 222)),
+                        CreateBlockSpec(new Vector2Int(112, 222))
+                    },
+                    cleanup);
+                CreateSelfTestBlock(
+                    "Topology Runtime Block B",
+                    new[] { CreateBlockSpec(new Vector2Int(111, 223)) },
+                    cleanup);
+
+                TopologyMapDataProvider provider = controllerObject.AddComponent<TopologyMapDataProvider>();
+                provider.autoFindSource = false;
+                provider.topologyGrid = null;
+                provider.fusionSandbox = sandbox;
+                provider.Refresh(false);
+
+                if (!provider.HasTopology ||
+                    !provider.IsRoomCell(new Vector2Int(111, 222)) ||
+                    !provider.IsRoomCell(new Vector2Int(112, 222)) ||
+                    !provider.IsRoomCell(new Vector2Int(111, 223)))
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] Topology provider did not collect runtime fusion cells.");
+                    return 1;
+                }
+
+                if (!provider.TryGetRoomCell(new Vector3(111.25f, 222.25f, 0f), out Vector2Int roomCell) ||
+                    roomCell != new Vector2Int(111, 222))
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] Topology provider did not resolve a runtime fusion world point to the expected cell.");
+                    return 1;
+                }
+
+                if (!provider.TryGetWorldLogicalPosition(
+                        new Vector3(111.5f, 222.5f, 0f),
+                        out Vector2 logicalPosition,
+                        out _) ||
+                    Vector2.Distance(logicalPosition, new Vector2(111f, 222f)) > 0.0001f)
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] Topology provider did not project runtime fusion world position to map space.");
                     return 1;
                 }
 

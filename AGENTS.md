@@ -6,6 +6,7 @@
 - `TilePlacementGrid.cellSize` must remain `1x5`, with its origin snapped to the same grid.
 - Room visuals are generated as connected whole planes from adjacent registered room cells. Do not rebuild a visual-tile-prefab-per-cell system unless explicitly requested.
 - `RuntimeTileMesh` uses generic `1x1` logical tile coordinates internally; project-specific world size is applied through `tileSize` (for current rooms, `1x5`).
+- `Assets/Scenes/RedScene.unity` is the primary development and design reference scene. Do not use `LogicalCursorIntegration`, `SampleScene`, `newstuff`, or old room scenes as the default reference for new Fusion gameplay, topology map, camera, player, shop, footstep, or day-night work unless the user explicitly asks to compare legacy behavior.
 - `TilePieceDefinition.cells` is the source of truth for a tile footprint. Keep cells explicit for production prefabs; do not let decorative children auto-generate gameplay cells.
 - `Player` is the physical cursor/body and owns blocking, footsteps, and current-block checks.
 - `Heading Point` is the interaction pointer. Hover-to-interact systems such as curtains, drawing zones, placement previews, and UI-like world boxes must query Heading Point, not Player.

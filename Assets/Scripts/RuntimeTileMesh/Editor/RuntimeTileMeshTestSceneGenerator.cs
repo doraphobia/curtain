@@ -13,11 +13,12 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
     [InitializeOnLoad]
     public static class RuntimeTileMeshTestSceneGenerator
     {
-        private const string ScenePath = "Assets/Scenes/RuntimeTileMeshTest.unity";
+        private const string ScenePath = "Assets/Scenes/RedScene.unity";
         private const string DemoFolder = "Assets/Scripts/RuntimeTileMesh/Demo";
         private const string WhiteMaterialPath = DemoFolder + "/RuntimeTileMesh_White.mat";
         private const string ProjectionMaterialPath = DemoFolder + "/RuntimeTileMesh_WorldProjection.mat";
         private const string DefaultFootstepFoleyPath = "Assets/Audio/Foley/DefaultFootstepFoley.asset";
+        private const string NightLoopClipPath = "Assets/art/u_izj2lpy7a6-night-sounds-380287.mp3";
         private const string FusionFolder = "Assets/Fusion";
         private const string FusionPrefabFolder = FusionFolder + "/Prefabs";
         private const string FusionMaterialFolder = FusionFolder + "/Materials";
@@ -75,7 +76,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             TryGenerateSceneFromMarker();
         }
 
-        [MenuItem("Tools/Duo Curtain/Runtime Tile Mesh/Create Test Scene")]
+        [MenuItem("Tools/Duo Curtain/Runtime Tile Mesh/Create RedScene")]
         public static void GenerateSceneAsset()
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode)
@@ -89,7 +90,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             FusionAssetSet fusionAssets = EnsureFusionAssets();
 
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-            scene.name = "RuntimeTileMeshTest";
+            scene.name = "RedScene";
 
             Material material = fusionAssets.blockMaterial != null
                 ? fusionAssets.blockMaterial
@@ -98,6 +99,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                 ? AssetDatabase.LoadAssetAtPath<Material>(ProjectionMaterialPath)
                 : null;
             CreateCameras(fusionAssets, out FusionModeCameraRig playerCamera, out FusionModeCameraRig managementCamera);
+            CreateDayNightSystem(playerCamera, managementCamera);
             CreateInstructionText();
             CreateGridOverlay(material);
             RuntimeTileMeshFusionSandbox sandbox = CreateFusionSandboxController();
@@ -110,7 +112,9 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             CreateFusionBlock("Fusion Block - Z", RuntimeTileMeshDemo.DemoShape.Z, new Vector3(6f, -2f, 0f), material, projectionMaterial);
             Camera activeCamera = playerCamera != null ? playerCamera.Camera : Camera.main;
             PlayerControl playerControl = CreatePlayerControl(sandbox, activeCamera);
+            BindCameraReferences(playerCamera, managementCamera, playerControl, sandbox);
             CreateBlockInfoOverlay(sandbox, activeCamera);
+            CreateTopologyMap(sandbox, playerControl);
             CreateGameModeController(sandbox, playerControl, playerCamera, managementCamera, fusionAssets);
 
             Directory.CreateDirectory(Path.GetDirectoryName(ScenePath));
@@ -159,7 +163,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
         private static void RequestDelayedGeneration()
         {
             Directory.CreateDirectory(Path.GetDirectoryName(MarkerAbsolutePath()));
-            File.WriteAllText(MarkerAbsolutePath(), "generate RuntimeTileMeshTest.unity");
+            File.WriteAllText(MarkerAbsolutePath(), "generate RedScene.unity");
             QueueMarkerGeneration();
         }
 
@@ -452,6 +456,80 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             }
         }
 
+        private static StageCycleController CreateDayNightSystem(
+            FusionModeCameraRig playerCamera,
+            FusionModeCameraRig managementCamera)
+        {
+            GameObject controllerObject = new GameObject("RedScene Day Night Cycle");
+            StageCycleController stageController = controllerObject.AddComponent<StageCycleController>();
+            stageController.stages = new List<StageCycleController.StageDefinition>
+            {
+                new StageCycleController.StageDefinition { id = StageIds.DayTop, duration = 10f },
+                new StageCycleController.StageDefinition { id = StageIds.DayBottom, duration = 10f },
+                new StageCycleController.StageDefinition { id = StageIds.BeforeNight, duration = 3f },
+                new StageCycleController.StageDefinition { id = StageIds.Night, duration = 16f }
+            };
+            stageController.transitionDuration = 1f;
+            stageController.startStageIndex = 0;
+            stageController.nightLoopClip = AssetDatabase.LoadAssetAtPath<AudioClip>(NightLoopClipPath);
+            stageController.nightLoopVolume = 1f;
+            stageController.nightsRequiredForSettlement = 9999;
+            stageController.settlementSceneName = string.Empty;
+
+            ConfigureCameraWeather(playerCamera, stageController);
+            ConfigureCameraWeather(managementCamera, stageController);
+            return stageController;
+        }
+
+        private static void ConfigureCameraWeather(FusionModeCameraRig rig, StageCycleController stageController)
+        {
+            if (rig == null || rig.Camera == null)
+                return;
+
+            Camera camera = rig.Camera;
+            camera.clearFlags = CameraClearFlags.SolidColor;
+
+            DayNightCameraWeather weather = rig.GetComponent<DayNightCameraWeather>();
+            if (weather == null)
+                weather = rig.gameObject.AddComponent<DayNightCameraWeather>();
+
+            weather.targetCamera = camera;
+            weather.stageController = stageController;
+            weather.dayColor = new Color(0.83f, 0.83f, 0.83f, 1f);
+            weather.nightColor = Color.black;
+            weather.cycleDuration = 10f;
+            weather.transitionDuration = 1f;
+            weather.stageColors = new List<DayNightCameraWeather.StageCameraColor>
+            {
+                new DayNightCameraWeather.StageCameraColor { stageId = StageIds.DayTop, color = new Color(0.83f, 0.83f, 0.83f, 1f) },
+                new DayNightCameraWeather.StageCameraColor { stageId = StageIds.DayBottom, color = new Color(0.61f, 0.61f, 0.61f, 1f) },
+                new DayNightCameraWeather.StageCameraColor { stageId = StageIds.BeforeNight, color = new Color(0.18f, 0.18f, 0.2f, 1f) },
+                new DayNightCameraWeather.StageCameraColor { stageId = StageIds.Night, color = Color.black }
+            };
+        }
+
+        private static void BindCameraReferences(
+            FusionModeCameraRig playerCamera,
+            FusionModeCameraRig managementCamera,
+            PlayerControl playerControl,
+            RuntimeTileMeshFusionSandbox sandbox)
+        {
+            ConfigureCameraReferences(playerCamera, playerControl, sandbox);
+            ConfigureCameraReferences(managementCamera, playerControl, sandbox);
+        }
+
+        private static void ConfigureCameraReferences(
+            FusionModeCameraRig rig,
+            PlayerControl playerControl,
+            RuntimeTileMeshFusionSandbox sandbox)
+        {
+            if (rig == null)
+                return;
+
+            rig.playerControl = playerControl;
+            rig.fusionSandbox = sandbox;
+        }
+
         private static void SetSceneCameraAudioListener(FusionModeCameraRig rig, bool enabled)
         {
             if (rig == null || rig.Camera == null)
@@ -575,7 +653,8 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             control.playerCollisionRadius = 0.22f;
             control.driveCameraFromCursorOffset = false;
             control.maxCursorMoveSpeed = 5.5f;
-            control.worldDistancePerFootstep = 1.1f;
+            control.worldDistancePerFootstep = 0.68f;
+            control.minSecondsBetweenFootsteps = 0.055f;
             control.footstepSurfaceIdOverride = "Concrete";
 
             FoleyProfile profile = AssetDatabase.LoadAssetAtPath<FoleyProfile>(DefaultFootstepFoleyPath);
@@ -588,6 +667,8 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             control.footstepFoleyPlayer = foleyPlayer;
 
             FoleyStepClock stepClock = controllerObject.AddComponent<FoleyStepClock>();
+            stepClock.distancePerStep = control.worldDistancePerFootstep;
+            stepClock.minSecondsBetweenSteps = control.minSecondsBetweenFootsteps;
             control.stepClock = stepClock;
             sandbox.playerControl = control;
             sandbox.carryPlayerWithSelectedBlock = true;
@@ -616,6 +697,39 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             overlay.labelSize = new Vector2(82f, 51f);
             overlay.topRightInset = new Vector2(8f, -8f);
             overlay.textColor = Color.black;
+        }
+
+        private static void CreateTopologyMap(RuntimeTileMeshFusionSandbox sandbox, PlayerControl playerControl)
+        {
+            GameObject mapObject = new GameObject("Topology Map System");
+            TopologyMapDataProvider provider = mapObject.AddComponent<TopologyMapDataProvider>();
+            provider.topologyGrid = null;
+            provider.fusionSandbox = sandbox;
+            provider.autoFindSource = true;
+            provider.useRuntimeFusionFallback = true;
+            provider.refreshOnEnable = true;
+            provider.pollForExternalChanges = true;
+
+            TopologyMapRenderer renderer = mapObject.AddComponent<TopologyMapRenderer>();
+            renderer.dataProvider = provider;
+            renderer.placementGrid = null;
+            renderer.playerControl = playerControl;
+            renderer.autoBindReferences = true;
+            renderer.createProviderIfMissing = true;
+            renderer.createCanvasIfMissing = true;
+            renderer.visible = true;
+            renderer.rebuildOnEnable = true;
+            renderer.renderMode = TopologyMapRenderMode.EntireBuilding;
+            renderer.defaultMapSize = new Vector2(220f, 180f);
+            renderer.defaultAnchoredPosition = new Vector2(-32f, -32f);
+            renderer.padding = 18f;
+            renderer.cellSpacing = 1.5f;
+            renderer.backgroundColor = new Color(0.68f, 0.68f, 0.68f, 0.82f);
+            renderer.roomColor = Color.white;
+            renderer.currentRoomColor = new Color(1f, 0.94f, 0.42f, 1f);
+            renderer.frameColor = Color.black;
+            renderer.playerMarkerColor = Color.black;
+            renderer.playerMarkerSize = 9f;
         }
 
         private static void CreateGameModeController(

@@ -65,8 +65,8 @@ namespace DuoCurtain.RuntimeTileMesh
         public RectTransform shopPanelRoot;
         public RectTransform shopContentRoot;
         public TextMeshProUGUI shopConfirmationText;
-        public string confirmPurchaseFormat = "你是否要购买 {0}? 再次点击确认";
-        public string cannotAffordFormat = "金钱不足: {0}";
+        public string confirmPurchaseFormat = "Buy {0}? Click again to confirm.";
+        public string cannotAffordFormat = "Not enough money: {0}";
         public Vector2 shopPanelSize = new Vector2(360f, 460f);
         public Vector2 shopPanelAnchoredPosition = new Vector2(-32f, -112f);
         public Color shopPanelColor = new Color(0f, 0f, 0f, 0.72f);
