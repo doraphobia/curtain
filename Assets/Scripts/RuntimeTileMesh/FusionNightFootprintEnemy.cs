@@ -93,6 +93,14 @@ namespace DuoCurtain.RuntimeTileMesh
         public int runtimeVisionSortingOrder = 52;
         public float runtimeVisionZOffset = -0.2f;
 
+        [Header("Vision Alert Feedback")]
+        public bool useVisionAlertColorProgress = true;
+        [Min(0.05f)]
+        public float visionAlertConfirmSeconds = 1f;
+        [Min(0.01f)]
+        public float visionAlertFadeSeconds = 0.45f;
+        public Color visionAlertColor = new Color(1f, 0.12f, 0.06f, 0.62f);
+
         [Header("Legacy Vision Line Fallback")]
         public bool showWindowProjection = true;
         public Material visionLineMaterial;
@@ -124,6 +132,7 @@ namespace DuoCurtain.RuntimeTileMesh
         private bool windowSanityDamageApplied;
         private float lastContactDamageTime = -999f;
         private Vector2 lastMoveDirection = Vector2.up;
+        private float visionAlertProgress;
 
         public TraceEnemyState CurrentState => currentState;
 
@@ -592,14 +601,64 @@ namespace DuoCurtain.RuntimeTileMesh
                 return;
             }
 
-            Color primary = confirmedPlayerByVision ? detectedVisionColor : searchingVisionColor;
-            Color secondary = confirmedPlayerByVision
-                ? new Color(detectedVisionColor.r, detectedVisionColor.g, detectedVisionColor.b, Mathf.Min(1f, detectedVisionColor.a * 1.35f))
-                : new Color(searchingVisionColor.r, searchingVisionColor.g, searchingVisionColor.b, Mathf.Min(1f, searchingVisionColor.a * 1.6f));
-            visionRenderController.renderParameters.primaryColor = primary;
-            visionRenderController.renderParameters.secondaryColor = secondary;
             visionSensor.SetForward(lastMoveDirection);
             visionSensor.ForceSample();
+
+            bool seesPlayer = CanSeePlayerWithRuntimeVision();
+            UpdateVisionAlertProgress(seesPlayer);
+
+            Color primary;
+            Color secondary;
+            if (useVisionAlertColorProgress)
+            {
+                primary = Color.Lerp(searchingVisionColor, visionAlertColor, visionAlertProgress);
+                secondary = new Color(primary.r, primary.g, primary.b, Mathf.Min(1f, primary.a * 1.45f));
+            }
+            else
+            {
+                primary = confirmedPlayerByVision ? detectedVisionColor : searchingVisionColor;
+                secondary = confirmedPlayerByVision
+                    ? new Color(detectedVisionColor.r, detectedVisionColor.g, detectedVisionColor.b, Mathf.Min(1f, detectedVisionColor.a * 1.35f))
+                    : new Color(searchingVisionColor.r, searchingVisionColor.g, searchingVisionColor.b, Mathf.Min(1f, searchingVisionColor.a * 1.6f));
+            }
+
+            visionRenderController.renderParameters.primaryColor = primary;
+            visionRenderController.renderParameters.secondaryColor = secondary;
+            visionRenderController.Render(visionSensor.LatestSnapshot);
+        }
+
+        private bool CanSeePlayerWithRuntimeVision()
+        {
+            if (visionSensor == null || playerControl == null || !playerControl.HasPlayerWorldPosition)
+                return false;
+
+            return visionSensor.CanSeeWorldPoint(playerControl.PlayerWorldPosition);
+        }
+
+        private void UpdateVisionAlertProgress(bool seesPlayer)
+        {
+            bool lockedAlert =
+                confirmedPlayerByVision ||
+                currentState == TraceEnemyState.TargetingDoor ||
+                currentState == TraceEnemyState.BreakingDoor ||
+                currentState == TraceEnemyState.EnteredRoom ||
+                currentState == TraceEnemyState.ChasingPlayer;
+
+            if (lockedAlert)
+            {
+                visionAlertProgress = 1f;
+                return;
+            }
+
+            if (seesPlayer)
+            {
+                float duration = Mathf.Max(0.05f, visionAlertConfirmSeconds);
+                visionAlertProgress = Mathf.Clamp01(visionAlertProgress + Time.deltaTime / duration);
+                return;
+            }
+
+            float fadeDuration = Mathf.Max(0.01f, visionAlertFadeSeconds);
+            visionAlertProgress = Mathf.Clamp01(visionAlertProgress - Time.deltaTime / fadeDuration);
         }
 
         private void EnsureVisionSystem()

@@ -50,6 +50,13 @@ public class PlayerControl : MonoBehaviour
     public bool showPlayerAtHeadingPointOverUI = false;
     public bool spawnAtRandomRuntimeTileBlockCenter = false;
 
+    [Header("Startup Safety")]
+    public bool waitForRuntimeTileSpawnBeforeMouseFallback = true;
+    [Min(0f)]
+    public float runtimeTileSpawnWaitSeconds = 3f;
+    [Min(0f)]
+    public float startupInputLockSeconds = 0.35f;
+
     [Header("Player Collision")]
     public bool usePlayerCollisionRadius = true;
     [Min(0f)]
@@ -184,6 +191,9 @@ public class PlayerControl : MonoBehaviour
     private bool playerIsOutsideRuntimeRoom;
     private TextMeshProUGUI outdoorWarningText;
     private Canvas outdoorWarningCanvas;
+    private bool runtimeSpawnWaitStarted;
+    private float runtimeSpawnWaitDeadline;
+    private float startupInputUnlockTime;
 
     public Vector3 PlayerWorldPosition => currentWorldPosition;
     public Vector3 CurrentWorldPosition => PlayerWorldPosition;
@@ -260,7 +270,7 @@ public class PlayerControl : MonoBehaviour
         lastPointerOverUI = IsPointerOverUI();
         float deltaTime = useUnscaledTime ? Time.unscaledDeltaTime : Time.deltaTime;
 
-        if (headingPointInputEnabled)
+        if (headingPointInputEnabled && hasWorldPosition)
         {
             UpdateHeadingPoint();
         }
@@ -429,12 +439,27 @@ public class PlayerControl : MonoBehaviour
         ResolveFootstepAudioSource();
     }
 
-    private void InitializeWorldPosition()
+    private bool InitializeWorldPosition()
     {
         if (hasWorldPosition || targetCamera == null)
-            return;
+            return hasWorldPosition;
 
-        Vector3 startWorld = ScreenToWorld(Input.mousePosition);
+        Vector3 startWorld;
+        if (spawnAtRandomRuntimeTileBlockCenter &&
+            runtimeTileWalkableArea != null &&
+            runtimeTileWalkableArea.TryGetRandomBlockCenter(out Vector3 runtimeSpawnWorld))
+        {
+            CompleteWorldPositionInitialization(runtimeSpawnWorld, true);
+            return true;
+        }
+
+        if (ShouldWaitForRuntimeTileSpawn())
+        {
+            currentCursorSpeed = 0f;
+            return false;
+        }
+
+        startWorld = ScreenToWorld(Input.mousePosition);
         if (clampCursorToRoom && ShouldUseRuntimeTileWalkableAreaFirst())
         {
             if (spawnAtRandomRuntimeTileBlockCenter && runtimeTileWalkableArea.TryGetRandomBlockCenter(out Vector3 spawnWorld))
@@ -454,9 +479,42 @@ public class PlayerControl : MonoBehaviour
                 startWorld = runtimeTileWalkableArea.ClampPlayerWorldPoint(startWorld, startWorld, PlayerCollisionRadius);
         }
 
-        startWorld.z = 0f;
-        currentWorldPosition = startWorld;
+        CompleteWorldPositionInitialization(startWorld, true);
+        return true;
+    }
+
+    private bool ShouldWaitForRuntimeTileSpawn()
+    {
+        if (!waitForRuntimeTileSpawnBeforeMouseFallback ||
+            !spawnAtRandomRuntimeTileBlockCenter ||
+            runtimeTileWalkableArea == null ||
+            runtimeTileSpawnWaitSeconds <= 0f)
+        {
+            return false;
+        }
+
+        if (runtimeTileWalkableArea.HasWalkableCells)
+            return false;
+
+        if (!runtimeSpawnWaitStarted)
+        {
+            runtimeSpawnWaitStarted = true;
+            runtimeSpawnWaitDeadline = Time.unscaledTime + runtimeTileSpawnWaitSeconds;
+        }
+
+        return Time.unscaledTime <= runtimeSpawnWaitDeadline;
+    }
+
+    private void CompleteWorldPositionInitialization(Vector3 worldPosition, bool lockStartupInput)
+    {
+        worldPosition.z = 0f;
+        currentWorldPosition = worldPosition;
         hasWorldPosition = true;
+        playerIsOutsideRuntimeRoom = IsOutsideRuntimeRoomAt(currentWorldPosition);
+        runtimeSpawnWaitStarted = false;
+
+        if (lockStartupInput && startupInputLockSeconds > 0f)
+            startupInputUnlockTime = Mathf.Max(startupInputUnlockTime, Time.unscaledTime + startupInputLockSeconds);
     }
 
     private void UpdateHeadingPoint()
@@ -497,7 +555,17 @@ public class PlayerControl : MonoBehaviour
         if (targetCamera == null)
             return 0f;
 
-        InitializeWorldPosition();
+        if (!InitializeWorldPosition())
+        {
+            currentCursorSpeed = 0f;
+            return 0f;
+        }
+
+        if (IsStartupInputLocked())
+        {
+            currentCursorSpeed = 0f;
+            return 0f;
+        }
 
         if (pointerOverUI && freezeWorldCursorWhenPointerOverUI)
         {
@@ -571,6 +639,11 @@ public class PlayerControl : MonoBehaviour
             maxCursorMoveSpeed *
             GetMovementSpeedMultiplier();
         return currentWorldPosition + worldVelocity * Mathf.Max(0f, deltaTime);
+    }
+
+    private bool IsStartupInputLocked()
+    {
+        return startupInputUnlockTime > 0f && Time.unscaledTime < startupInputUnlockTime;
     }
 
     private float GetMovementSpeedMultiplier()

@@ -79,6 +79,8 @@ namespace DuoCurtain.RuntimeTileMesh
         public bool requireContinuousWalkablePath = true;
         [Range(0.05f, 1f)]
         public float pathSampleCellStep = 0.25f;
+        [Min(0f)]
+        public float outdoorBoundarySkin = 0.03f;
 
         [Header("Player Carry")]
         public PlayerControl playerControl;
@@ -953,13 +955,19 @@ namespace DuoCurtain.RuntimeTileMesh
             }
 
             if (!previousInside && !desiredInside &&
-                SegmentTouchesWalkableArea(previousWorldPoint, desiredWorldPoint, playerRadius, walkableCells, out Vector3 lastOutdoorPoint))
+                SegmentTouchesWalkableArea(
+                    previousWorldPoint,
+                    desiredWorldPoint,
+                    playerRadius,
+                    walkableCells,
+                    out _,
+                    out _))
             {
                 if (AllowsDoorwayBoundaryPassage(previousWorldPoint, desiredWorldPoint, playerRadius))
                     return desiredWorldPoint;
 
                 TryBlockDoorMovement(previousWorldPoint, desiredWorldPoint, playerRadius);
-                return lastOutdoorPoint;
+                return ClampSegmentToOutdoorArea(previousWorldPoint, desiredWorldPoint, playerRadius, walkableCells);
             }
 
             return TryBlockDoorMovement(previousWorldPoint, desiredWorldPoint, playerRadius)
@@ -1637,10 +1645,42 @@ namespace DuoCurtain.RuntimeTileMesh
             float clearanceRadius,
             HashSet<Vector2Int> walkableCells)
         {
-            if (!SegmentTouchesWalkableArea(from, to, clearanceRadius, walkableCells, out Vector3 lastOutdoorPoint))
+            if (!SegmentTouchesWalkableArea(
+                    from,
+                    to,
+                    clearanceRadius,
+                    walkableCells,
+                    out Vector3 lastOutdoorPoint,
+                    out Vector3 firstWalkablePoint))
+            {
                 return to;
+            }
 
-            return lastOutdoorPoint;
+            Vector3 low = lastOutdoorPoint;
+            Vector3 high = firstWalkablePoint;
+            for (int i = 0; i < 18; i++)
+            {
+                Vector3 mid = Vector3.Lerp(low, high, 0.5f);
+                if (ContainsWorldPoint(mid, clearanceRadius, walkableCells))
+                    high = mid;
+                else
+                    low = mid;
+            }
+
+            Vector2 away = (Vector2)(low - high);
+            if (away.sqrMagnitude <= 0.000001f)
+                away = (Vector2)(from - to);
+
+            if (away.sqrMagnitude > 0.000001f && outdoorBoundarySkin > 0f)
+            {
+                Vector3 skinned = low + (Vector3)(away.normalized * outdoorBoundarySkin);
+                skinned.z = 0f;
+                if (!ContainsWorldPoint(skinned, clearanceRadius, walkableCells))
+                    return skinned;
+            }
+
+            low.z = 0f;
+            return low;
         }
 
         private bool SegmentTouchesWalkableArea(
@@ -1648,15 +1688,20 @@ namespace DuoCurtain.RuntimeTileMesh
             Vector3 to,
             float clearanceRadius,
             HashSet<Vector2Int> walkableCells,
-            out Vector3 lastOutdoorPoint)
+            out Vector3 lastOutdoorPoint,
+            out Vector3 firstWalkablePoint)
         {
             lastOutdoorPoint = from;
+            firstWalkablePoint = to;
             int steps = GetSegmentSampleCount(from, to);
             for (int i = 1; i <= steps; i++)
             {
                 Vector3 sample = Vector3.Lerp(from, to, i / (float)steps);
                 if (ContainsWorldPoint(sample, clearanceRadius, walkableCells))
+                {
+                    firstWalkablePoint = sample;
                     return true;
+                }
 
                 lastOutdoorPoint = sample;
             }
