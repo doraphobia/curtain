@@ -440,7 +440,7 @@ namespace DuoCurtain.RuntimeTileMesh
             if (motion.sqrMagnitude <= 0.000001f)
                 return false;
 
-            if (TryGetWallCrossingAlongCoordinate(from, to, out float alongCoordinate) &&
+            if (TryGetDoorwaySweepAlongCoordinate(from, to, playerRadius, out float alongCoordinate) &&
                 TryGetWallSegmentIndex(alongCoordinate, out int segmentIndex))
             {
                 if (segmentIndex != doorVariableOffset)
@@ -456,6 +456,8 @@ namespace DuoCurtain.RuntimeTileMesh
 
                 if (!IsDoorwayPassable())
                     return true;
+
+                return false;
             }
 
             DoorPanelPose currentPose = GetCurrentPanelPose();
@@ -487,7 +489,7 @@ namespace DuoCurtain.RuntimeTileMesh
             if (motion.sqrMagnitude <= 0.000001f)
                 return false;
 
-            if (!TryGetWallCrossingAlongCoordinate(from, to, out float alongCoordinate))
+            if (!TryGetDoorwaySweepAlongCoordinate(from, to, playerRadius, out float alongCoordinate))
                 return false;
 
             if (!TryGetWallSegmentIndex(alongCoordinate, out int segmentIndex))
@@ -668,6 +670,49 @@ namespace DuoCurtain.RuntimeTileMesh
                 return false;
 
             float horizontalT = Mathf.Clamp01((horizontalLine - from.y) / dy);
+            alongCoordinate = Mathf.Lerp(from.x, to.x, horizontalT);
+            return true;
+        }
+
+        private bool TryGetDoorwaySweepAlongCoordinate(Vector2 from, Vector2 to, float playerRadius, out float alongCoordinate)
+        {
+            if (TryGetWallCrossingAlongCoordinate(from, to, out alongCoordinate))
+                return true;
+
+            playerRadius = Mathf.Max(0f, playerRadius);
+            float contactDistance = playerRadius + Mathf.Max(0.001f, GetWorldDoorThickness() * 0.5f);
+            if (axis == DoorAxis.Vertical)
+            {
+                float line = seamCenter.x;
+                float fromSide = from.x - line;
+                float toSide = to.x - line;
+                if (Mathf.Min(Mathf.Abs(fromSide), Mathf.Abs(toSide)) > contactDistance)
+                {
+                    alongCoordinate = 0f;
+                    return false;
+                }
+
+                float dx = to.x - from.x;
+                float t = Mathf.Abs(dx) > 0.000001f
+                    ? Mathf.Clamp01((line - from.x) / dx)
+                    : (Mathf.Abs(toSide) <= Mathf.Abs(fromSide) ? 1f : 0f);
+                alongCoordinate = Mathf.Lerp(from.y, to.y, t);
+                return true;
+            }
+
+            float horizontalLine = seamCenter.y;
+            float horizontalFromSide = from.y - horizontalLine;
+            float horizontalToSide = to.y - horizontalLine;
+            if (Mathf.Min(Mathf.Abs(horizontalFromSide), Mathf.Abs(horizontalToSide)) > contactDistance)
+            {
+                alongCoordinate = 0f;
+                return false;
+            }
+
+            float dy = to.y - from.y;
+            float horizontalT = Mathf.Abs(dy) > 0.000001f
+                ? Mathf.Clamp01((horizontalLine - from.y) / dy)
+                : (Mathf.Abs(horizontalToSide) <= Mathf.Abs(horizontalFromSide) ? 1f : 0f);
             alongCoordinate = Mathf.Lerp(from.x, to.x, horizontalT);
             return true;
         }
