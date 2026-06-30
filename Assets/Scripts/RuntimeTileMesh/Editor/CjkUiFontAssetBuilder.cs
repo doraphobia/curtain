@@ -9,13 +9,19 @@ using UnityEngine.TextCore.LowLevel;
 
 namespace DuoCurtain.RuntimeTileMesh.Editor
 {
+    [InitializeOnLoad]
     public static class CjkUiFontAssetBuilder
     {
         public const string SourceFontPath = "Assets/Fusion/Resources/Fonts/Hiragino Sans GB.ttc";
         public const string FontAssetPath = "Assets/Fusion/Resources/Fonts/Cjk UI SDF.asset";
 
         private const string DefaultCharacterSet =
-            "TYPE: 现在你在屋子外面，目前的你很脆弱！ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 -_,.!?";
+            "type: 现在你在屋子外面，目前的你很脆弱！ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 -_,.!?";
+
+        static CjkUiFontAssetBuilder()
+        {
+            EditorApplication.delayCall += () => EnsureFontAsset();
+        }
 
         [MenuItem("Tools/Duo Curtain/Fusion/Rebuild CJK UI TMP Font Asset")]
         public static void RebuildFontAsset()

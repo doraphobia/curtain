@@ -1,10 +1,14 @@
 using TMPro;
 using UnityEngine;
 using UnityEngine.TextCore.LowLevel;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 public static class CjkUiFontUtility
 {
     public const string DefaultResourcesFontPath = "Fonts/Cjk UI SDF";
+    public const string DefaultEditorFontAssetPath = "Assets/Fusion/Resources/Fonts/Cjk UI SDF.asset";
 
     private static TMP_FontAsset cachedFont;
 
@@ -43,7 +47,8 @@ public static class CjkUiFontUtility
     {
         if (preferredFont != null)
         {
-            PrimeCharacters(preferredFont, textToPrime);
+            if (CanPopulateAtlas(preferredFont))
+                PrimeCharacters(preferredFont, textToPrime);
             return preferredFont;
         }
 
