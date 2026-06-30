@@ -284,7 +284,7 @@ namespace DuoCurtain.RuntimeTileMesh
             label.lineSpacing = 0f;
             label.color = textColor;
             label.alignment = TextAlignmentOptions.TopLeft;
-            label.enableWordWrapping = false;
+            label.textWrappingMode = TextWrappingModes.NoWrap;
             label.overflowMode = TextOverflowModes.Overflow;
             label.richText = true;
             label.margin = Vector4.zero;
