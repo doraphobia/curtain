@@ -26,6 +26,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             failures += ExpectFusionBlockMergeRules();
             failures += ExpectFusionDoorRules();
             failures += ExpectSelectedBlockCarriesPlayer();
+            failures += ExpectBlockInfoDescription();
 
             if (failures == 0)
             {
@@ -300,6 +301,60 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                     Vector3.Distance(player.PlayerWorldPosition, expectedPlayerPosition) > 0.0001f)
                 {
                     Debug.LogError("[RuntimeTileMeshSelfTest] Player carry should release on placement without changing the final player position.");
+                    return 1;
+                }
+
+                return 0;
+            }
+            finally
+            {
+                for (int i = cleanup.Count - 1; i >= 0; i--)
+                {
+                    if (cleanup[i] != null)
+                        UnityEngine.Object.DestroyImmediate(cleanup[i]);
+                }
+            }
+        }
+
+        private static int ExpectBlockInfoDescription()
+        {
+            List<GameObject> cleanup = new List<GameObject>();
+            try
+            {
+                RuntimeTileMeshDraggableBlock block = CreateSelfTestBlock(
+                    "Block Info Description",
+                    new[]
+                    {
+                        CreateBlockSpec(Vector2Int.zero),
+                        CreateBlockSpec(new Vector2Int(1, 2))
+                    },
+                    cleanup);
+                block.blockType = string.Empty;
+
+                string fallbackDescription = RuntimeTileMeshBlockInfoOverlay.BuildDescription(
+                    block,
+                    "DEFAULT",
+                    "UNIT",
+                    true);
+                if (fallbackDescription != "2X3 UNIT\nDEFAULT")
+                {
+                    Debug.LogError(
+                        "[RuntimeTileMeshSelfTest] Block info fallback description was incorrect: " +
+                        fallbackDescription);
+                    return 1;
+                }
+
+                block.blockType = "Kitchen";
+                string typedDescription = RuntimeTileMeshBlockInfoOverlay.BuildDescription(
+                    block,
+                    "DEFAULT",
+                    "UNIT",
+                    true);
+                if (typedDescription != "2X3 UNIT\nKITCHEN")
+                {
+                    Debug.LogError(
+                        "[RuntimeTileMeshSelfTest] Block info typed description was incorrect: " +
+                        typedDescription);
                     return 1;
                 }
 

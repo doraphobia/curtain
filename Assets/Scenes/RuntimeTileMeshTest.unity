@@ -2096,6 +2096,7 @@ GameObject:
   m_Component:
   - component: {fileID: 772584327}
   - component: {fileID: 772584326}
+  - component: {fileID: 772584328}
   m_Layer: 0
   m_Name: Fusion Sandbox Controller
   m_TagString: Untagged
@@ -2147,6 +2148,39 @@ MonoBehaviour:
   drawSceneGrid: 1
   sceneGridHalfExtents: {x: 10, y: 6}
   sceneGridColor: {r: 0.45, g: 0.45, b: 0.5, a: 0.35}
+--- !u!114 &772584328
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 772584325}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c64c0d6727471482c8a415b6e09e6532, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::DuoCurtain.RuntimeTileMesh.RuntimeTileMeshBlockInfoOverlay
+  displayKey: 9
+  displayMode: 0
+  startVisible: 0
+  fusionSandbox: {fileID: 772584326}
+  worldCamera: {fileID: 1405905150}
+  labelFont: {fileID: 11400000, guid: 39c0afe25adf141b3ae55154f1bd95e6, type: 2}
+  resourcesFontPath: Fonts/Bayon-Regular SDF
+  fontSize: 30
+  lineHeight: 30
+  letterSpacingPercent: -5
+  textColor: {r: 0, g: 0, b: 0, a: 1}
+  labelSize: {x: 82, y: 51}
+  topRightInset: {x: -8, y: -8}
+  defaultBlockType: DEFAULT
+  unitSuffix: UNIT
+  uppercaseType: 1
+  canvasSortingOrder: 1150
+  referenceResolution: {x: 1920, y: 1080}
+  canvasScaleMatch: 0.5
+  blockRefreshInterval: 0.2
+  hideLabelsOutsideScreen: 1
 --- !u!4 &772584327
 Transform:
   m_ObjectHideFlags: 0

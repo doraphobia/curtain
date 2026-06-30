@@ -108,7 +108,9 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             CreateFusionBlock("Fusion Block - 1x3", RuntimeTileMeshDemo.DemoShape.OneByThree, new Vector3(-1f, -2f, 0f), material, projectionMaterial);
             CreateFusionBlock("Fusion Block - T", RuntimeTileMeshDemo.DemoShape.T, new Vector3(3f, 1f, 0f), material, projectionMaterial);
             CreateFusionBlock("Fusion Block - Z", RuntimeTileMeshDemo.DemoShape.Z, new Vector3(6f, -2f, 0f), material, projectionMaterial);
-            PlayerControl playerControl = CreatePlayerControl(sandbox, playerCamera != null ? playerCamera.Camera : Camera.main);
+            Camera activeCamera = playerCamera != null ? playerCamera.Camera : Camera.main;
+            PlayerControl playerControl = CreatePlayerControl(sandbox, activeCamera);
+            CreateBlockInfoOverlay(sandbox, activeCamera);
             CreateGameModeController(sandbox, playerControl, playerCamera, managementCamera, fusionAssets);
 
             Directory.CreateDirectory(Path.GetDirectoryName(ScenePath));
@@ -457,7 +459,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
         private static void CreateInstructionText()
         {
             CreateLabel(
-                "Fusion Sandbox\nEnter toggles Player / Management mode. Blocks are editable only in Management.\nUse 1-4 to buy preset blocks, then drag, snap, place, and merge.",
+                "Fusion Sandbox\nEnter toggles Player / Management mode. Tab toggles Block size and Type labels.\nUse 1-4 to buy preset blocks, then drag, snap, place, and merge.",
                 new Vector3(-8.8f, 5.45f, -0.2f),
                 0.09f,
                 TextAnchor.UpperLeft,
@@ -550,6 +552,29 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             sandbox.playerControl = control;
             sandbox.carryPlayerWithSelectedBlock = true;
             return control;
+        }
+
+        private static void CreateBlockInfoOverlay(RuntimeTileMeshFusionSandbox sandbox, Camera targetCamera)
+        {
+            if (sandbox == null)
+                return;
+
+            RuntimeTileMeshBlockInfoOverlay overlay =
+                sandbox.GetComponent<RuntimeTileMeshBlockInfoOverlay>();
+            if (overlay == null)
+                overlay = sandbox.gameObject.AddComponent<RuntimeTileMeshBlockInfoOverlay>();
+
+            overlay.fusionSandbox = sandbox;
+            overlay.worldCamera = targetCamera;
+            overlay.labelFont = BayonFontAssetBuilder.EnsureFontAsset();
+            overlay.displayKey = KeyCode.Tab;
+            overlay.displayMode = RuntimeTileMeshBlockInfoOverlay.TabDisplayMode.ToggleOnPress;
+            overlay.startVisible = false;
+            overlay.fontSize = 30f;
+            overlay.lineHeight = 30f;
+            overlay.letterSpacingPercent = -5f;
+            overlay.labelSize = new Vector2(82f, 51f);
+            overlay.textColor = Color.black;
         }
 
         private static void CreateGameModeController(

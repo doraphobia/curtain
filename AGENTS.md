@@ -10,3 +10,4 @@
 - `Player` is the physical cursor/body and owns blocking, footsteps, and current-block checks.
 - `Heading Point` is the interaction pointer. Hover-to-interact systems such as curtains, drawing zones, placement previews, and UI-like world boxes must query Heading Point, not Player.
 - In Management Mode, selecting a block that currently contains `Player` carries `Player` with that block by preserving the player's local offset until the block is placed or the selection is cancelled.
+- The Tab block-information overlay shows one screen-space label per Fusion Block at its logical top-right corner. Dimensions come from the `RuntimeTileMeshView.tiles` logical bounding box, and Type comes from `RuntimeTileMeshDraggableBlock.blockType` with `DEFAULT` fallback.

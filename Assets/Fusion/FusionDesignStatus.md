@@ -18,6 +18,7 @@
 - 没有生成门的共享边在融合后可以自由通行。
 - 商店使用两次点击确认。购买成功的 Block 立即附着在 Heading Point 上进行吸附放置。
 - 管理模式选中当前包含 Player 的 Block 时，Player 保持在 Block 内原有局部位置并跟随 Block 移动。
+- Tab 可切换 Block 信息层，每个 Fusion Block 在逻辑包围盒右上角显示一份尺寸与 Type，并使用 Bayon 的 Figma typography 规格。
 
 ## 当前只是临时实现
 

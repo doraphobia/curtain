@@ -166,7 +166,7 @@ namespace DuoCurtain.RuntimeTileMesh
             if (fusionSandbox == null)
                 fusionSandbox = FindFirstObjectByType<RuntimeTileMeshFusionSandbox>();
 
-            if (worldCamera == null && fusionSandbox != null)
+            if (fusionSandbox != null && fusionSandbox.worldCamera != null)
                 worldCamera = fusionSandbox.worldCamera;
             if (worldCamera == null)
                 worldCamera = Camera.main;
