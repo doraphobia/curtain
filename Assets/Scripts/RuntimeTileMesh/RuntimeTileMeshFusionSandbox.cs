@@ -9,6 +9,7 @@ namespace DuoCurtain.RuntimeTileMesh
         [Header("Input")]
         public Camera worldCamera;
         public LayerMask blockLayerMask = ~0;
+        public bool managementInputEnabled = true;
         public bool preserveGrabOffset = true;
         public bool snapExistingBlocksOnAwake = true;
         public bool mergeExistingBlocksOnAwake = true;
@@ -60,6 +61,7 @@ namespace DuoCurtain.RuntimeTileMesh
         private bool selectedThisFrame;
 
         public bool HasWalkableCells => CollectWalkableCells().Count > 0;
+        public bool ManagementInputEnabled => managementInputEnabled;
 
         void Awake()
         {
@@ -78,6 +80,12 @@ namespace DuoCurtain.RuntimeTileMesh
         {
             if (worldCamera == null)
                 return;
+
+            if (!managementInputEnabled)
+            {
+                ClearHover();
+                return;
+            }
 
             selectedThisFrame = false;
             Vector3 mouseWorld = ScreenToWorld(Input.mousePosition);
@@ -106,6 +114,117 @@ namespace DuoCurtain.RuntimeTileMesh
             }
         }
 
+        public void SetManagementInputEnabled(bool enabled)
+        {
+            SetManagementInputEnabled(enabled, true);
+        }
+
+        public void SetManagementInputEnabled(bool enabled, bool placeSelectedBlockWhenDisabling)
+        {
+            if (managementInputEnabled == enabled)
+                return;
+
+            managementInputEnabled = enabled;
+            if (enabled)
+                return;
+
+            ClearHover();
+            if (selectedBlock == null)
+                return;
+
+            if (placeSelectedBlockWhenDisabling)
+            {
+                PlaceSelectedBlock();
+                return;
+            }
+
+            selectedBlock.SetSelected(false);
+            selectedBlock.SetSortingOrder(normalSortingOrder);
+            selectedBlock = null;
+        }
+
+        public RuntimeTileMeshDraggableBlock SpawnBlock(
+            RuntimeTileMeshDraggableBlock prefab,
+            Vector3 worldPosition,
+            bool beginDragging)
+        {
+            if (prefab == null)
+                return null;
+
+            Vector3 spawnPosition = SnapWorldPosition(worldPosition, prefab.transform.position.z);
+            RuntimeTileMeshDraggableBlock block = Instantiate(prefab, spawnPosition, prefab.transform.rotation);
+            block.name = prefab.name;
+            block.gameObject.SetActive(true);
+            block.SnapRootToGrid(gridSize, gridOrigin);
+            block.RebuildAndRefresh();
+
+            RefreshBlocks();
+            if (!blocks.Contains(block))
+                blocks.Add(block);
+
+            if (beginDragging && managementInputEnabled)
+                BeginDraggingBlock(block, worldPosition, false);
+
+            return block;
+        }
+
+        public void BeginDraggingBlock(RuntimeTileMeshDraggableBlock block, Vector3 pointerWorld, bool useGrabOffset)
+        {
+            if (!managementInputEnabled || block == null)
+                return;
+
+            if (selectedBlock != null && selectedBlock != block)
+                PlaceSelectedBlock();
+
+            ClearHover();
+            selectedBlock = block;
+            selectedBlock.SetSelected(true);
+            selectedBlock.SetSortingOrder(selectedSortingOrder);
+            grabOffset = useGrabOffset ? selectedBlock.transform.position - pointerWorld : Vector3.zero;
+            selectedThisFrame = true;
+            MoveSelectedBlock(pointerWorld);
+        }
+
+        public Vector3 GetPointerWorldPosition()
+        {
+            if (worldCamera == null)
+                worldCamera = Camera.main;
+
+            return worldCamera != null ? ScreenToWorld(Input.mousePosition) : Vector3.zero;
+        }
+
+        public bool TryGetWorldBounds(out Bounds bounds)
+        {
+            if (blocks.Count == 0)
+                RefreshBlocks();
+
+            bool hasBounds = false;
+            bounds = default(Bounds);
+            for (int i = 0; i < blocks.Count; i++)
+            {
+                RuntimeTileMeshDraggableBlock block = blocks[i];
+                if (block == null || !block.isActiveAndEnabled)
+                    continue;
+
+                HashSet<Vector2Int> blockCells = block.GetWorldCells(gridSize, gridOrigin);
+                foreach (Vector2Int cell in blockCells)
+                {
+                    Bounds cellBounds = GetCellWorldBounds(cell);
+                    if (!hasBounds)
+                    {
+                        bounds = cellBounds;
+                        hasBounds = true;
+                    }
+                    else
+                    {
+                        bounds.Encapsulate(cellBounds);
+                    }
+                }
+            }
+
+            return hasBounds;
+        }
+
         private void UpdateHover(Vector3 mouseWorld)
         {
             RuntimeTileMeshDraggableBlock nextHover = FindBlockAt(mouseWorld);
@@ -118,6 +237,15 @@ namespace DuoCurtain.RuntimeTileMesh
             hoveredBlock = nextHover;
             if (hoveredBlock != null)
                 hoveredBlock.SetHovered(true);
+        }
+
+        private void ClearHover()
+        {
+            if (hoveredBlock == null)
+                return;
+
+            hoveredBlock.SetHovered(false);
+            hoveredBlock = null;
         }
 
         private void PickUpBlock(RuntimeTileMeshDraggableBlock block, Vector3 mouseWorld)

@@ -41,6 +41,7 @@ public class PlayerControl : MonoBehaviour
     public bool restoreSystemCursorOnDisable = true;
 
     [Header("Player Point")]
+    public bool playerInputEnabled = true;
     public bool clampCursorToRoom = true;
     public bool freezeWorldCursorWhenPointerOverUI = true;
     public bool showPlayerAtHeadingPointOverUI = false;
@@ -56,6 +57,7 @@ public class PlayerControl : MonoBehaviour
     public Color debugBlockedPlayerColor = new Color(1f, 0.25f, 0.25f, 1f);
 
     [Header("Heading Point")]
+    public bool headingPointInputEnabled = true;
     public bool showHeadingPoint = true;
     public bool createHeadingPointIfMissing = true;
     public Image headingPointImage;
@@ -171,6 +173,7 @@ public class PlayerControl : MonoBehaviour
     public bool HasPlayerWorldPosition => hasWorldPosition;
     public bool HasHeadingWorldPosition => hasHeadingWorldPosition;
     public float PlayerCollisionRadius => usePlayerCollisionRadius ? Mathf.Max(0f, playerCollisionRadius) : 0f;
+    public float CurrentCursorSpeed => currentCursorSpeed;
 
     public static bool IsRunning => Active != null && Active.isActiveAndEnabled;
     public static bool HasActive => IsRunning && Active.hasWorldPosition;
@@ -224,10 +227,29 @@ public class PlayerControl : MonoBehaviour
         lastPointerOverUI = IsPointerOverUI();
         float deltaTime = useUnscaledTime ? Time.unscaledDeltaTime : Time.deltaTime;
 
-        UpdateHeadingPoint();
-        float movedDistance = UpdateLogicalWorldPosition(lastPointerOverUI, deltaTime);
+        if (headingPointInputEnabled)
+        {
+            UpdateHeadingPoint();
+        }
+        else
+        {
+            hasHeadingWorldPosition = false;
+        }
+
+        float movedDistance = 0f;
+        if (playerInputEnabled)
+        {
+            movedDistance = UpdateLogicalWorldPosition(lastPointerOverUI, deltaTime);
+        }
+        else
+        {
+            currentCursorSpeed = 0f;
+            InitializeWorldPosition();
+        }
+
         UpdateStepClock(movedDistance, deltaTime);
-        ApplyCameraPan(lastPointerOverUI, deltaTime);
+        if (playerInputEnabled)
+            ApplyCameraPan(lastPointerOverUI, deltaTime);
         UpdateCursorMotionEffects(movedDistance);
     }
 
