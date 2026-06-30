@@ -105,7 +105,7 @@ namespace DuoCurtain.RuntimeTileMesh
 
             pauseManager.toggleKey = KeyCode.Space;
             pauseManager.captureWorldCameraOnly = true;
-            pauseManager.blurCanvasSortingOrder = -100;
+            pauseManager.blurCanvasSortingOrder = 5000;
             if (pauseManager.blurSourceCamera == null)
                 pauseManager.blurSourceCamera = mainCamera;
         }

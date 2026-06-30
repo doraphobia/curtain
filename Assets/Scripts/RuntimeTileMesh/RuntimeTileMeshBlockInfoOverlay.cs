@@ -48,7 +48,7 @@ namespace DuoCurtain.RuntimeTileMesh
         public Color outlineColor = new Color(1f, 1f, 1f, 0.92f);
         [Range(0f, 0.5f)]
         public float outlineWidth = 0.16f;
-        public bool useLabelBackground = true;
+        public bool useLabelBackground = false;
         public Color labelBackgroundColor = new Color(1f, 1f, 1f, 0.72f);
         public Vector2 labelSize = new Vector2(82f, 51f);
         public Vector2 topRightInset = new Vector2(8f, -8f);

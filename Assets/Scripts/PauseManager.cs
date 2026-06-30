@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Reflection;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -25,7 +26,22 @@ public class PauseManager : MonoBehaviour
     [Range(1, 4)]
     public int blurIterations = 2;
     public Color blurTint = new Color(0f, 0f, 0f, 0.18f);
-    public int blurCanvasSortingOrder = -100;
+    public int blurCanvasSortingOrder = 5000;
+
+    [Header("Pause Transition")]
+    [Min(0f)]
+    public float pauseFadeInDuration = 0.28f;
+    [Min(0f)]
+    public float pauseFadeOutDuration = 0.2f;
+    public AnimationCurve pauseFadeCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+
+    [Header("Pause Title")]
+    public bool showPauseTitle = true;
+    public string pauseTitle = "GAME PAUSED";
+    [Min(1f)]
+    public float pauseTitleFontSize = 72f;
+    public Color pauseTitleColor = Color.white;
+    public Vector2 pauseTitleAnchoredPosition = Vector2.zero;
 
     public static bool IsGamePaused { get; private set; }
     public static event Action<bool> PauseChanged;
@@ -36,9 +52,14 @@ public class PauseManager : MonoBehaviour
     private bool prevAudioPaused;
     private Coroutine blurCaptureRoutine;
     private Canvas blurCanvas;
+    private CanvasGroup blurCanvasGroup;
     private RawImage blurImage;
     private Image blurTintImage;
+    private TextMeshProUGUI pauseTitleText;
     private Texture2D blurTexture;
+    private Coroutine blurFadeRoutine;
+    private Coroutine resumeRoutine;
+    private bool resumeInProgress;
 
     void Update()
     {
@@ -89,12 +110,42 @@ public class PauseManager : MonoBehaviour
 
     private void Resume()
     {
+        if (resumeInProgress)
+            return;
+
         if (blurCaptureRoutine != null)
         {
             StopCoroutine(blurCaptureRoutine);
             blurCaptureRoutine = null;
         }
 
+        if (showBlurOverlay && blurCanvas != null && blurCanvas.gameObject.activeSelf && pauseFadeOutDuration > 0.0001f)
+        {
+            resumeInProgress = true;
+            if (blurFadeRoutine != null)
+            {
+                StopCoroutine(blurFadeRoutine);
+                blurFadeRoutine = null;
+            }
+            if (resumeRoutine != null)
+                StopCoroutine(resumeRoutine);
+            resumeRoutine = StartCoroutine(ResumeAfterFadeOut());
+            return;
+        }
+
+        CompleteResume();
+    }
+
+    private IEnumerator ResumeAfterFadeOut()
+    {
+        yield return FadeBlurOverlay(blurCanvasGroup != null ? blurCanvasGroup.alpha : 1f, 0f, pauseFadeOutDuration);
+        resumeRoutine = null;
+        resumeInProgress = false;
+        CompleteResume();
+    }
+
+    private void CompleteResume()
+    {
         HideBlurOverlay(true);
 
         Time.timeScale = prevTimeScale <= 0f ? 1f : prevTimeScale;
@@ -135,7 +186,7 @@ public class PauseManager : MonoBehaviour
             yield break;
 
         Texture2D screenshot = captureWorldCameraOnly
-            ? CaptureWorldCameraAsTexture()
+            ? CaptureCameraAsTexture(blurSourceCamera != null ? blurSourceCamera : Camera.main)
             : ScreenCapture.CaptureScreenshotAsTexture();
         if (screenshot == null)
             yield break;
@@ -158,9 +209,8 @@ public class PauseManager : MonoBehaviour
         SetBlurTexture(blurred);
     }
 
-    private Texture2D CaptureWorldCameraAsTexture()
+    public static Texture2D CaptureCameraAsTexture(Camera sourceCamera)
     {
-        Camera sourceCamera = blurSourceCamera != null ? blurSourceCamera : Camera.main;
         if (sourceCamera == null)
             return ScreenCapture.CaptureScreenshotAsTexture();
 
@@ -199,19 +249,24 @@ public class PauseManager : MonoBehaviour
 
     private void EnsureBlurOverlay()
     {
-        if (blurCanvas != null && blurImage != null && blurTintImage != null)
+        if (blurCanvas != null && blurImage != null && blurTintImage != null && pauseTitleText != null)
             return;
 
         GameObject canvasObject = new GameObject(
             "Pause Blur Canvas",
             typeof(Canvas),
             typeof(CanvasScaler),
+            typeof(CanvasGroup),
             typeof(GraphicRaycaster));
         canvasObject.transform.SetParent(transform, false);
 
         blurCanvas = canvasObject.GetComponent<Canvas>();
         blurCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
         blurCanvas.sortingOrder = blurCanvasSortingOrder;
+        blurCanvasGroup = canvasObject.GetComponent<CanvasGroup>();
+        blurCanvasGroup.alpha = 0f;
+        blurCanvasGroup.interactable = false;
+        blurCanvasGroup.blocksRaycasts = true;
 
         CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
@@ -234,6 +289,21 @@ public class PauseManager : MonoBehaviour
         blurTintImage.raycastTarget = false;
         blurTintImage.color = blurTint;
 
+        GameObject titleObject = new GameObject("Pause Title", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+        titleObject.transform.SetParent(canvasObject.transform, false);
+        RectTransform titleRect = titleObject.GetComponent<RectTransform>();
+        titleRect.anchorMin = new Vector2(0.5f, 0.5f);
+        titleRect.anchorMax = new Vector2(0.5f, 0.5f);
+        titleRect.pivot = new Vector2(0.5f, 0.5f);
+        titleRect.anchoredPosition = pauseTitleAnchoredPosition;
+        titleRect.sizeDelta = new Vector2(960f, 160f);
+        pauseTitleText = titleObject.GetComponent<TextMeshProUGUI>();
+        pauseTitleText.raycastTarget = false;
+        pauseTitleText.alignment = TextAlignmentOptions.Center;
+        pauseTitleText.fontSize = pauseTitleFontSize;
+        pauseTitleText.color = pauseTitleColor;
+        pauseTitleText.text = pauseTitle;
+
         canvasObject.SetActive(false);
     }
 
@@ -249,12 +319,36 @@ public class PauseManager : MonoBehaviour
 
         blurImage.texture = blurTexture;
         blurTintImage.color = blurTint;
+        if (pauseTitleText != null)
+        {
+            pauseTitleText.gameObject.SetActive(showPauseTitle);
+            pauseTitleText.text = pauseTitle;
+            pauseTitleText.fontSize = pauseTitleFontSize;
+            pauseTitleText.color = pauseTitleColor;
+            pauseTitleText.rectTransform.anchoredPosition = pauseTitleAnchoredPosition;
+        }
+
         blurCanvas.sortingOrder = blurCanvasSortingOrder;
+        if (blurCanvasGroup != null)
+            blurCanvasGroup.alpha = pauseFadeInDuration > 0.0001f ? 0f : 1f;
         blurCanvas.gameObject.SetActive(true);
+
+        if (pauseFadeInDuration > 0.0001f)
+        {
+            if (blurFadeRoutine != null)
+                StopCoroutine(blurFadeRoutine);
+            blurFadeRoutine = StartCoroutine(FadeBlurOverlay(0f, 1f, pauseFadeInDuration));
+        }
     }
 
     private void HideBlurOverlay(bool destroyTexture)
     {
+        if (blurFadeRoutine != null)
+        {
+            StopCoroutine(blurFadeRoutine);
+            blurFadeRoutine = null;
+        }
+
         if (blurCanvas != null)
             blurCanvas.gameObject.SetActive(false);
 
@@ -268,6 +362,34 @@ public class PauseManager : MonoBehaviour
         blurTexture = null;
     }
 
+    private IEnumerator FadeBlurOverlay(float from, float to, float duration)
+    {
+        EnsureBlurOverlay();
+        if (blurCanvasGroup == null)
+            yield break;
+
+        if (duration <= 0.0001f)
+        {
+            blurCanvasGroup.alpha = to;
+            blurFadeRoutine = null;
+            yield break;
+        }
+
+        float start = Time.unscaledTime;
+        while (true)
+        {
+            float normalized = Mathf.Clamp01((Time.unscaledTime - start) / duration);
+            float eased = pauseFadeCurve != null ? pauseFadeCurve.Evaluate(normalized) : normalized;
+            blurCanvasGroup.alpha = Mathf.LerpUnclamped(from, to, eased);
+            if (normalized >= 1f)
+                break;
+            yield return null;
+        }
+
+        blurCanvasGroup.alpha = to;
+        blurFadeRoutine = null;
+    }
+
     private static void StretchToParent(RectTransform rectTransform)
     {
         rectTransform.anchorMin = Vector2.zero;
@@ -276,7 +398,7 @@ public class PauseManager : MonoBehaviour
         rectTransform.offsetMax = Vector2.zero;
     }
 
-    private static Texture2D CreateBlurredTexture(
+    public static Texture2D CreateBlurredTexture(
         Texture2D source,
         int downsample,
         int radius,
@@ -445,6 +567,22 @@ public class PauseManager : MonoBehaviour
         if (!paused)
             return;
 
+        if (blurCaptureRoutine != null)
+        {
+            StopCoroutine(blurCaptureRoutine);
+            blurCaptureRoutine = null;
+        }
+        if (blurFadeRoutine != null)
+        {
+            StopCoroutine(blurFadeRoutine);
+            blurFadeRoutine = null;
+        }
+        if (resumeRoutine != null)
+        {
+            StopCoroutine(resumeRoutine);
+            resumeRoutine = null;
+        }
+        resumeInProgress = false;
         HideBlurOverlay(true);
         Time.timeScale = prevTimeScale <= 0f ? 1f : prevTimeScale;
         Time.fixedDeltaTime = prevFixedDeltaTime > 0f ? prevFixedDeltaTime : Time.fixedDeltaTime;

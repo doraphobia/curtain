@@ -1,5 +1,8 @@
 using System.Collections.Generic;
+using System.Collections;
+using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace DuoCurtain.RuntimeTileMesh
 {
@@ -20,6 +23,19 @@ namespace DuoCurtain.RuntimeTileMesh
         [Min(0.5f)]
         public float spawnPadding = 2.5f;
         public bool spawnImmediatelyIfAlreadyNight = true;
+
+        [Header("Spawn Warning")]
+        public bool warnBeforeOffscreenSpawn = true;
+        public bool warnOnlyWhenOffscreen = true;
+        [Min(0f)]
+        public float spawnWarningLeadTime = 1.25f;
+        public string spawnWarningText = "SOMETHING IS OUTSIDE";
+        public Color spawnWarningTextColor = new Color(1f, 0.95f, 0.78f, 1f);
+        public Color spawnWarningPanelColor = new Color(0f, 0f, 0f, 0.34f);
+        [Min(1f)]
+        public float spawnWarningFontSize = 42f;
+        public Vector2 spawnWarningAnchoredPosition = new Vector2(0f, 300f);
+        public int spawnWarningCanvasSortingOrder = 1350;
 
         [Header("Enemy Defaults")]
         [Min(0f)]
@@ -47,6 +63,11 @@ namespace DuoCurtain.RuntimeTileMesh
         private bool wasNight;
         private GameObject leftFootprintPrefab;
         private GameObject rightFootprintPrefab;
+        private int pendingSpawnCount;
+        private Canvas warningCanvas;
+        private CanvasGroup warningCanvasGroup;
+        private RectTransform warningPanelRect;
+        private TextMeshProUGUI warningText;
 
         void Awake()
         {
@@ -76,16 +97,40 @@ namespace DuoCurtain.RuntimeTileMesh
             EnsureFootprintPrefabs();
             CleanupEnemyList();
 
-            int spawnCount = Mathf.Min(Mathf.Max(0, enemiesPerNight), Mathf.Max(0, maxActiveEnemies - activeEnemies.Count));
+            int spawnCount = Mathf.Min(
+                Mathf.Max(0, enemiesPerNight),
+                Mathf.Max(0, maxActiveEnemies - activeEnemies.Count - pendingSpawnCount));
             for (int i = 0; i < spawnCount; i++)
-                SpawnEnemy();
+                StartCoroutine(SpawnEnemyWithWarning());
         }
 
-        private void SpawnEnemy()
+        private IEnumerator SpawnEnemyWithWarning()
         {
-            if (!TryGetSpawnPosition(out Vector3 spawnPosition))
-                spawnPosition = transform.position;
+            pendingSpawnCount++;
+            try
+            {
+                if (!TryGetSpawnPosition(out Vector3 spawnPosition))
+                    spawnPosition = transform.position;
 
+                bool shouldWarn = warnBeforeOffscreenSpawn &&
+                    (!warnOnlyWhenOffscreen || IsOutsidePlayerView(spawnPosition));
+                if (shouldWarn && spawnWarningLeadTime > 0.0001f)
+                {
+                    ShowSpawnWarning(true);
+                    yield return new WaitForSecondsRealtime(spawnWarningLeadTime);
+                    ShowSpawnWarning(false);
+                }
+
+                SpawnEnemyAt(spawnPosition);
+            }
+            finally
+            {
+                pendingSpawnCount = Mathf.Max(0, pendingSpawnCount - 1);
+            }
+        }
+
+        private void SpawnEnemyAt(Vector3 spawnPosition)
+        {
             GameObject enemyObject = new GameObject("Fusion Night Footprint Enemy");
             enemyObject.transform.position = spawnPosition;
             enemyObject.transform.SetParent(transform, true);
@@ -102,6 +147,89 @@ namespace DuoCurtain.RuntimeTileMesh
             activeEnemies.Add(enemy);
             if (logSpawns)
                 Debug.Log("[FusionNightEnemySpawner] Spawned footprint enemy at " + spawnPosition + ".", enemy);
+        }
+
+        private bool IsOutsidePlayerView(Vector3 worldPosition)
+        {
+            Camera camera = fusionSandbox != null && fusionSandbox.worldCamera != null
+                ? fusionSandbox.worldCamera
+                : Camera.main;
+            if (camera == null)
+                return true;
+
+            Vector3 viewport = camera.WorldToViewportPoint(worldPosition);
+            return viewport.z < 0f ||
+                   viewport.x < 0f || viewport.x > 1f ||
+                   viewport.y < 0f || viewport.y > 1f;
+        }
+
+        private void ShowSpawnWarning(bool visible)
+        {
+            EnsureWarningCanvas();
+            if (warningCanvas == null || warningCanvasGroup == null || warningText == null)
+                return;
+
+            warningCanvas.gameObject.SetActive(visible);
+            warningCanvasGroup.alpha = visible ? 1f : 0f;
+            warningText.text = spawnWarningText;
+            warningText.fontSize = spawnWarningFontSize;
+            warningText.color = spawnWarningTextColor;
+            if (warningPanelRect != null)
+                warningPanelRect.anchoredPosition = spawnWarningAnchoredPosition;
+        }
+
+        private void EnsureWarningCanvas()
+        {
+            if (warningCanvas != null && warningCanvasGroup != null && warningText != null)
+                return;
+
+            GameObject canvasObject = new GameObject(
+                "Fusion Enemy Spawn Warning Canvas",
+                typeof(RectTransform),
+                typeof(Canvas),
+                typeof(CanvasScaler),
+                typeof(CanvasGroup));
+            canvasObject.transform.SetParent(transform, false);
+            warningCanvas = canvasObject.GetComponent<Canvas>();
+            warningCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            warningCanvas.sortingOrder = spawnWarningCanvasSortingOrder;
+            warningCanvasGroup = canvasObject.GetComponent<CanvasGroup>();
+            warningCanvasGroup.alpha = 0f;
+            warningCanvasGroup.interactable = false;
+            warningCanvasGroup.blocksRaycasts = false;
+
+            CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.matchWidthOrHeight = 0.5f;
+
+            GameObject panelObject = new GameObject("Warning Panel", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            panelObject.transform.SetParent(canvasObject.transform, false);
+            warningPanelRect = panelObject.GetComponent<RectTransform>();
+            warningPanelRect.anchorMin = new Vector2(0.5f, 0.5f);
+            warningPanelRect.anchorMax = new Vector2(0.5f, 0.5f);
+            warningPanelRect.pivot = new Vector2(0.5f, 0.5f);
+            warningPanelRect.anchoredPosition = spawnWarningAnchoredPosition;
+            warningPanelRect.sizeDelta = new Vector2(760f, 92f);
+            Image panelImage = panelObject.GetComponent<Image>();
+            panelImage.raycastTarget = false;
+            panelImage.color = spawnWarningPanelColor;
+
+            GameObject textObject = new GameObject("Warning Text", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+            textObject.transform.SetParent(panelObject.transform, false);
+            RectTransform textRect = textObject.GetComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = Vector2.zero;
+            textRect.offsetMax = Vector2.zero;
+            warningText = textObject.GetComponent<TextMeshProUGUI>();
+            warningText.raycastTarget = false;
+            warningText.alignment = TextAlignmentOptions.Center;
+            warningText.text = spawnWarningText;
+            warningText.fontSize = spawnWarningFontSize;
+            warningText.color = spawnWarningTextColor;
+
+            canvasObject.SetActive(false);
         }
 
         private bool TryGetSpawnPosition(out Vector3 spawnPosition)

@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -104,6 +105,21 @@ namespace DuoCurtain.RuntimeTileMesh
         public Color shopPendingButtonColor = new Color(0.1f, 0.38f, 1f, 0.35f);
         public Color shopTextColor = Color.white;
         public Color shopPriceColor = new Color(1f, 0.84f, 0.36f, 1f);
+        public Color blockShopButtonColor = new Color(1f, 1f, 1f, 0.12f);
+        public Color wallAttachmentShopButtonColor = new Color(1f, 1f, 1f, 0.19f);
+        public Color blockShopStrokeColor = new Color(1f, 1f, 1f, 0f);
+        public Color wallAttachmentShopStrokeColor = new Color(1f, 1f, 1f, 0.75f);
+        public Vector2 shopItemStrokeDistance = new Vector2(2f, -2f);
+
+        [Header("Fusion Shop Frosted Backdrop")]
+        public bool useShopBlurredBackdrop = true;
+        [Range(1, 8)]
+        public int shopBackdropBlurDownsample = 3;
+        [Range(0, 12)]
+        public int shopBackdropBlurRadius = 4;
+        [Range(1, 4)]
+        public int shopBackdropBlurIterations = 2;
+        public Color shopBackdropTint = new Color(1f, 1f, 1f, 0.16f);
 
         [Header("Fusion Wall Attachment Shop")]
         [Min(0.05f)]
@@ -137,13 +153,23 @@ namespace DuoCurtain.RuntimeTileMesh
         public string moneyFormat = "Money: {0}";
         [Min(0f)]
         public float defaultStartingMoney = 100f;
+        public Vector2 moneyHudAnchoredPosition = new Vector2(32f, 24f);
+        public Vector2 moneyHudSize = new Vector2(320f, 64f);
+        public bool liftMoneyAboveShop = true;
+        [Min(0f)]
+        public float moneyShopClearance = 18f;
 
         private Camera activeCamera;
         private readonly List<Button> shopButtons = new List<Button>();
         private readonly List<Image> shopButtonImages = new List<Image>();
+        private readonly List<Outline> shopButtonOutlines = new List<Outline>();
         private readonly List<RawImage> shopThumbnailImages = new List<RawImage>();
         private CanvasGroup shopCanvasGroup;
+        private RawImage shopBackdropImage;
+        private Texture2D shopBackdropTexture;
+        private Coroutine shopBackdropCaptureRoutine;
         private FusionShopThumbnailRenderer shopThumbnailRenderer;
+        private RectTransform moneyTextRectTransform;
         private RuntimeTileMeshFusionSandbox boundSandbox;
         private RuntimeTileMeshDraggableBlock pendingPurchasedBlock;
         private int pendingPurchasedPrice;
@@ -192,6 +218,18 @@ namespace DuoCurtain.RuntimeTileMesh
             UnbindSandboxEvents();
             if (currencySource != null)
                 currencySource.ValueChanged -= HandleCurrencyChanged;
+        }
+
+        void OnDestroy()
+        {
+            if (shopBackdropCaptureRoutine != null)
+                StopCoroutine(shopBackdropCaptureRoutine);
+
+            if (shopBackdropTexture != null)
+            {
+                Destroy(shopBackdropTexture);
+                shopBackdropTexture = null;
+            }
         }
 
         void Update()
@@ -783,7 +821,14 @@ namespace DuoCurtain.RuntimeTileMesh
 
         private void EnsureMoneyHud()
         {
-            if (moneyText != null || !createMoneyHudIfMissing)
+            if (moneyText != null)
+            {
+                moneyTextRectTransform = moneyText.rectTransform;
+                ApplyMoneyHudPosition();
+                return;
+            }
+
+            if (!createMoneyHudIfMissing)
                 return;
 
             Canvas canvas = FindFirstObjectByType<Canvas>();
@@ -808,17 +853,14 @@ namespace DuoCurtain.RuntimeTileMesh
             textObject.transform.SetParent(canvas.transform, false);
 
             RectTransform rect = textObject.GetComponent<RectTransform>();
-            rect.anchorMin = new Vector2(1f, 1f);
-            rect.anchorMax = new Vector2(1f, 1f);
-            rect.pivot = new Vector2(1f, 1f);
-            rect.anchoredPosition = new Vector2(-32f, -24f);
-            rect.sizeDelta = new Vector2(320f, 64f);
+            moneyTextRectTransform = rect;
 
             moneyText = textObject.GetComponent<TextMeshProUGUI>();
-            moneyText.alignment = TextAlignmentOptions.TopRight;
+            moneyText.alignment = TextAlignmentOptions.BottomLeft;
             moneyText.fontSize = 32f;
             moneyText.color = Color.white;
             moneyText.raycastTarget = false;
+            ApplyMoneyHudPosition();
         }
 
         private void EnsureShopPanel()
@@ -832,6 +874,7 @@ namespace DuoCurtain.RuntimeTileMesh
                     shopCanvasGroup = shopPanelRoot.GetComponent<CanvasGroup>();
                     if (shopCanvasGroup == null)
                         shopCanvasGroup = shopPanelRoot.gameObject.AddComponent<CanvasGroup>();
+                    EnsureShopBackdrop();
                 }
                 return;
             }
@@ -861,6 +904,7 @@ namespace DuoCurtain.RuntimeTileMesh
             panelImage.raycastTarget = true;
 
             shopCanvasGroup = panelObject.GetComponent<CanvasGroup>();
+            EnsureShopBackdrop();
 
             VerticalLayoutGroup panelLayout = panelObject.AddComponent<VerticalLayoutGroup>();
             panelLayout.padding = new RectOffset(24, 24, 12, 18);
@@ -928,6 +972,135 @@ namespace DuoCurtain.RuntimeTileMesh
             ApplyShopVisibility(true);
         }
 
+        private void EnsureShopBackdrop()
+        {
+            if (shopPanelRoot == null)
+                return;
+
+            if (shopBackdropImage != null)
+                return;
+
+            Transform existing = shopPanelRoot.Find("Shop Blurred Backdrop");
+            GameObject backdropObject;
+            if (existing != null)
+            {
+                backdropObject = existing.gameObject;
+            }
+            else
+            {
+                backdropObject = new GameObject(
+                    "Shop Blurred Backdrop",
+                    typeof(RectTransform),
+                    typeof(CanvasRenderer),
+                    typeof(RawImage),
+                    typeof(LayoutElement));
+                backdropObject.transform.SetParent(shopPanelRoot, false);
+                backdropObject.transform.SetAsFirstSibling();
+            }
+
+            RectTransform rect = backdropObject.GetComponent<RectTransform>();
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+
+            LayoutElement layout = backdropObject.GetComponent<LayoutElement>();
+            if (layout != null)
+                layout.ignoreLayout = true;
+
+            shopBackdropImage = backdropObject.GetComponent<RawImage>();
+            shopBackdropImage.raycastTarget = false;
+            shopBackdropImage.color = useShopBlurredBackdrop ? shopBackdropTint : Color.clear;
+            shopBackdropImage.texture = shopBackdropTexture;
+        }
+
+        private void CaptureShopBackdrop()
+        {
+            if (!useShopBlurredBackdrop || shopPanelRoot == null)
+                return;
+
+            EnsureShopBackdrop();
+            if (shopBackdropCaptureRoutine != null)
+                StopCoroutine(shopBackdropCaptureRoutine);
+
+            shopBackdropCaptureRoutine = StartCoroutine(CaptureShopBackdropAtEndOfFrame());
+        }
+
+        private IEnumerator CaptureShopBackdropAtEndOfFrame()
+        {
+            yield return new WaitForEndOfFrame();
+            shopBackdropCaptureRoutine = null;
+
+            Camera sourceCamera = fusionSandbox != null && fusionSandbox.worldCamera != null
+                ? fusionSandbox.worldCamera
+                : Camera.main;
+            Texture2D screenshot = PauseManager.CaptureCameraAsTexture(sourceCamera);
+            if (screenshot == null)
+                yield break;
+
+            Texture2D blurred = PauseManager.CreateBlurredTexture(
+                screenshot,
+                Mathf.Max(1, shopBackdropBlurDownsample),
+                Mathf.Max(0, shopBackdropBlurRadius),
+                Mathf.Max(1, shopBackdropBlurIterations));
+            Destroy(screenshot);
+
+            if (blurred == null)
+                yield break;
+
+            if (shopBackdropTexture != null)
+                Destroy(shopBackdropTexture);
+
+            shopBackdropTexture = blurred;
+            shopBackdropTexture.name = "Fusion Shop Blurred Backdrop";
+            shopBackdropTexture.wrapMode = TextureWrapMode.Clamp;
+            shopBackdropTexture.filterMode = FilterMode.Bilinear;
+
+            if (shopBackdropImage != null)
+            {
+                shopBackdropImage.texture = shopBackdropTexture;
+                shopBackdropImage.color = shopBackdropTint;
+                UpdateShopBackdropUv();
+            }
+        }
+
+        private void UpdateShopBackdropUv()
+        {
+            if (shopBackdropImage == null || shopPanelRoot == null || shopBackdropTexture == null)
+                return;
+
+            Vector3[] corners = new Vector3[4];
+            shopPanelRoot.GetWorldCorners(corners);
+            Canvas canvas = shopPanelRoot.GetComponentInParent<Canvas>();
+            Camera eventCamera = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay
+                ? canvas.worldCamera
+                : null;
+            Vector2 min = RectTransformUtility.WorldToScreenPoint(eventCamera, corners[0]);
+            Vector2 max = RectTransformUtility.WorldToScreenPoint(eventCamera, corners[2]);
+            float screenWidth = Mathf.Max(1f, Screen.width);
+            float screenHeight = Mathf.Max(1f, Screen.height);
+            Rect uv = Rect.MinMaxRect(
+                Mathf.Clamp01(min.x / screenWidth),
+                Mathf.Clamp01(min.y / screenHeight),
+                Mathf.Clamp01(max.x / screenWidth),
+                Mathf.Clamp01(max.y / screenHeight));
+            if (uv.width <= 0.0001f || uv.height <= 0.0001f)
+                uv = new Rect(0f, 0f, 1f, 1f);
+            shopBackdropImage.uvRect = uv;
+        }
+
+        private void ClearShopBackdrop()
+        {
+            if (shopBackdropCaptureRoutine != null)
+            {
+                StopCoroutine(shopBackdropCaptureRoutine);
+                shopBackdropCaptureRoutine = null;
+            }
+
+            if (shopBackdropImage != null)
+                shopBackdropImage.color = Color.clear;
+        }
+
         private Canvas CreateOverlayCanvas(string name, int sortingOrder)
         {
             GameObject canvasObject = new GameObject(
@@ -972,6 +1145,7 @@ namespace DuoCurtain.RuntimeTileMesh
         {
             shopButtons.Clear();
             shopButtonImages.Clear();
+            shopButtonOutlines.Clear();
             shopThumbnailImages.Clear();
             if (shopContentRoot == null)
                 return;
@@ -1027,8 +1201,13 @@ namespace DuoCurtain.RuntimeTileMesh
             rect.sizeDelta = shopCardSize;
 
             Image image = buttonObject.GetComponent<Image>();
-            image.color = shopButtonColor;
+            image.color = GetShopButtonBaseColor(item);
             image.raycastTarget = true;
+
+            Outline outline = buttonObject.AddComponent<Outline>();
+            outline.effectDistance = shopItemStrokeDistance;
+            outline.useGraphicAlpha = true;
+            outline.effectColor = GetShopStrokeColor(item);
 
             Button button = buttonObject.GetComponent<Button>();
             int capturedIndex = index;
@@ -1112,6 +1291,7 @@ namespace DuoCurtain.RuntimeTileMesh
 
             shopButtons.Add(button);
             shopButtonImages.Add(image);
+            shopButtonOutlines.Add(outline);
             shopThumbnailImages.Add(thumbnail);
         }
 
@@ -1146,6 +1326,33 @@ namespace DuoCurtain.RuntimeTileMesh
 
             int value = currencySource != null ? currencySource.CurrentWholeValue : Mathf.FloorToInt(defaultStartingMoney);
             moneyText.text = string.Format(moneyFormat, value);
+            ApplyMoneyHudPosition();
+        }
+
+        private void ApplyMoneyHudPosition()
+        {
+            if (moneyText == null)
+                return;
+
+            if (moneyTextRectTransform == null)
+                moneyTextRectTransform = moneyText.rectTransform;
+            if (moneyTextRectTransform == null)
+                return;
+
+            moneyTextRectTransform.anchorMin = Vector2.zero;
+            moneyTextRectTransform.anchorMax = Vector2.zero;
+            moneyTextRectTransform.pivot = Vector2.zero;
+            moneyTextRectTransform.sizeDelta = moneyHudSize;
+
+            Vector2 anchored = moneyHudAnchoredPosition;
+            if (liftMoneyAboveShop)
+            {
+                float lift = Mathf.Max(0f, shopBannerHeight + shopBottomInset + moneyShopClearance);
+                anchored.y += lift * Mathf.Clamp01(shopSlideValue);
+            }
+
+            moneyTextRectTransform.anchoredPosition = anchored;
+            moneyText.alignment = TextAlignmentOptions.BottomLeft;
         }
 
         private void RefreshShopPanel()
@@ -1168,8 +1375,34 @@ namespace DuoCurtain.RuntimeTileMesh
                     (allowFreePurchases || currencySource == null || currencySource.CanAfford(item.price));
 
                 if (i < shopButtonImages.Count && shopButtonImages[i] != null)
-                    shopButtonImages[i].color = i == pendingShopIndex ? shopPendingButtonColor : shopButtonColor;
+                    shopButtonImages[i].color = i == pendingShopIndex ? shopPendingButtonColor : GetShopButtonBaseColor(item);
+
+                if (i < shopButtonOutlines.Count && shopButtonOutlines[i] != null)
+                {
+                    shopButtonOutlines[i].effectColor = GetShopStrokeColor(item);
+                    shopButtonOutlines[i].effectDistance = shopItemStrokeDistance;
+                }
             }
+        }
+
+        private Color GetShopButtonBaseColor(BlockShopItem item)
+        {
+            if (item == null)
+                return shopButtonColor;
+
+            return item.itemKind == ShopItemKind.WallAttachment
+                ? wallAttachmentShopButtonColor
+                : blockShopButtonColor;
+        }
+
+        private Color GetShopStrokeColor(BlockShopItem item)
+        {
+            if (item == null)
+                return blockShopStrokeColor;
+
+            return item.itemKind == ShopItemKind.WallAttachment
+                ? wallAttachmentShopStrokeColor
+                : blockShopStrokeColor;
         }
 
         private void ApplyShopVisibility(bool instant)
@@ -1213,6 +1446,9 @@ namespace DuoCurtain.RuntimeTileMesh
             if (shopPanelRoot == null)
                 return;
 
+            if (expanded)
+                CaptureShopBackdrop();
+
             float target = expanded ? 1f : 0f;
             if (instant || shopSlideDuration <= 0.01f)
             {
@@ -1222,6 +1458,8 @@ namespace DuoCurtain.RuntimeTileMesh
                 shopSlideAnimating = false;
                 ApplyShopSlidePosition();
                 RefreshShopInteractionState();
+                if (!expanded)
+                    ClearShopBackdrop();
                 return;
             }
 
@@ -1259,6 +1497,8 @@ namespace DuoCurtain.RuntimeTileMesh
                 shopSlideValue = shopSlideTargetValue;
                 shopSlideAnimating = false;
                 ApplyShopSlidePosition();
+                if (shopSlideTargetValue <= 0.001f)
+                    ClearShopBackdrop();
             }
 
             RefreshShopInteractionState();
@@ -1276,6 +1516,8 @@ namespace DuoCurtain.RuntimeTileMesh
             anchored.x = 0f;
             anchored.y = Mathf.Lerp(hiddenY, shownY, Mathf.Clamp01(shopSlideValue));
             shopPanelRoot.anchoredPosition = anchored;
+            ApplyMoneyHudPosition();
+            UpdateShopBackdropUv();
         }
 
         private void RefreshShopInteractionState()

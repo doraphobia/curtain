@@ -620,7 +620,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             sandbox.mergeAfterPlacement = true;
             sandbox.deactivateAbsorbedBlocksImmediately = true;
             sandbox.logFusionEvents = true;
-            sandbox.sceneGridHalfExtents = new Vector2Int(10, 6);
+            sandbox.sceneGridHalfExtents = new Vector2Int(40, 24);
             sandbox.generateDoorsOnFusion = true;
             sandbox.doorSharedEdgeCells = 3;
             sandbox.doorThickness = 0.25f;
@@ -636,6 +636,10 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             sandbox.doorBlocksPlayer = true;
             sandbox.wallDebugColor = new Color(0.38f, 0.38f, 0.38f, 0.95f);
             sandbox.wallDebugLineWidth = 0.02f;
+            sandbox.renderRuntimeGridInGame = true;
+            sandbox.disableLegacyRuntimeGridOverlay = true;
+            sandbox.runtimeGridColor = new Color(1f, 1f, 1f, 0.42f);
+            sandbox.runtimeGridLineWidth = 0.012f;
 
             RuntimeTileMeshFusionIntegrityMonitor integrityMonitor =
                 controllerObject.AddComponent<RuntimeTileMeshFusionIntegrityMonitor>();
@@ -741,7 +745,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             overlay.useTextOutline = true;
             overlay.outlineColor = new Color(1f, 1f, 1f, 0.92f);
             overlay.outlineWidth = 0.16f;
-            overlay.useLabelBackground = true;
+            overlay.useLabelBackground = false;
             overlay.labelBackgroundColor = new Color(1f, 1f, 1f, 0.72f);
         }
 
@@ -799,6 +803,9 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             controller.allowFreePurchases = true;
             controller.defaultStartingMoney = 100f;
             controller.moneyFormat = "Money: {0}";
+            controller.moneyHudAnchoredPosition = new Vector2(32f, 24f);
+            controller.liftMoneyAboveShop = true;
+            controller.useShopBlurredBackdrop = true;
 
             controller.shopItems = new List<FusionGameModeController.BlockShopItem>
             {
@@ -891,10 +898,10 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
         private static void CreateGridOverlay(Material material)
         {
             GameObject root = new GameObject("Runtime Grid Overlay");
-            const int halfWidth = 10;
-            const int halfHeight = 6;
+            const int halfWidth = 40;
+            const int halfHeight = 24;
             const float lineWidth = 0.015f;
-            Color lineColor = new Color(0.28f, 0.3f, 0.34f, 0.85f);
+            Color lineColor = new Color(1f, 1f, 1f, 0.42f);
 
             for (int x = -halfWidth; x <= halfWidth; x++)
                 CreateGridLine(root.transform, "Grid X " + x, material, lineColor, lineWidth, new Vector3(x, -halfHeight, 0.25f), new Vector3(x, halfHeight, 0.25f));

@@ -85,8 +85,20 @@ namespace DuoCurtain.RuntimeTileMesh
         public Vector2Int sceneGridHalfExtents = new Vector2Int(12, 7);
         public Color sceneGridColor = new Color(0.45f, 0.45f, 0.5f, 0.35f);
 
+        [Header("Runtime Grid Overlay")]
+        public bool renderRuntimeGridInGame = true;
+        public bool disableLegacyRuntimeGridOverlay = true;
+        public Color runtimeGridColor = new Color(1f, 1f, 1f, 0.42f);
+        [Min(0.001f)]
+        public float runtimeGridLineWidth = 0.012f;
+        public int runtimeGridSortingOrder = -45;
+        [Min(0f)]
+        public float runtimeGridCameraPaddingCells = 2f;
+        public Material runtimeGridMaterial;
+
         private readonly List<RuntimeTileMeshDraggableBlock> blocks =
             new List<RuntimeTileMeshDraggableBlock>();
+        private readonly List<LineRenderer> runtimeGridLines = new List<LineRenderer>();
 
         private RuntimeTileMeshDraggableBlock hoveredBlock;
         private RuntimeTileMeshDraggableBlock selectedBlock;
@@ -101,6 +113,9 @@ namespace DuoCurtain.RuntimeTileMesh
         private readonly List<RuntimeTileMeshFusionDoor> playerDoorContactRemovalBuffer =
             new List<RuntimeTileMeshFusionDoor>();
         private int suppressPointerInputFrame = -1;
+        private Transform runtimeGridRoot;
+        private Material runtimeGridRuntimeMaterial;
+        private bool legacyRuntimeGridChecked;
 
         public bool HasWalkableCells => CollectWalkableCells().Count > 0;
         public bool ManagementInputEnabled => managementInputEnabled;
@@ -191,6 +206,22 @@ namespace DuoCurtain.RuntimeTileMesh
             UpdateHover(mouseWorld);
             if (Input.GetMouseButtonDown(0) && hoveredBlock != null)
                 PickUpBlock(hoveredBlock, mouseWorld);
+        }
+
+        void LateUpdate()
+        {
+            UpdateRuntimeGridOverlay();
+        }
+
+        void OnDestroy()
+        {
+            if (runtimeGridRuntimeMaterial != null)
+            {
+                if (Application.isPlaying)
+                    Destroy(runtimeGridRuntimeMaterial);
+                else
+                    DestroyImmediate(runtimeGridRuntimeMaterial);
+            }
         }
 
         private void HandleDoorInteractionInput()
@@ -1638,6 +1669,146 @@ namespace DuoCurtain.RuntimeTileMesh
         {
             Vector2Int cell = RuntimeTileMeshDraggableBlock.WorldToCell(worldPosition, gridSize, gridOrigin);
             return RuntimeTileMeshDraggableBlock.CellToWorld(cell, gridSize, gridOrigin, z);
+        }
+
+        private void UpdateRuntimeGridOverlay()
+        {
+            if (!Application.isPlaying)
+                return;
+
+            if (disableLegacyRuntimeGridOverlay && !legacyRuntimeGridChecked)
+            {
+                legacyRuntimeGridChecked = true;
+                GameObject legacy = GameObject.Find("Runtime Grid Overlay");
+                if (legacy != null && legacy.transform != runtimeGridRoot)
+                    legacy.SetActive(false);
+            }
+
+            if (!renderRuntimeGridInGame || worldCamera == null)
+            {
+                if (runtimeGridRoot != null)
+                    runtimeGridRoot.gameObject.SetActive(false);
+                return;
+            }
+
+            EnsureRuntimeGridRoot();
+            if (runtimeGridRoot == null)
+                return;
+
+            runtimeGridRoot.gameObject.SetActive(true);
+            float safeGridSize = Mathf.Max(0.0001f, Mathf.Abs(gridSize));
+            float halfHeight = worldCamera.orthographic
+                ? worldCamera.orthographicSize
+                : Mathf.Max(1f, Vector3.Distance(worldCamera.transform.position, Vector3.zero) * 0.5f);
+            float halfWidth = halfHeight * Mathf.Max(0.01f, worldCamera.aspect);
+            Vector3 center = worldCamera.transform.position;
+            float padding = Mathf.Max(0f, runtimeGridCameraPaddingCells) * safeGridSize;
+
+            float minWorldX = center.x - halfWidth - padding;
+            float maxWorldX = center.x + halfWidth + padding;
+            float minWorldY = center.y - halfHeight - padding;
+            float maxWorldY = center.y + halfHeight + padding;
+
+            int minX = Mathf.FloorToInt((minWorldX - gridOrigin.x) / safeGridSize);
+            int maxX = Mathf.CeilToInt((maxWorldX - gridOrigin.x) / safeGridSize);
+            int minY = Mathf.FloorToInt((minWorldY - gridOrigin.y) / safeGridSize);
+            int maxY = Mathf.CeilToInt((maxWorldY - gridOrigin.y) / safeGridSize);
+
+            int lineIndex = 0;
+            for (int x = minX; x <= maxX; x++)
+            {
+                float worldX = gridOrigin.x + x * safeGridSize;
+                LineRenderer line = GetRuntimeGridLine(lineIndex++);
+                ConfigureRuntimeGridLine(
+                    line,
+                    new Vector3(worldX, gridOrigin.y + minY * safeGridSize, 0f),
+                    new Vector3(worldX, gridOrigin.y + maxY * safeGridSize, 0f));
+            }
+
+            for (int y = minY; y <= maxY; y++)
+            {
+                float worldY = gridOrigin.y + y * safeGridSize;
+                LineRenderer line = GetRuntimeGridLine(lineIndex++);
+                ConfigureRuntimeGridLine(
+                    line,
+                    new Vector3(gridOrigin.x + minX * safeGridSize, worldY, 0f),
+                    new Vector3(gridOrigin.x + maxX * safeGridSize, worldY, 0f));
+            }
+
+            for (int i = lineIndex; i < runtimeGridLines.Count; i++)
+            {
+                if (runtimeGridLines[i] != null)
+                    runtimeGridLines[i].gameObject.SetActive(false);
+            }
+        }
+
+        private void EnsureRuntimeGridRoot()
+        {
+            if (runtimeGridRoot != null)
+                return;
+
+            GameObject root = new GameObject("Fusion Runtime Camera Grid");
+            root.transform.SetParent(transform, false);
+            runtimeGridRoot = root.transform;
+        }
+
+        private LineRenderer GetRuntimeGridLine(int index)
+        {
+            while (runtimeGridLines.Count <= index)
+            {
+                GameObject lineObject = new GameObject("Runtime Grid Line " + runtimeGridLines.Count);
+                lineObject.transform.SetParent(runtimeGridRoot, false);
+                LineRenderer line = lineObject.AddComponent<LineRenderer>();
+                line.useWorldSpace = true;
+                line.positionCount = 2;
+                line.numCapVertices = 0;
+                line.numCornerVertices = 0;
+                runtimeGridLines.Add(line);
+            }
+
+            LineRenderer renderer = runtimeGridLines[index];
+            renderer.gameObject.SetActive(true);
+            return renderer;
+        }
+
+        private void ConfigureRuntimeGridLine(LineRenderer line, Vector3 start, Vector3 end)
+        {
+            if (line == null)
+                return;
+
+            line.sharedMaterial = GetRuntimeGridMaterial();
+            line.startColor = runtimeGridColor;
+            line.endColor = runtimeGridColor;
+            line.widthMultiplier = Mathf.Max(0.001f, runtimeGridLineWidth);
+            line.sortingOrder = runtimeGridSortingOrder;
+            line.SetPosition(0, start);
+            line.SetPosition(1, end);
+        }
+
+        private Material GetRuntimeGridMaterial()
+        {
+            if (runtimeGridMaterial != null)
+                return runtimeGridMaterial;
+
+            if (runtimeGridRuntimeMaterial != null)
+                return runtimeGridRuntimeMaterial;
+
+            Shader shader = Shader.Find("Sprites/Default");
+            if (shader == null)
+                shader = Shader.Find("Universal Render Pipeline/Unlit");
+            if (shader == null)
+                shader = Shader.Find("Unlit/Color");
+
+            if (shader == null)
+                return null;
+
+            runtimeGridRuntimeMaterial = new Material(shader);
+            runtimeGridRuntimeMaterial.name = "Fusion Runtime Camera Grid";
+            if (runtimeGridRuntimeMaterial.HasProperty("_BaseColor"))
+                runtimeGridRuntimeMaterial.SetColor("_BaseColor", Color.white);
+            if (runtimeGridRuntimeMaterial.HasProperty("_Color"))
+                runtimeGridRuntimeMaterial.SetColor("_Color", Color.white);
+            return runtimeGridRuntimeMaterial;
         }
 
         void OnDrawGizmos()

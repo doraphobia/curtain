@@ -393,7 +393,7 @@ MonoBehaviour:
   normalSortingOrder: 0
   selectedSortingOrder: 10
   drawSceneGrid: 1
-  sceneGridHalfExtents: {x: 10, y: 6}
+  sceneGridHalfExtents: {x: 40, y: 24}
   sceneGridColor: {r: 0.45, g: 0.45, b: 0.5, a: 0.35}
 --- !u!114 &31788942
 MonoBehaviour:
@@ -425,7 +425,7 @@ MonoBehaviour:
   useTextOutline: 1
   outlineColor: {r: 1, g: 1, b: 1, a: 0.92}
   outlineWidth: 0.16
-  useLabelBackground: 1
+  useLabelBackground: 0
   labelBackgroundColor: {r: 1, g: 1, b: 1, a: 0.72}
   labelSize: {x: 82, y: 51}
   topRightInset: {x: 8, y: -8}
@@ -8300,10 +8300,10 @@ TextMesh:
   m_GameObject: {fileID: 2099612282}
   m_Text: 'Fusion Sandbox
 
-    Enter toggles Player / Management mode. Tab toggles
-    Block size and Type labels.
+    Enter toggles Player / Management mode. Block labels
+    appear automatically in Management.
 
-    Use 1-4 to buy preset blocks, then drag, snap,
+    Use 1-5 to buy blocks or windows, then drag, snap,
     place, and merge.'
   m_OffsetZ: 0
   m_CharacterSize: 0.09
