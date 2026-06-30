@@ -63,17 +63,39 @@ namespace DuoCurtain.RuntimeTileMesh
         public bool createShopPanelIfMissing = true;
         public bool showShopOnlyInManagementMode = true;
         public RectTransform shopPanelRoot;
+        public RectTransform shopViewportRoot;
         public RectTransform shopContentRoot;
         public TextMeshProUGUI shopConfirmationText;
         public string confirmPurchaseFormat = "Buy {0}? Click again to confirm.";
         public string cannotAffordFormat = "Not enough money: {0}";
-        public Vector2 shopPanelSize = new Vector2(360f, 460f);
-        public Vector2 shopPanelAnchoredPosition = new Vector2(-32f, -112f);
+        [Min(120f)]
+        public float shopBannerHeight = 300f;
+        [Min(0f)]
+        public float shopBottomInset = 0f;
+        [Min(0.01f)]
+        public float shopSlideDuration = 0.38f;
+        public AnimationCurve shopSlideCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+        public Vector2 shopCardSize = new Vector2(292f, 220f);
+        [Min(0f)]
+        public float shopCardSpacing = 16f;
+        [Min(1f)]
+        public float shopEdgeScrollZone = 180f;
+        [Min(0f)]
+        public float shopEdgeScrollMinSpeed = 160f;
+        [Min(0f)]
+        public float shopEdgeScrollMaxSpeed = 1050f;
         public Color shopPanelColor = new Color(0f, 0f, 0f, 0.72f);
         public Color shopButtonColor = new Color(1f, 1f, 1f, 0.12f);
         public Color shopPendingButtonColor = new Color(0.1f, 0.38f, 1f, 0.35f);
         public Color shopTextColor = Color.white;
         public Color shopPriceColor = new Color(1f, 0.84f, 0.36f, 1f);
+
+        [Header("Fusion Shop Thumbnails")]
+        [Range(64, 1024)]
+        public int shopThumbnailResolution = 256;
+        [Min(0.05f)]
+        public float shopThumbnailFramingPadding = 0.35f;
+        public Color shopThumbnailBackground = new Color(0f, 0f, 0f, 0f);
 
         [Header("Currency")]
         public TimeCounterUI currencySource;
@@ -86,7 +108,19 @@ namespace DuoCurtain.RuntimeTileMesh
         private Camera activeCamera;
         private readonly List<Button> shopButtons = new List<Button>();
         private readonly List<Image> shopButtonImages = new List<Image>();
+        private readonly List<RawImage> shopThumbnailImages = new List<RawImage>();
+        private CanvasGroup shopCanvasGroup;
+        private FusionShopThumbnailRenderer shopThumbnailRenderer;
+        private RuntimeTileMeshFusionSandbox boundSandbox;
+        private RuntimeTileMeshDraggableBlock pendingPurchasedBlock;
+        private int pendingPurchasedPrice;
         private int pendingShopIndex = -1;
+        private int shopItemsSignature;
+        private float shopSlideValue;
+        private float shopSlideStartValue;
+        private float shopSlideTargetValue;
+        private float shopSlideStartTime;
+        private bool shopSlideAnimating;
         private bool cachedPlayerHeadingLimit;
         private bool hasCachedPlayerHeadingState;
 
@@ -96,8 +130,8 @@ namespace DuoCurtain.RuntimeTileMesh
         {
             ResolveReferences();
             EnsureCurrencySource();
-            EnsureMoneyHud();
             EnsureShopPanel();
+            EnsureMoneyHud();
 
             if (applyStartModeOnAwake)
                 SetMode(startMode, false);
@@ -108,6 +142,7 @@ namespace DuoCurtain.RuntimeTileMesh
         void OnEnable()
         {
             ResolveReferences();
+            BindSandboxEvents();
             if (currencySource != null)
                 currencySource.ValueChanged += HandleCurrencyChanged;
             RefreshMoneyHud();
@@ -115,6 +150,7 @@ namespace DuoCurtain.RuntimeTileMesh
 
         void OnDisable()
         {
+            UnbindSandboxEvents();
             if (currencySource != null)
                 currencySource.ValueChanged -= HandleCurrencyChanged;
         }
@@ -122,11 +158,17 @@ namespace DuoCurtain.RuntimeTileMesh
         void Update()
         {
             ResolveReferences();
+            BindSandboxEvents();
 
             if (Input.GetKeyDown(toggleModeKey))
                 ToggleMode();
 
-            if (IsManagementMode)
+            HandlePendingConfirmationOutsideClick();
+            HandlePurchasedBlockCancellation();
+            UpdateShopSlide();
+            UpdateShopEdgeScroll();
+
+            if (IsManagementMode && IsShopInteractive())
                 HandleShopHotkeys();
 
             RefreshMoneyHud();
@@ -160,11 +202,14 @@ namespace DuoCurtain.RuntimeTileMesh
             if (item == null || item.blockPrefab == null || fusionSandbox == null)
                 return false;
 
+            int paidPrice = 0;
             if (!allowFreePurchases)
             {
                 EnsureCurrencySource();
                 if (currencySource == null || !currencySource.TrySpend(item.price))
                     return false;
+
+                paidPrice = item.price;
             }
 
             Vector3 spawnPosition = transform.position;
@@ -178,10 +223,18 @@ namespace DuoCurtain.RuntimeTileMesh
                 spawnPosition,
                 dragPurchasedBlockImmediately);
 
-            if (spawned != null)
-                spawned.name = item.displayName;
+            if (spawned == null)
+            {
+                if (paidPrice > 0 && currencySource != null)
+                    currencySource.AddValue(paidPrice);
+                return false;
+            }
 
-            return spawned != null;
+            spawned.name = item.displayName;
+            pendingPurchasedBlock = spawned;
+            pendingPurchasedPrice = paidPrice;
+            SetShopExpanded(false, false);
+            return true;
         }
 
         private void ApplyModeState(bool smoothCamera)
@@ -204,7 +257,7 @@ namespace DuoCurtain.RuntimeTileMesh
                 fusionSandbox.SetManagementInputEnabled(management, placeSelectedBlockWhenLeavingManagement);
 
             ApplyCursorState(management);
-            ApplyShopVisibility();
+            ApplyShopVisibility(!smoothCamera);
             SwitchCamera(management ? managementCamera : playerCamera, smoothCamera);
         }
 
@@ -303,7 +356,7 @@ namespace DuoCurtain.RuntimeTileMesh
 
         public void HandleShopItemClicked(int index)
         {
-            if (!IsManagementMode)
+            if (!IsManagementMode || !IsShopInteractive())
                 return;
 
             if (index < 0 || index >= shopItems.Count)
@@ -334,6 +387,33 @@ namespace DuoCurtain.RuntimeTileMesh
                 SetConfirmationText(string.Empty);
                 RefreshShopPanel();
             }
+        }
+
+        private void HandlePendingConfirmationOutsideClick()
+        {
+            if (pendingShopIndex < 0 || !IsShopInteractive() || !Input.GetMouseButtonDown(0))
+                return;
+
+            if (IsPointerInsideRect(shopPanelRoot))
+                return;
+
+            pendingShopIndex = -1;
+            SetConfirmationText(string.Empty);
+            if (fusionSandbox != null)
+                fusionSandbox.SuppressPointerInputForCurrentFrame();
+            RefreshShopPanel();
+        }
+
+        private void HandlePurchasedBlockCancellation()
+        {
+            if (pendingPurchasedBlock == null || fusionSandbox == null)
+                return;
+
+            if (fusionSandbox.SelectedBlock != pendingPurchasedBlock)
+                return;
+
+            if (Input.GetMouseButtonDown(Mathf.Max(0, fusionSandbox.cancelSelectionMouseButton)))
+                fusionSandbox.CancelSelectedBlock(true);
         }
 
         private void ApplyCursorState(bool management)
@@ -378,6 +458,55 @@ namespace DuoCurtain.RuntimeTileMesh
 
             if (currencySource == null)
                 currencySource = FindFirstObjectByType<TimeCounterUI>();
+        }
+
+        private void BindSandboxEvents()
+        {
+            if (boundSandbox == fusionSandbox)
+                return;
+
+            UnbindSandboxEvents();
+            boundSandbox = fusionSandbox;
+            if (boundSandbox == null)
+                return;
+
+            boundSandbox.BlockPlaced += HandleSandboxBlockPlaced;
+            boundSandbox.BlockSelectionCancelled += HandleSandboxBlockSelectionCancelled;
+        }
+
+        private void UnbindSandboxEvents()
+        {
+            if (boundSandbox == null)
+                return;
+
+            boundSandbox.BlockPlaced -= HandleSandboxBlockPlaced;
+            boundSandbox.BlockSelectionCancelled -= HandleSandboxBlockSelectionCancelled;
+            boundSandbox = null;
+        }
+
+        private void HandleSandboxBlockPlaced(RuntimeTileMeshDraggableBlock block)
+        {
+            if (block == null || block != pendingPurchasedBlock)
+                return;
+
+            pendingPurchasedBlock = null;
+            pendingPurchasedPrice = 0;
+            if (IsManagementMode)
+                SetShopExpanded(true, false);
+        }
+
+        private void HandleSandboxBlockSelectionCancelled(RuntimeTileMeshDraggableBlock block, bool destroyed)
+        {
+            if (block == null || block != pendingPurchasedBlock)
+                return;
+
+            if (destroyed && pendingPurchasedPrice > 0 && currencySource != null)
+                currencySource.AddValue(pendingPurchasedPrice);
+
+            pendingPurchasedBlock = null;
+            pendingPurchasedPrice = 0;
+            if (IsManagementMode)
+                SetShopExpanded(true, false);
         }
 
         private void BindCameraRigReferences(FusionModeCameraRig rig)
@@ -460,61 +589,105 @@ namespace DuoCurtain.RuntimeTileMesh
             {
                 EnsureCanvasCanReceiveClicks(shopPanelRoot != null ? shopPanelRoot.GetComponentInParent<Canvas>() : null);
                 EnsureEventSystem();
+                if (shopPanelRoot != null)
+                {
+                    shopCanvasGroup = shopPanelRoot.GetComponent<CanvasGroup>();
+                    if (shopCanvasGroup == null)
+                        shopCanvasGroup = shopPanelRoot.gameObject.AddComponent<CanvasGroup>();
+                }
                 return;
             }
 
-            Canvas canvas = FindFirstObjectByType<Canvas>();
+            GameObject existingCanvasObject = GameObject.Find("Fusion UI Canvas");
+            Canvas canvas = existingCanvasObject != null ? existingCanvasObject.GetComponent<Canvas>() : null;
             if (canvas == null)
                 canvas = CreateOverlayCanvas("Fusion UI Canvas", 1200);
-            else
-                EnsureCanvasCanReceiveClicks(canvas);
+            EnsureCanvasCanReceiveClicks(canvas);
             EnsureEventSystem();
 
-            GameObject panelObject = new GameObject("Fusion Block Shop Panel", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            GameObject panelObject = new GameObject(
+                "Fusion Block Shop Banner",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(Image),
+                typeof(CanvasGroup));
             panelObject.transform.SetParent(canvas.transform, false);
             shopPanelRoot = panelObject.GetComponent<RectTransform>();
-            shopPanelRoot.anchorMin = new Vector2(1f, 1f);
-            shopPanelRoot.anchorMax = new Vector2(1f, 1f);
-            shopPanelRoot.pivot = new Vector2(1f, 1f);
-            shopPanelRoot.anchoredPosition = shopPanelAnchoredPosition;
-            shopPanelRoot.sizeDelta = shopPanelSize;
+            shopPanelRoot.anchorMin = new Vector2(0f, 0f);
+            shopPanelRoot.anchorMax = new Vector2(1f, 0f);
+            shopPanelRoot.pivot = new Vector2(0.5f, 0f);
+            shopPanelRoot.sizeDelta = new Vector2(0f, shopBannerHeight);
 
             Image panelImage = panelObject.GetComponent<Image>();
             panelImage.color = shopPanelColor;
             panelImage.raycastTarget = true;
 
+            shopCanvasGroup = panelObject.GetComponent<CanvasGroup>();
+
             VerticalLayoutGroup panelLayout = panelObject.AddComponent<VerticalLayoutGroup>();
-            panelLayout.padding = new RectOffset(16, 16, 14, 16);
-            panelLayout.spacing = 10f;
+            panelLayout.padding = new RectOffset(24, 24, 12, 18);
+            panelLayout.spacing = 8f;
             panelLayout.childControlWidth = true;
-            panelLayout.childControlHeight = false;
+            panelLayout.childControlHeight = true;
             panelLayout.childForceExpandWidth = true;
             panelLayout.childForceExpandHeight = false;
 
-            GameObject titleObject = CreateTmpTextObject("Shop Title", panelObject.transform, "Blocks", 30f, shopTextColor, TextAlignmentOptions.TopLeft);
-            LayoutElement titleLayout = titleObject.AddComponent<LayoutElement>();
-            titleLayout.preferredHeight = 42f;
-
-            GameObject confirmObject = CreateTmpTextObject("Shop Confirmation", panelObject.transform, string.Empty, 22f, shopPriceColor, TextAlignmentOptions.TopLeft);
+            GameObject confirmObject = CreateTmpTextObject(
+                "Shop Confirmation",
+                panelObject.transform,
+                string.Empty,
+                24f,
+                shopPriceColor,
+                TextAlignmentOptions.Center);
             shopConfirmationText = confirmObject.GetComponent<TextMeshProUGUI>();
             LayoutElement confirmLayout = confirmObject.AddComponent<LayoutElement>();
-            confirmLayout.preferredHeight = 64f;
+            confirmLayout.preferredHeight = 38f;
 
-            GameObject contentObject = new GameObject("Shop Content", typeof(RectTransform), typeof(VerticalLayoutGroup));
-            contentObject.transform.SetParent(panelObject.transform, false);
+            GameObject viewportObject = new GameObject(
+                "Shop Viewport",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(Image),
+                typeof(RectMask2D),
+                typeof(LayoutElement));
+            viewportObject.transform.SetParent(panelObject.transform, false);
+            shopViewportRoot = viewportObject.GetComponent<RectTransform>();
+            Image viewportImage = viewportObject.GetComponent<Image>();
+            viewportImage.color = new Color(1f, 1f, 1f, 0.001f);
+            viewportImage.raycastTarget = false;
+            LayoutElement viewportLayout = viewportObject.GetComponent<LayoutElement>();
+            viewportLayout.flexibleHeight = 1f;
+
+            GameObject contentObject = new GameObject(
+                "Shop Content",
+                typeof(RectTransform),
+                typeof(HorizontalLayoutGroup),
+                typeof(ContentSizeFitter));
+            contentObject.transform.SetParent(viewportObject.transform, false);
             shopContentRoot = contentObject.GetComponent<RectTransform>();
-            VerticalLayoutGroup contentLayout = contentObject.GetComponent<VerticalLayoutGroup>();
-            contentLayout.spacing = 8f;
-            contentLayout.childControlWidth = true;
-            contentLayout.childControlHeight = false;
-            contentLayout.childForceExpandWidth = true;
-            contentLayout.childForceExpandHeight = false;
+            shopContentRoot.anchorMin = new Vector2(0f, 0f);
+            shopContentRoot.anchorMax = new Vector2(0f, 1f);
+            shopContentRoot.pivot = new Vector2(0f, 0.5f);
+            shopContentRoot.anchoredPosition = Vector2.zero;
+            shopContentRoot.sizeDelta = new Vector2(0f, 0f);
 
-            LayoutElement contentLayoutElement = contentObject.AddComponent<LayoutElement>();
-            contentLayoutElement.flexibleHeight = 1f;
+            HorizontalLayoutGroup contentLayout = contentObject.GetComponent<HorizontalLayoutGroup>();
+            contentLayout.spacing = shopCardSpacing;
+            contentLayout.childControlWidth = false;
+            contentLayout.childControlHeight = true;
+            contentLayout.childForceExpandWidth = false;
+            contentLayout.childForceExpandHeight = true;
+
+            ContentSizeFitter fitter = contentObject.GetComponent<ContentSizeFitter>();
+            fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+            fitter.verticalFit = ContentSizeFitter.FitMode.Unconstrained;
+
+            shopSlideValue = 0f;
+            shopSlideTargetValue = 0f;
+            ApplyShopSlidePosition();
 
             RebuildShopButtons();
-            ApplyShopVisibility();
+            ApplyShopVisibility(true);
         }
 
         private Canvas CreateOverlayCanvas(string name, int sortingOrder)
@@ -561,24 +734,53 @@ namespace DuoCurtain.RuntimeTileMesh
         {
             shopButtons.Clear();
             shopButtonImages.Clear();
+            shopThumbnailImages.Clear();
             if (shopContentRoot == null)
                 return;
 
             for (int i = shopContentRoot.childCount - 1; i >= 0; i--)
-                Destroy(shopContentRoot.GetChild(i).gameObject);
+            {
+                GameObject child = shopContentRoot.GetChild(i).gameObject;
+                child.SetActive(false);
+                Destroy(child);
+            }
 
             for (int i = 0; i < shopItems.Count; i++)
                 CreateShopButton(i);
+
+            shopItemsSignature = CalculateShopItemsSignature();
+            LayoutRebuilder.ForceRebuildLayoutImmediate(shopContentRoot);
+
+            if (shopThumbnailRenderer == null)
+            {
+                shopThumbnailRenderer = GetComponent<FusionShopThumbnailRenderer>();
+                if (shopThumbnailRenderer == null)
+                    shopThumbnailRenderer = gameObject.AddComponent<FusionShopThumbnailRenderer>();
+            }
+
+            shopThumbnailRenderer.Rebuild(
+                shopItems,
+                shopThumbnailImages,
+                shopThumbnailResolution,
+                shopThumbnailBackground,
+                shopThumbnailFramingPadding);
         }
 
         private void CreateShopButton(int index)
         {
             BlockShopItem item = shopItems[index];
-            GameObject buttonObject = new GameObject("Shop Item - " + (item != null ? item.displayName : index.ToString()), typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+            GameObject buttonObject = new GameObject(
+                "Shop Item - " + (item != null ? item.displayName : index.ToString()),
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(Image),
+                typeof(Button),
+                typeof(LayoutElement),
+                typeof(VerticalLayoutGroup));
             buttonObject.transform.SetParent(shopContentRoot, false);
 
             RectTransform rect = buttonObject.GetComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(0f, 64f);
+            rect.sizeDelta = shopCardSize;
 
             Image image = buttonObject.GetComponent<Image>();
             image.color = shopButtonColor;
@@ -588,27 +790,85 @@ namespace DuoCurtain.RuntimeTileMesh
             int capturedIndex = index;
             button.onClick.AddListener(() => HandleShopItemClicked(capturedIndex));
 
-            LayoutElement layout = buttonObject.AddComponent<LayoutElement>();
-            layout.preferredHeight = 64f;
+            LayoutElement layout = buttonObject.GetComponent<LayoutElement>();
+            layout.preferredWidth = shopCardSize.x;
+            layout.preferredHeight = shopCardSize.y;
+            layout.minWidth = shopCardSize.x;
 
-            HorizontalLayoutGroup row = buttonObject.AddComponent<HorizontalLayoutGroup>();
-            row.padding = new RectOffset(14, 14, 8, 8);
-            row.spacing = 10f;
-            row.childControlWidth = true;
-            row.childControlHeight = true;
-            row.childForceExpandWidth = false;
-            row.childForceExpandHeight = true;
+            VerticalLayoutGroup column = buttonObject.GetComponent<VerticalLayoutGroup>();
+            column.padding = new RectOffset(14, 14, 12, 12);
+            column.spacing = 8f;
+            column.childControlWidth = true;
+            column.childControlHeight = true;
+            column.childForceExpandWidth = true;
+            column.childForceExpandHeight = false;
 
-            GameObject nameText = CreateTmpTextObject("Name", buttonObject.transform, item != null ? item.displayName : "Block", 24f, shopTextColor, TextAlignmentOptions.MidlineLeft);
+            GameObject nameText = CreateTmpTextObject(
+                "Name",
+                buttonObject.transform,
+                item != null ? item.displayName : "Block",
+                26f,
+                shopTextColor,
+                TextAlignmentOptions.MidlineLeft);
             LayoutElement nameLayout = nameText.AddComponent<LayoutElement>();
-            nameLayout.flexibleWidth = 1f;
+            nameLayout.preferredHeight = 34f;
 
-            GameObject priceText = CreateTmpTextObject("Price", buttonObject.transform, item != null ? item.price.ToString() : "0", 22f, shopPriceColor, TextAlignmentOptions.MidlineRight);
+            GameObject bodyObject = new GameObject(
+                "Thumbnail and Price",
+                typeof(RectTransform),
+                typeof(HorizontalLayoutGroup),
+                typeof(LayoutElement));
+            bodyObject.transform.SetParent(buttonObject.transform, false);
+            HorizontalLayoutGroup bodyLayout = bodyObject.GetComponent<HorizontalLayoutGroup>();
+            bodyLayout.spacing = 10f;
+            bodyLayout.childControlWidth = true;
+            bodyLayout.childControlHeight = true;
+            bodyLayout.childForceExpandWidth = false;
+            bodyLayout.childForceExpandHeight = true;
+            LayoutElement bodySize = bodyObject.GetComponent<LayoutElement>();
+            bodySize.flexibleHeight = 1f;
+
+            GameObject thumbnailContainer = new GameObject(
+                "Live Block Thumbnail Container",
+                typeof(RectTransform),
+                typeof(LayoutElement));
+            thumbnailContainer.transform.SetParent(bodyObject.transform, false);
+            LayoutElement thumbnailLayout = thumbnailContainer.GetComponent<LayoutElement>();
+            thumbnailLayout.flexibleWidth = 1f;
+            thumbnailLayout.minWidth = Mathf.Max(80f, shopCardSize.x - 120f);
+
+            GameObject thumbnailObject = new GameObject(
+                "Live Block Thumbnail",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(RawImage),
+                typeof(AspectRatioFitter));
+            thumbnailObject.transform.SetParent(thumbnailContainer.transform, false);
+            RectTransform thumbnailRect = thumbnailObject.GetComponent<RectTransform>();
+            thumbnailRect.anchorMin = Vector2.zero;
+            thumbnailRect.anchorMax = Vector2.one;
+            thumbnailRect.offsetMin = Vector2.zero;
+            thumbnailRect.offsetMax = Vector2.zero;
+            RawImage thumbnail = thumbnailObject.GetComponent<RawImage>();
+            thumbnail.color = Color.white;
+            thumbnail.raycastTarget = false;
+            AspectRatioFitter aspect = thumbnailObject.GetComponent<AspectRatioFitter>();
+            aspect.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+            aspect.aspectRatio = 1f;
+
+            GameObject priceText = CreateTmpTextObject(
+                "Price",
+                bodyObject.transform,
+                item != null ? item.price.ToString() : "0",
+                24f,
+                shopPriceColor,
+                TextAlignmentOptions.BottomRight);
             LayoutElement priceLayout = priceText.AddComponent<LayoutElement>();
-            priceLayout.preferredWidth = 88f;
+            priceLayout.preferredWidth = 72f;
 
             shopButtons.Add(button);
             shopButtonImages.Add(image);
+            shopThumbnailImages.Add(thumbnail);
         }
 
         private GameObject CreateTmpTextObject(
@@ -649,9 +909,10 @@ namespace DuoCurtain.RuntimeTileMesh
             if (shopPanelRoot == null)
                 return;
 
-            if (shopButtons.Count != shopItems.Count)
+            if (shopButtons.Count != shopItems.Count || shopItemsSignature != CalculateShopItemsSignature())
                 RebuildShopButtons();
 
+            bool shopInteractive = IsShopInteractive();
             for (int i = 0; i < shopButtons.Count; i++)
             {
                 Button button = shopButtons[i];
@@ -659,7 +920,7 @@ namespace DuoCurtain.RuntimeTileMesh
                     continue;
 
                 BlockShopItem item = i < shopItems.Count ? shopItems[i] : null;
-                button.interactable = IsManagementMode && item != null && item.blockPrefab != null &&
+                button.interactable = shopInteractive && item != null && item.blockPrefab != null &&
                     (allowFreePurchases || currencySource == null || currencySource.CanAfford(item.price));
 
                 if (i < shopButtonImages.Count && shopButtonImages[i] != null)
@@ -667,7 +928,7 @@ namespace DuoCurtain.RuntimeTileMesh
             }
         }
 
-        private void ApplyShopVisibility()
+        private void ApplyShopVisibility(bool instant)
         {
             if (shopPanelRoot == null)
                 return;
@@ -678,13 +939,211 @@ namespace DuoCurtain.RuntimeTileMesh
                 SetConfirmationText(string.Empty);
             }
 
-            shopPanelRoot.gameObject.SetActive(!showShopOnlyInManagementMode || IsManagementMode);
+            bool shouldExpand = (!showShopOnlyInManagementMode || IsManagementMode) && pendingPurchasedBlock == null;
+            SetShopExpanded(shouldExpand, instant);
         }
 
         private void SetConfirmationText(string text)
         {
             if (shopConfirmationText != null)
-                shopConfirmationText.text = text;
+                shopConfirmationText.text = string.IsNullOrEmpty(text) ? " " : text;
+        }
+
+        private bool IsShopInteractive()
+        {
+            if (shopPanelRoot == null || shopCanvasGroup == null)
+                return false;
+
+            if (showShopOnlyInManagementMode && !IsManagementMode)
+                return false;
+
+            return pendingPurchasedBlock == null &&
+                !shopSlideAnimating &&
+                shopSlideTargetValue > 0.5f &&
+                shopSlideValue >= 0.999f;
+        }
+
+        private void SetShopExpanded(bool expanded, bool instant)
+        {
+            if (shopPanelRoot == null)
+                return;
+
+            float target = expanded ? 1f : 0f;
+            if (instant || shopSlideDuration <= 0.01f)
+            {
+                shopSlideValue = target;
+                shopSlideStartValue = target;
+                shopSlideTargetValue = target;
+                shopSlideAnimating = false;
+                ApplyShopSlidePosition();
+                RefreshShopInteractionState();
+                return;
+            }
+
+            if (!shopSlideAnimating && Mathf.Approximately(shopSlideValue, target))
+            {
+                shopSlideTargetValue = target;
+                RefreshShopInteractionState();
+                return;
+            }
+
+            shopSlideStartValue = shopSlideValue;
+            shopSlideTargetValue = target;
+            shopSlideStartTime = Time.unscaledTime;
+            shopSlideAnimating = true;
+            RefreshShopInteractionState();
+        }
+
+        private void UpdateShopSlide()
+        {
+            if (!shopSlideAnimating)
+            {
+                ApplyShopSlidePosition();
+                RefreshShopInteractionState();
+                return;
+            }
+
+            float duration = Mathf.Max(0.01f, shopSlideDuration);
+            float normalized = Mathf.Clamp01((Time.unscaledTime - shopSlideStartTime) / duration);
+            float eased = shopSlideCurve != null ? shopSlideCurve.Evaluate(normalized) : normalized;
+            shopSlideValue = Mathf.LerpUnclamped(shopSlideStartValue, shopSlideTargetValue, eased);
+            ApplyShopSlidePosition();
+
+            if (normalized >= 1f)
+            {
+                shopSlideValue = shopSlideTargetValue;
+                shopSlideAnimating = false;
+                ApplyShopSlidePosition();
+            }
+
+            RefreshShopInteractionState();
+        }
+
+        private void ApplyShopSlidePosition()
+        {
+            if (shopPanelRoot == null)
+                return;
+
+            shopPanelRoot.sizeDelta = new Vector2(0f, Mathf.Max(120f, shopBannerHeight));
+            float hiddenY = -Mathf.Max(120f, shopBannerHeight) - 4f;
+            float shownY = Mathf.Max(0f, shopBottomInset);
+            Vector2 anchored = shopPanelRoot.anchoredPosition;
+            anchored.x = 0f;
+            anchored.y = Mathf.Lerp(hiddenY, shownY, Mathf.Clamp01(shopSlideValue));
+            shopPanelRoot.anchoredPosition = anchored;
+        }
+
+        private void RefreshShopInteractionState()
+        {
+            if (shopCanvasGroup == null)
+                return;
+
+            bool interactive = IsShopInteractive();
+            shopCanvasGroup.interactable = interactive;
+            shopCanvasGroup.blocksRaycasts = interactive;
+        }
+
+        private void UpdateShopEdgeScroll()
+        {
+            if (!IsShopInteractive() || shopViewportRoot == null || shopContentRoot == null)
+                return;
+
+            if (!IsPointerInsideRect(shopViewportRoot))
+                return;
+
+            LayoutRebuilder.ForceRebuildLayoutImmediate(shopContentRoot);
+            float viewportWidth = shopViewportRoot.rect.width;
+            float contentWidth = Mathf.Max(shopContentRoot.rect.width, LayoutUtility.GetPreferredWidth(shopContentRoot));
+            float maxOffset = Mathf.Max(0f, contentWidth - viewportWidth);
+            if (maxOffset <= 0.01f)
+            {
+                SetShopContentX(0f, 0f);
+                return;
+            }
+
+            Vector2 localPointer;
+            Canvas canvas = shopViewportRoot.GetComponentInParent<Canvas>();
+            Camera eventCamera = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay
+                ? canvas.worldCamera
+                : null;
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                shopViewportRoot,
+                Input.mousePosition,
+                eventCamera,
+                out localPointer))
+            {
+                return;
+            }
+
+            Rect viewportRect = shopViewportRoot.rect;
+            float zone = Mathf.Min(Mathf.Max(1f, shopEdgeScrollZone), viewportWidth * 0.5f);
+            float direction = 0f;
+            float pressure = 0f;
+            if (localPointer.x < viewportRect.xMin + zone)
+            {
+                direction = 1f;
+                pressure = Mathf.InverseLerp(viewportRect.xMin + zone, viewportRect.xMin, localPointer.x);
+            }
+            else if (localPointer.x > viewportRect.xMax - zone)
+            {
+                direction = -1f;
+                pressure = Mathf.InverseLerp(viewportRect.xMax - zone, viewportRect.xMax, localPointer.x);
+            }
+
+            if (Mathf.Approximately(direction, 0f))
+                return;
+
+            pressure = Mathf.Clamp01(pressure);
+            float speed = Mathf.Lerp(shopEdgeScrollMinSpeed, shopEdgeScrollMaxSpeed, pressure * pressure);
+            float nextX = shopContentRoot.anchoredPosition.x + direction * speed * Time.unscaledDeltaTime;
+            SetShopContentX(nextX, maxOffset);
+        }
+
+        private void SetShopContentX(float x, float maxOffset)
+        {
+            if (shopContentRoot == null)
+                return;
+
+            Vector2 position = shopContentRoot.anchoredPosition;
+            position.x = Mathf.Clamp(x, -Mathf.Max(0f, maxOffset), 0f);
+            shopContentRoot.anchoredPosition = position;
+        }
+
+        private static bool IsPointerInsideRect(RectTransform target)
+        {
+            if (target == null || !target.gameObject.activeInHierarchy)
+                return false;
+
+            Canvas canvas = target.GetComponentInParent<Canvas>();
+            Camera eventCamera = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay
+                ? canvas.worldCamera
+                : null;
+            return RectTransformUtility.RectangleContainsScreenPoint(target, Input.mousePosition, eventCamera);
+        }
+
+        private int CalculateShopItemsSignature()
+        {
+            unchecked
+            {
+                int hash = 17;
+                hash = hash * 31 + shopItems.Count;
+                for (int i = 0; i < shopItems.Count; i++)
+                {
+                    BlockShopItem item = shopItems[i];
+                    if (item == null)
+                    {
+                        hash *= 31;
+                        continue;
+                    }
+
+                    hash = hash * 31 + (item.displayName != null ? item.displayName.GetHashCode() : 0);
+                    hash = hash * 31 + (item.blockPrefab != null ? item.blockPrefab.GetInstanceID() : 0);
+                    hash = hash * 31 + item.price;
+                    hash = hash * 31 + (int)item.hotkey;
+                }
+
+                return hash;
+            }
         }
     }
 }

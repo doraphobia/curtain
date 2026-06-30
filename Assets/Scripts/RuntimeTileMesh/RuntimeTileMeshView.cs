@@ -49,6 +49,7 @@ namespace DuoCurtain.RuntimeTileMesh
 
         private RuntimeTileMeshBuildResult lastBuildResult;
         private Material runtimeFallbackMaterial;
+        private bool hasRebuilt;
 
         public event Action<RuntimeTileMeshView> Rebuilt;
 
@@ -56,7 +57,7 @@ namespace DuoCurtain.RuntimeTileMesh
 
         void Start()
         {
-            if (rebuildOnStart)
+            if (rebuildOnStart && !hasRebuilt)
                 Rebuild();
         }
 
@@ -87,6 +88,7 @@ namespace DuoCurtain.RuntimeTileMesh
 
         public RuntimeTileMeshBuildResult RebuildFromTiles(IEnumerable<Vector2Int> inputTiles)
         {
+            hasRebuilt = true;
 #if UNITY_EDITOR
             RuntimeTileMeshBuildDebug.Enabled = enableBuildDebugLogging;
 #endif
@@ -114,6 +116,9 @@ namespace DuoCurtain.RuntimeTileMesh
 
                 return lastBuildResult;
             }
+
+            if (previousRoot != null)
+                previousRoot.gameObject.SetActive(false);
 
             Transform root = CreateGeneratedRoot();
             for (int i = 0; i < lastBuildResult.components.Count; i++)

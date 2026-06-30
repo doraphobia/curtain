@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -12,6 +13,7 @@ namespace DuoCurtain.RuntimeTileMesh
         public LayerMask blockLayerMask = ~0;
         public bool managementInputEnabled = true;
         public bool ignorePointerOverUI = true;
+        public int cancelSelectionMouseButton = 1;
         public bool preserveGrabOffset = true;
         public bool snapExistingBlocksOnAwake = true;
         public bool mergeExistingBlocksOnAwake = true;
@@ -34,7 +36,7 @@ namespace DuoCurtain.RuntimeTileMesh
         [Min(1)]
         public int doorSharedEdgeCells = 3;
         [Min(0.01f)]
-        public float doorThickness = 0.5f;
+        public float doorThickness = 0.25f;
         [Range(1f, 179f)]
         public float doorOpenAngleDegrees = 90f;
         public Color doorColor = Color.black;
@@ -46,9 +48,9 @@ namespace DuoCurtain.RuntimeTileMesh
 
         [Header("Fusion Wall Visual")]
         public GameObject wallVisualPrefab;
-        public Color wallDebugColor = new Color(0f, 0f, 0f, 0.9f);
+        public Color wallDebugColor = new Color(0.38f, 0.38f, 0.38f, 0.95f);
         [Min(0.005f)]
-        public float wallDebugLineWidth = 0.08f;
+        public float wallDebugLineWidth = 0.035f;
 
         [Header("Player Walkable Area")]
         public bool excludeSelectedBlockFromWalkableArea = true;
@@ -72,15 +74,21 @@ namespace DuoCurtain.RuntimeTileMesh
 
         private RuntimeTileMeshDraggableBlock hoveredBlock;
         private RuntimeTileMeshDraggableBlock selectedBlock;
+        private Vector3 selectedStartPosition;
         private Vector3 grabOffset;
         private bool selectedThisFrame;
         private RuntimeTileMeshDraggableBlock playerCarrierBlock;
         private Vector3 playerCarrierLocalOffset;
         private readonly List<RuntimeTileMeshFusionDoor> doorBuffer = new List<RuntimeTileMeshFusionDoor>();
+        private int suppressPointerInputFrame = -1;
 
         public bool HasWalkableCells => CollectWalkableCells().Count > 0;
         public bool ManagementInputEnabled => managementInputEnabled;
         public bool IsCarryingPlayer => playerCarrierBlock != null;
+        public RuntimeTileMeshDraggableBlock SelectedBlock => selectedBlock;
+
+        public event Action<RuntimeTileMeshDraggableBlock> BlockPlaced;
+        public event Action<RuntimeTileMeshDraggableBlock, bool> BlockSelectionCancelled;
 
         void Awake()
         {
@@ -106,6 +114,12 @@ namespace DuoCurtain.RuntimeTileMesh
             if (PauseManager.IsGamePaused)
                 return;
 
+            if (suppressPointerInputFrame == Time.frameCount)
+            {
+                ClearHover();
+                return;
+            }
+
             if (!managementInputEnabled)
             {
                 HandleDoorInteractionInput();
@@ -124,6 +138,12 @@ namespace DuoCurtain.RuntimeTileMesh
             if (selectedBlock != null)
             {
                 MoveSelectedBlock(mouseWorld);
+                if (Input.GetMouseButtonDown(Mathf.Max(0, cancelSelectionMouseButton)))
+                {
+                    CancelSelectedBlock(false);
+                    return;
+                }
+
                 if (!pointerOverUI && Input.GetMouseButtonDown(0) && !selectedThisFrame)
                     PlaceSelectedBlock();
                 return;
@@ -206,10 +226,7 @@ namespace DuoCurtain.RuntimeTileMesh
                 return;
             }
 
-            selectedBlock.SetSelected(false);
-            selectedBlock.SetSortingOrder(normalSortingOrder);
-            selectedBlock = null;
-            ReleaseCarriedPlayer();
+            CancelSelectedBlock(false);
         }
 
         public RuntimeTileMeshDraggableBlock SpawnBlock(
@@ -237,6 +254,43 @@ namespace DuoCurtain.RuntimeTileMesh
             return block;
         }
 
+        public void SuppressPointerInputForCurrentFrame()
+        {
+            suppressPointerInputFrame = Time.frameCount;
+        }
+
+        public bool CancelSelectedBlock(bool destroyBlock)
+        {
+            RuntimeTileMeshDraggableBlock cancelled = selectedBlock;
+            if (cancelled == null)
+                return false;
+
+            selectedBlock = null;
+            cancelled.SetSelected(false);
+            cancelled.SetSortingOrder(normalSortingOrder);
+
+            if (!destroyBlock)
+            {
+                cancelled.transform.position = selectedStartPosition;
+                MoveCarriedPlayerTo(cancelled);
+            }
+
+            ReleaseCarriedPlayer();
+            BlockSelectionCancelled?.Invoke(cancelled, destroyBlock);
+
+            if (destroyBlock)
+            {
+                cancelled.gameObject.SetActive(false);
+                blocks.Remove(cancelled);
+                if (Application.isPlaying)
+                    Destroy(cancelled.gameObject);
+                else
+                    DestroyImmediate(cancelled.gameObject);
+            }
+
+            return true;
+        }
+
         public void BeginDraggingBlock(RuntimeTileMeshDraggableBlock block, Vector3 pointerWorld, bool useGrabOffset)
         {
             BeginDraggingBlockInternal(block, pointerWorld, useGrabOffset, true);
@@ -256,6 +310,7 @@ namespace DuoCurtain.RuntimeTileMesh
 
             ClearHover();
             selectedBlock = block;
+            selectedStartPosition = block.transform.position;
             selectedBlock.SetSelected(true);
             selectedBlock.SetSortingOrder(selectedSortingOrder);
             grabOffset = useGrabOffset ? selectedBlock.transform.position - pointerWorld : Vector3.zero;
@@ -339,6 +394,7 @@ namespace DuoCurtain.RuntimeTileMesh
             }
 
             selectedBlock = block;
+            selectedStartPosition = block.transform.position;
             selectedBlock.SetSelected(true);
             selectedBlock.SetSortingOrder(selectedSortingOrder);
             grabOffset = preserveGrabOffset ? selectedBlock.transform.position - mouseWorld : Vector3.zero;
@@ -370,6 +426,8 @@ namespace DuoCurtain.RuntimeTileMesh
 
             if (mergeAfterPlacement)
                 MergeConnectedBlocks(placed);
+
+            BlockPlaced?.Invoke(placed);
         }
 
         private void BindPlayerToSelectedBlock(bool allowPlayerCarry)
@@ -404,6 +462,20 @@ namespace DuoCurtain.RuntimeTileMesh
             }
 
             Vector3 carriedWorldPosition = playerCarrierBlock.transform.position + playerCarrierLocalOffset;
+            carriedWorldPosition.z = 0f;
+            playerControl.SetWorldPositionImmediate(carriedWorldPosition);
+        }
+
+        private void MoveCarriedPlayerTo(RuntimeTileMeshDraggableBlock block)
+        {
+            if (playerCarrierBlock == null || playerCarrierBlock != block)
+                return;
+
+            ResolvePlayerControl();
+            if (playerControl == null)
+                return;
+
+            Vector3 carriedWorldPosition = block.transform.position + playerCarrierLocalOffset;
             carriedWorldPosition.z = 0f;
             playerControl.SetWorldPositionImmediate(carriedWorldPosition);
         }
@@ -720,7 +792,7 @@ namespace DuoCurtain.RuntimeTileMesh
                 return false;
             }
 
-            RuntimeTileMeshDraggableBlock spawnBlock = activeBlocks[Random.Range(0, activeBlocks.Count)];
+            RuntimeTileMeshDraggableBlock spawnBlock = activeBlocks[UnityEngine.Random.Range(0, activeBlocks.Count)];
             HashSet<Vector2Int> cells = spawnBlock.GetWorldCells(gridSize, gridOrigin);
             if (cells.Count == 0)
             {

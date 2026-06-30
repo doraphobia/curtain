@@ -19,6 +19,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             failures += ExpectSuccessfulComponents("L", RuntimeTileMeshDemo.CreateShape(RuntimeTileMeshDemo.DemoShape.L), settings, 1);
             failures += ExpectSuccessfulComponents("T", RuntimeTileMeshDemo.CreateShape(RuntimeTileMeshDemo.DemoShape.T), settings, 1);
             failures += ExpectSuccessfulComponents("Z", RuntimeTileMeshDemo.CreateShape(RuntimeTileMeshDemo.DemoShape.Z), settings, 1);
+            failures += ExpectDistinctPresetShapes();
             failures += ExpectDeterministicBuild("Z", RuntimeTileMeshDemo.CreateShape(RuntimeTileMeshDemo.DemoShape.Z), settings);
             failures += ExpectSuccessfulComponents("DiagonalTouch", RuntimeTileMeshDemo.CreateShape(RuntimeTileMeshDemo.DemoShape.DiagonalTouch), settings, 2);
             failures += ExpectSuccessfulComponents("RingWithHole", RuntimeTileMeshDemo.CreateShape(RuntimeTileMeshDemo.DemoShape.RingWithHole), settings, 1);
@@ -87,6 +88,17 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             }
 
             return failures;
+        }
+
+        private static int ExpectDistinctPresetShapes()
+        {
+            HashSet<Vector2Int> l = new HashSet<Vector2Int>(RuntimeTileMeshDemo.CreateShape(RuntimeTileMeshDemo.DemoShape.L));
+            HashSet<Vector2Int> z = new HashSet<Vector2Int>(RuntimeTileMeshDemo.CreateShape(RuntimeTileMeshDemo.DemoShape.Z));
+            if (!l.SetEquals(z))
+                return 0;
+
+            Debug.LogError("[RuntimeTileMeshSelfTest] L and Z presets must not share the same footprint.");
+            return 1;
         }
 
         private static bool FirstTriangleFacesDefault2DCamera(RuntimeTileMeshData meshData)

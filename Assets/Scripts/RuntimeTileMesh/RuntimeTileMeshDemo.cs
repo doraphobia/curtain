@@ -90,9 +90,9 @@ namespace DuoCurtain.RuntimeTileMesh
                 case DemoShape.Z:
                     return new List<Vector2Int>
                     {
-                        new Vector2Int(0, 0),
-                        new Vector2Int(0, 1),
                         new Vector2Int(0, 2),
+                        new Vector2Int(1, 2),
+                        new Vector2Int(1, 1),
                         new Vector2Int(1, 0),
                         new Vector2Int(2, 0)
                     };

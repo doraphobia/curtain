@@ -343,15 +343,15 @@ MonoBehaviour:
   logFusionEvents: 1
   generateDoorsOnFusion: 1
   doorSharedEdgeCells: 3
-  doorThickness: 0.5
+  doorThickness: 0.25
   doorColor: {r: 0, g: 0, b: 0, a: 1}
   doorBlocksPlayer: 1
   allowHeadingPointDoorInteraction: 1
   doorInteractionMouseButton: 0
   doorInteractionRadius: 0.12
   wallVisualPrefab: {fileID: 0}
-  wallDebugColor: {r: 0, g: 0, b: 0, a: 0.9}
-  wallDebugLineWidth: 0.08
+  wallDebugColor: {r: 0.38, g: 0.38, b: 0.38, a: 0.95}
+  wallDebugLineWidth: 0.035
   excludeSelectedBlockFromWalkableArea: 1
   requireContinuousWalkablePath: 1
   pathSampleCellStep: 0.25

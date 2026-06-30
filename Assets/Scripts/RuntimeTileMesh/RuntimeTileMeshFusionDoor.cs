@@ -28,7 +28,7 @@ namespace DuoCurtain.RuntimeTileMesh
         [Min(0.0001f)]
         public float gridSize = 1f;
         [Min(0.01f)]
-        public float closedThickness = 0.5f;
+        public float closedThickness = 0.25f;
         [Min(0.01f)]
         public float doorLength = 1f;
         [Min(0f)]
@@ -49,10 +49,10 @@ namespace DuoCurtain.RuntimeTileMesh
         [Header("Wall Visual")]
         public bool useDefaultWallDebugVisual = true;
         public GameObject wallVisualPrefab;
-        public Color wallColor = new Color(0f, 0f, 0f, 0.9f);
+        public Color wallColor = new Color(0.38f, 0.38f, 0.38f, 0.95f);
         [Min(0.005f)]
-        public float wallLineWidth = 0.08f;
-        public bool useWallContrastOutline = true;
+        public float wallLineWidth = 0.035f;
+        public bool useWallContrastOutline = false;
         [Min(1f)]
         public float wallOutlineWidthMultiplier = 2.35f;
         [Range(0f, 1f)]
@@ -78,6 +78,8 @@ namespace DuoCurtain.RuntimeTileMesh
         private Mesh runtimeMesh;
         private Transform wallVisualRoot;
         private float lastToggleTime = -999f;
+        private readonly HashSet<int> supportedWallVariables = new HashSet<int>();
+        private readonly Dictionary<int, Vector2> wallVisualOffsetsByVariable = new Dictionary<int, Vector2>();
 
         public bool IsOpen => isOpen;
         public Vector2 OpenDirection => openDirection;
@@ -87,6 +89,9 @@ namespace DuoCurtain.RuntimeTileMesh
 
         void Awake()
         {
+            if (supportedWallVariables.Count == 0)
+                CacheDefaultWallSupport();
+
             EnsureVisual();
             ApplyVisualState();
         }
@@ -107,7 +112,12 @@ namespace DuoCurtain.RuntimeTileMesh
             wallGapLength = Mathf.Max(0.01f, wallGapLength);
 
             if (Application.isPlaying && panelTransform != null)
+            {
+                if (supportedWallVariables.Count == 0)
+                    CacheDefaultWallSupport();
+
                 ApplyVisualState();
+            }
         }
 
         void OnDestroy()
@@ -162,6 +172,7 @@ namespace DuoCurtain.RuntimeTileMesh
             openDirection = axis == DoorAxis.Vertical ? Vector2.right : Vector2.up;
             hingeEnd = DoorHingeEnd.Negative;
 
+            CacheDefaultWallSupport();
             EnsureVisual();
             RebuildWallVisual();
             ApplyVisualState();
@@ -173,17 +184,34 @@ namespace DuoCurtain.RuntimeTileMesh
                 return;
 
             int doorVariable = DoorVariable;
-            if (!TryGetExpandedWallSpan(blockCells, doorVariable, out int expandedStart, out int expandedLength))
+            if (!TryGetExpandedWallSpan(
+                    blockCells,
+                    doorVariable,
+                    out int expandedStart,
+                    out int expandedLength,
+                    out Dictionary<int, Vector2> visualOffsets))
+            {
                 return;
+            }
 
             int expandedOffset = doorVariable - expandedStart;
             if (expandedOffset < 0 || expandedOffset >= expandedLength)
                 return;
 
+            supportedWallVariables.Clear();
+            wallVisualOffsetsByVariable.Clear();
+            foreach (KeyValuePair<int, Vector2> pair in visualOffsets)
+            {
+                supportedWallVariables.Add(pair.Key);
+                wallVisualOffsetsByVariable[pair.Key] = pair.Value;
+            }
+
             if (expandedStart == wallVariableStart &&
                 expandedLength == wallCellLength &&
                 expandedOffset == doorVariableOffset)
             {
+                RebuildWallVisual();
+                ApplyVisualState();
                 return;
             }
 
@@ -236,6 +264,7 @@ namespace DuoCurtain.RuntimeTileMesh
             if (motion.sqrMagnitude <= 0.000001f)
                 return false;
 
+            bool crossedOpenDoorway = false;
             if (TryGetWallCrossingAlongCoordinate(from, to, out float alongCoordinate) &&
                 TryGetWallSegmentIndex(alongCoordinate, out int segmentIndex))
             {
@@ -249,6 +278,8 @@ namespace DuoCurtain.RuntimeTileMesh
 
                     return true;
                 }
+
+                crossedOpenDoorway = true;
             }
 
             if (!isOpen && CanToggleNow() &&
@@ -258,7 +289,7 @@ namespace DuoCurtain.RuntimeTileMesh
                 return true;
             }
 
-            if (isOpen && CanToggleNow() &&
+            if (isOpen && !crossedOpenDoorway && CanToggleNow() &&
                 SegmentTouchesPanel(from, to, GetOpenPanelPose(), playerRadius, out _))
             {
                 Close();
@@ -354,6 +385,13 @@ namespace DuoCurtain.RuntimeTileMesh
             }
 
             segmentIndex = Mathf.Clamp(Mathf.FloorToInt(local / safeGridSize), 0, wallCellLength - 1);
+            if (supportedWallVariables.Count > 0 &&
+                !supportedWallVariables.Contains(wallVariableStart + segmentIndex))
+            {
+                segmentIndex = -1;
+                return false;
+            }
+
             return true;
         }
 
@@ -676,19 +714,26 @@ namespace DuoCurtain.RuntimeTileMesh
 
             float safeGridSize = Mathf.Max(0.0001f, Mathf.Abs(gridSize));
             float runStart = GetWallRunStartLocal();
-            float segmentStart = runStart + startCellOffset * safeGridSize;
-            float segmentEnd = runStart + endCellOffset * safeGridSize;
-            float cursor = segmentStart;
-            int dashIndex = 0;
-
-            while (cursor < segmentEnd - 0.0001f)
+            for (int cellOffset = startCellOffset; cellOffset < endCellOffset; cellOffset++)
             {
-                float dashEnd = Mathf.Min(segmentEnd, cursor + wallDashLength * safeGridSize);
-                CreateWallDash(startCellOffset, cursor, dashEnd, dashIndex, true);
-                if (useWallContrastOutline)
-                    CreateWallDash(startCellOffset, cursor, dashEnd, dashIndex, false);
-                cursor = dashEnd + wallGapLength * safeGridSize;
-                dashIndex++;
+                int variable = wallVariableStart + cellOffset;
+                if (!TryGetWallVisualOffset(variable, out Vector2 visualOffset))
+                    continue;
+
+                float segmentStart = runStart + cellOffset * safeGridSize;
+                float segmentEnd = segmentStart + safeGridSize;
+                float cursor = segmentStart;
+                int dashIndex = 0;
+
+                while (cursor < segmentEnd - 0.0001f)
+                {
+                    float dashEnd = Mathf.Min(segmentEnd, cursor + wallDashLength * safeGridSize);
+                    CreateWallDash(cellOffset, cursor, dashEnd, dashIndex, visualOffset, true);
+                    if (useWallContrastOutline)
+                        CreateWallDash(cellOffset, cursor, dashEnd, dashIndex, visualOffset, false);
+                    cursor = dashEnd + wallGapLength * safeGridSize;
+                    dashIndex++;
+                }
             }
         }
 
@@ -697,6 +742,7 @@ namespace DuoCurtain.RuntimeTileMesh
             float dashStart,
             float dashEnd,
             int dashIndex,
+            Vector2 visualOffset,
             bool foreground)
         {
             GameObject dashObject = new GameObject(
@@ -721,13 +767,13 @@ namespace DuoCurtain.RuntimeTileMesh
 
             if (axis == DoorAxis.Vertical)
             {
-                line.SetPosition(0, new Vector3(0f, dashStart, 0f));
-                line.SetPosition(1, new Vector3(0f, dashEnd, 0f));
+                line.SetPosition(0, new Vector3(visualOffset.x, dashStart + visualOffset.y, 0f));
+                line.SetPosition(1, new Vector3(visualOffset.x, dashEnd + visualOffset.y, 0f));
             }
             else
             {
-                line.SetPosition(0, new Vector3(dashStart, 0f, 0f));
-                line.SetPosition(1, new Vector3(dashEnd, 0f, 0f));
+                line.SetPosition(0, new Vector3(dashStart + visualOffset.x, visualOffset.y, 0f));
+                line.SetPosition(1, new Vector3(dashEnd + visualOffset.x, visualOffset.y, 0f));
             }
         }
 
@@ -739,45 +785,96 @@ namespace DuoCurtain.RuntimeTileMesh
             return contrast;
         }
 
+        private void CacheDefaultWallSupport()
+        {
+            supportedWallVariables.Clear();
+            wallVisualOffsetsByVariable.Clear();
+            for (int i = 0; i < wallCellLength; i++)
+            {
+                int variable = wallVariableStart + i;
+                supportedWallVariables.Add(variable);
+                wallVisualOffsetsByVariable[variable] = Vector2.zero;
+            }
+        }
+
+        private bool TryGetWallVisualOffset(int variable, out Vector2 visualOffset)
+        {
+            if (wallVisualOffsetsByVariable.TryGetValue(variable, out visualOffset))
+                return true;
+
+            if (supportedWallVariables.Count > 0 && !supportedWallVariables.Contains(variable))
+                return false;
+
+            visualOffset = Vector2.zero;
+            return supportedWallVariables.Count == 0 ||
+                   variable >= wallVariableStart &&
+                   variable < wallVariableStart + wallCellLength;
+        }
+
         private bool TryGetExpandedWallSpan(
             ICollection<Vector2Int> blockCells,
             int doorVariable,
             out int start,
-            out int length)
+            out int length,
+            out Dictionary<int, Vector2> visualOffsets)
         {
             start = wallVariableStart;
             length = wallCellLength;
+            visualOffsets = new Dictionary<int, Vector2>();
 
             HashSet<Vector2Int> cellLookup = blockCells as HashSet<Vector2Int> ?? new HashSet<Vector2Int>(blockCells);
-            if (!IsWallLineSegmentCovered(cellLookup, doorVariable))
+            if (!TryGetWallLineSegmentSupport(cellLookup, doorVariable, out _))
                 return false;
 
             int expandedStart = doorVariable;
-            while (IsWallLineSegmentCovered(cellLookup, expandedStart - 1))
+            while (TryGetWallLineSegmentSupport(cellLookup, expandedStart - 1, out _))
                 expandedStart--;
 
             int expandedEnd = doorVariable + 1;
-            while (IsWallLineSegmentCovered(cellLookup, expandedEnd))
+            while (TryGetWallLineSegmentSupport(cellLookup, expandedEnd, out _))
                 expandedEnd++;
+
+            for (int variable = expandedStart; variable < expandedEnd; variable++)
+            {
+                if (TryGetWallLineSegmentSupport(cellLookup, variable, out Vector2 visualOffset))
+                    visualOffsets[variable] = visualOffset;
+            }
 
             start = expandedStart;
             length = Mathf.Max(1, expandedEnd - expandedStart);
             return true;
         }
 
-        private bool IsWallLineSegmentCovered(HashSet<Vector2Int> cellLookup, int variable)
+        private bool TryGetWallLineSegmentSupport(
+            HashSet<Vector2Int> cellLookup,
+            int variable,
+            out Vector2 visualOffset)
         {
+            visualOffset = Vector2.zero;
             if (cellLookup == null)
                 return false;
 
+            float inset = Mathf.Max(0f, wallLineWidth * 0.5f) + 0.001f;
             if (axis == DoorAxis.Vertical)
             {
-                return cellLookup.Contains(new Vector2Int(wallEdgeCoordinate - 1, variable)) ||
-                       cellLookup.Contains(new Vector2Int(wallEdgeCoordinate, variable));
+                bool leftCovered = cellLookup.Contains(new Vector2Int(wallEdgeCoordinate - 1, variable));
+                bool rightCovered = cellLookup.Contains(new Vector2Int(wallEdgeCoordinate, variable));
+                if (!leftCovered && !rightCovered)
+                    return false;
+
+                if (leftCovered != rightCovered)
+                    visualOffset = new Vector2(leftCovered ? -inset : inset, 0f);
+                return true;
             }
 
-            return cellLookup.Contains(new Vector2Int(variable, wallEdgeCoordinate - 1)) ||
-                   cellLookup.Contains(new Vector2Int(variable, wallEdgeCoordinate));
+            bool lowerCovered = cellLookup.Contains(new Vector2Int(variable, wallEdgeCoordinate - 1));
+            bool upperCovered = cellLookup.Contains(new Vector2Int(variable, wallEdgeCoordinate));
+            if (!lowerCovered && !upperCovered)
+                return false;
+
+            if (lowerCovered != upperCovered)
+                visualOffset = new Vector2(0f, lowerCovered ? -inset : inset);
+            return true;
         }
 
         private float GetWallRunStartLocal()

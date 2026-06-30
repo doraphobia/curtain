@@ -89,7 +89,7 @@ public class EnemyFootstepAudio : MonoBehaviour
     private void WarmPool()
     {
         while (sourcePool.Count < poolSize)
-            sourcePool.Add(CreatePooledSource());
+            CreatePooledSource();
     }
 
     private AudioSource GetAvailableSource()

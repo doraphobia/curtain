@@ -92,6 +92,7 @@ public class EnemyFootprintTrace : MonoBehaviour
     public EnemyTraceState CurrentTraceState => currentTraceState;
     public int ActiveFootprintCount => footprints.Count;
     public int MaxIndividualFootprints => Mathf.Max(1, maxFootprintPairs) * 2;
+    public bool PreserveLastPairWhenStopped => preserveLastPairWhenStopped;
 
     void Awake()
     {

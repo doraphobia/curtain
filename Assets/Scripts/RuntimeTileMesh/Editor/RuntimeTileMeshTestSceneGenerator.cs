@@ -601,11 +601,11 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             sandbox.sceneGridHalfExtents = new Vector2Int(10, 6);
             sandbox.generateDoorsOnFusion = true;
             sandbox.doorSharedEdgeCells = 3;
-            sandbox.doorThickness = 0.5f;
+            sandbox.doorThickness = 0.25f;
             sandbox.doorColor = Color.black;
             sandbox.doorBlocksPlayer = true;
-            sandbox.wallDebugColor = new Color(0f, 0f, 0f, 0.9f);
-            sandbox.wallDebugLineWidth = 0.08f;
+            sandbox.wallDebugColor = new Color(0.38f, 0.38f, 0.38f, 0.95f);
+            sandbox.wallDebugLineWidth = 0.035f;
 
             RuntimeTileMeshFusionIntegrityMonitor integrityMonitor =
                 controllerObject.AddComponent<RuntimeTileMeshFusionIntegrityMonitor>();
