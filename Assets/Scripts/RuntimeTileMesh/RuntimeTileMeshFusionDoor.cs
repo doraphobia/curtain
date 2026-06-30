@@ -150,6 +150,30 @@ namespace DuoCurtain.RuntimeTileMesh
             return TryBlockMovement(fromWorld, toWorld, playerRadius);
         }
 
+        public bool TryInteract(Vector3 interactionWorldPoint, Vector3 playerWorldPoint, float interactionRadius)
+        {
+            if (!CanToggleNow())
+                return false;
+
+            Vector2 point = interactionWorldPoint;
+            Rect panelRect = isOpen ? GetOpenPanelRect() : GetClosedPanelRect();
+            if (!PointTouchesRect(point, panelRect, interactionRadius))
+                return false;
+
+            if (isOpen)
+            {
+                Close();
+                return true;
+            }
+
+            Vector2 movement = (Vector2)seamCenter - (Vector2)playerWorldPoint;
+            if (movement.sqrMagnitude <= 0.0001f)
+                movement = openDirection.sqrMagnitude > 0.0001f ? openDirection : Vector2.right;
+
+            OpenToward(movement);
+            return true;
+        }
+
         public bool TryBlockMovement(Vector3 fromWorld, Vector3 toWorld, float playerRadius)
         {
             Vector2 from = fromWorld;
@@ -336,6 +360,16 @@ namespace DuoCurtain.RuntimeTileMesh
             }
 
             return false;
+        }
+
+        private static bool PointTouchesRect(Vector2 point, Rect rect, float inflate)
+        {
+            inflate = Mathf.Max(0f, inflate);
+            rect.xMin -= inflate;
+            rect.xMax += inflate;
+            rect.yMin -= inflate;
+            rect.yMax += inflate;
+            return rect.Contains(point);
         }
 
         private void EnsureVisual()

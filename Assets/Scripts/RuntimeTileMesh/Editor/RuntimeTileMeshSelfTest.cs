@@ -467,6 +467,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             if (expectedDoorCount > 0 && doors.Length > 0)
             {
                 RuntimeTileMeshFusionDoor door = doors[0];
+                door.toggleCooldown = 0f;
                 float distance = Vector2.Distance(door.seamCenter, expectedDoorCenter);
                 if (distance > 0.0001f)
                 {
@@ -474,27 +475,27 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                     failures++;
                 }
 
-                if (!door.TryBlockMovement(new Vector3(0.75f, 0.5f, 0f), new Vector3(1.25f, 0.5f, 0f), 0.05f))
+                if (!sandbox.TryBlockDoorMovement(new Vector3(0.75f, 0.5f, 0f), new Vector3(1.25f, 0.5f, 0f), 0.05f))
                 {
-                    Debug.LogError("[RuntimeTileMeshSelfTest] Fusion door rule " + name + " expected the lower safe wall segment to block movement.");
+                    Debug.LogError("[RuntimeTileMeshSelfTest] Fusion door rule " + name + " expected the sandbox-level lower safe wall segment to block movement.");
                     failures++;
                 }
 
-                if (!door.TryBlockMovement(new Vector3(0.75f, 1.5f, 0f), new Vector3(1.25f, 1.5f, 0f), 0.05f))
+                if (!sandbox.TryBlockDoorMovement(new Vector3(0.75f, 1.5f, 0f), new Vector3(1.25f, 1.5f, 0f), 0.05f))
                 {
-                    Debug.LogError("[RuntimeTileMeshSelfTest] Fusion door rule " + name + " expected the closed door segment to block and open.");
+                    Debug.LogError("[RuntimeTileMeshSelfTest] Fusion door rule " + name + " expected the sandbox-level closed door segment to block and open.");
                     failures++;
                 }
 
                 if (!door.IsOpen)
                 {
-                    Debug.LogError("[RuntimeTileMeshSelfTest] Fusion door rule " + name + " expected the door to open after player collision.");
+                    Debug.LogError("[RuntimeTileMeshSelfTest] Fusion door rule " + name + " expected the door to open after sandbox-level player collision.");
                     failures++;
                 }
 
-                if (door.TryBlockMovement(new Vector3(0.75f, 1.5f, 0f), new Vector3(1.25f, 1.5f, 0f), 0.05f))
+                if (sandbox.TryBlockDoorMovement(new Vector3(0.75f, 1.5f, 0f), new Vector3(1.25f, 1.5f, 0f), 0.05f))
                 {
-                    Debug.LogError("[RuntimeTileMeshSelfTest] Fusion door rule " + name + " expected the open door segment to allow movement.");
+                    Debug.LogError("[RuntimeTileMeshSelfTest] Fusion door rule " + name + " expected the sandbox-level open door segment to allow movement.");
                     failures++;
                 }
             }

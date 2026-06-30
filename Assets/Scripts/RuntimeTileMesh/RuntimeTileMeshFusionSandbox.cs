@@ -34,6 +34,10 @@ namespace DuoCurtain.RuntimeTileMesh
         public float doorThickness = 0.5f;
         public Color doorColor = Color.black;
         public bool doorBlocksPlayer = true;
+        public bool allowHeadingPointDoorInteraction = true;
+        public int doorInteractionMouseButton = 0;
+        [Min(0f)]
+        public float doorInteractionRadius = 0.12f;
 
         [Header("Fusion Wall Visual")]
         public GameObject wallVisualPrefab;
@@ -67,6 +71,7 @@ namespace DuoCurtain.RuntimeTileMesh
         private bool selectedThisFrame;
         private RuntimeTileMeshDraggableBlock playerCarrierBlock;
         private Vector3 playerCarrierLocalOffset;
+        private readonly List<RuntimeTileMeshFusionDoor> doorBuffer = new List<RuntimeTileMeshFusionDoor>();
 
         public bool HasWalkableCells => CollectWalkableCells().Count > 0;
         public bool ManagementInputEnabled => managementInputEnabled;
@@ -94,6 +99,7 @@ namespace DuoCurtain.RuntimeTileMesh
 
             if (!managementInputEnabled)
             {
+                HandleDoorInteractionInput();
                 ClearHover();
                 ReleaseCarriedPlayer();
                 return;
@@ -123,6 +129,37 @@ namespace DuoCurtain.RuntimeTileMesh
             UpdateHover(mouseWorld);
             if (Input.GetMouseButtonDown(0) && hoveredBlock != null)
                 PickUpBlock(hoveredBlock, mouseWorld);
+        }
+
+        private void HandleDoorInteractionInput()
+        {
+            if (!allowHeadingPointDoorInteraction)
+                return;
+
+            if (!Input.GetMouseButtonDown(Mathf.Max(0, doorInteractionMouseButton)))
+                return;
+
+            if (ignorePointerOverUI && EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+                return;
+
+            Vector3 interactionWorldPoint;
+            if (!PlayerControl.TryGetInteractionWorldPosition(out interactionWorldPoint))
+                interactionWorldPoint = GetPointerWorldPosition();
+
+            Vector3 playerWorldPoint;
+            if (!PlayerControl.TryGetPlayerWorldPosition(out playerWorldPoint))
+                playerWorldPoint = interactionWorldPoint;
+
+            List<RuntimeTileMeshFusionDoor> doors = CollectActiveDoors();
+            for (int i = 0; i < doors.Count; i++)
+            {
+                RuntimeTileMeshFusionDoor door = doors[i];
+                if (door != null && door.isActiveAndEnabled &&
+                    door.TryInteract(interactionWorldPoint, playerWorldPoint, doorInteractionRadius))
+                {
+                    break;
+                }
+            }
         }
 
         public void RefreshBlocks()
@@ -927,11 +964,16 @@ namespace DuoCurtain.RuntimeTileMesh
 
         private bool TryToggleDoorFromMovement(Vector3 from, Vector3 to, float playerRadius)
         {
+            return TryBlockDoorMovement(from, to, playerRadius);
+        }
+
+        public bool TryBlockDoorMovement(Vector3 from, Vector3 to, float playerRadius)
+        {
             if (!doorBlocksPlayer)
                 return false;
 
-            RuntimeTileMeshFusionDoor[] doors = GetComponentsInChildren<RuntimeTileMeshFusionDoor>(true);
-            for (int i = 0; i < doors.Length; i++)
+            List<RuntimeTileMeshFusionDoor> doors = CollectActiveDoors();
+            for (int i = 0; i < doors.Count; i++)
             {
                 RuntimeTileMeshFusionDoor door = doors[i];
                 if (door != null && door.isActiveAndEnabled && door.TryBlockMovement(from, to, playerRadius))
@@ -939,6 +981,38 @@ namespace DuoCurtain.RuntimeTileMesh
             }
 
             return false;
+        }
+
+        private List<RuntimeTileMeshFusionDoor> CollectActiveDoors()
+        {
+            doorBuffer.Clear();
+            if (blocks.Count == 0)
+                RefreshBlocks();
+
+            for (int i = 0; i < blocks.Count; i++)
+            {
+                RuntimeTileMeshDraggableBlock block = blocks[i];
+                if (block == null || !block.isActiveAndEnabled)
+                    continue;
+
+                RuntimeTileMeshFusionDoor[] blockDoors = block.GetComponentsInChildren<RuntimeTileMeshFusionDoor>(true);
+                for (int j = 0; j < blockDoors.Length; j++)
+                {
+                    RuntimeTileMeshFusionDoor door = blockDoors[j];
+                    if (door != null && !doorBuffer.Contains(door))
+                        doorBuffer.Add(door);
+                }
+            }
+
+            RuntimeTileMeshFusionDoor[] sandboxDoors = GetComponentsInChildren<RuntimeTileMeshFusionDoor>(true);
+            for (int i = 0; i < sandboxDoors.Length; i++)
+            {
+                RuntimeTileMeshFusionDoor door = sandboxDoors[i];
+                if (door != null && !doorBuffer.Contains(door))
+                    doorBuffer.Add(door);
+            }
+
+            return doorBuffer;
         }
 
         private int GetSegmentSampleCount(Vector3 from, Vector3 to)
