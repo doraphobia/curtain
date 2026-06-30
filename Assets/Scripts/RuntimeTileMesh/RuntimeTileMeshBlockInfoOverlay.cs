@@ -27,6 +27,7 @@ namespace DuoCurtain.RuntimeTileMesh
         [Header("References")]
         public RuntimeTileMeshFusionSandbox fusionSandbox;
         public Camera worldCamera;
+        public bool autoFollowActiveFusionCamera = true;
         public TMP_FontAsset labelFont;
         public string resourcesFontPath = "Fonts/Bayon-Regular SDF";
 
@@ -38,6 +39,12 @@ namespace DuoCurtain.RuntimeTileMesh
         [Range(-100f, 100f)]
         public float letterSpacingPercent = -5f;
         public Color textColor = Color.black;
+        public bool useTextOutline = true;
+        public Color outlineColor = new Color(1f, 1f, 1f, 0.92f);
+        [Range(0f, 0.5f)]
+        public float outlineWidth = 0.16f;
+        public bool useLabelBackground = true;
+        public Color labelBackgroundColor = new Color(1f, 1f, 1f, 0.72f);
         public Vector2 labelSize = new Vector2(82f, 51f);
         public Vector2 topRightInset = new Vector2(8f, -8f);
         public string defaultBlockType = "DEFAULT";
@@ -53,8 +60,8 @@ namespace DuoCurtain.RuntimeTileMesh
         public float blockRefreshInterval = 0.2f;
         public bool hideLabelsOutsideScreen = true;
 
-        private readonly Dictionary<RuntimeTileMeshDraggableBlock, TextMeshProUGUI> labels =
-            new Dictionary<RuntimeTileMeshDraggableBlock, TextMeshProUGUI>();
+        private readonly Dictionary<RuntimeTileMeshDraggableBlock, LabelHandle> labels =
+            new Dictionary<RuntimeTileMeshDraggableBlock, LabelHandle>();
         private readonly List<RuntimeTileMeshDraggableBlock> staleBlocks =
             new List<RuntimeTileMeshDraggableBlock>();
 
@@ -280,8 +287,19 @@ namespace DuoCurtain.RuntimeTileMesh
             if (fusionSandbox == null)
                 fusionSandbox = FindFirstObjectByType<RuntimeTileMeshFusionSandbox>();
 
-            if (fusionSandbox != null && fusionSandbox.worldCamera != null)
+            if (autoFollowActiveFusionCamera)
+            {
+                Camera activeFusionCamera = ResolveActiveFusionCamera();
+                if (activeFusionCamera != null)
+                    worldCamera = activeFusionCamera;
+                else if (fusionSandbox != null && fusionSandbox.worldCamera != null)
+                    worldCamera = fusionSandbox.worldCamera;
+            }
+            else if (fusionSandbox != null && fusionSandbox.worldCamera != null)
+            {
                 worldCamera = fusionSandbox.worldCamera;
+            }
+
             if (worldCamera == null)
                 worldCamera = Camera.main;
 
@@ -338,18 +356,18 @@ namespace DuoCurtain.RuntimeTileMesh
                     continue;
 
                 activeSet.Add(block);
-                if (!labels.TryGetValue(block, out TextMeshProUGUI label) || label == null)
+                if (!labels.TryGetValue(block, out LabelHandle label) || label == null || label.text == null)
                 {
                     label = CreateLabel(block);
                     labels[block] = label;
                 }
 
                 ApplyLabelTypography(label);
-                label.text = FormatWithLineHeight(GetDescription(block));
+                label.text.text = FormatWithLineHeight(GetDescription(block));
             }
 
             staleBlocks.Clear();
-            foreach (KeyValuePair<RuntimeTileMeshDraggableBlock, TextMeshProUGUI> pair in labels)
+            foreach (KeyValuePair<RuntimeTileMeshDraggableBlock, LabelHandle> pair in labels)
             {
                 if (pair.Key == null || !activeSet.Contains(pair.Key))
                     staleBlocks.Add(pair.Key);
@@ -358,19 +376,19 @@ namespace DuoCurtain.RuntimeTileMesh
             for (int i = 0; i < staleBlocks.Count; i++)
             {
                 RuntimeTileMeshDraggableBlock staleBlock = staleBlocks[i];
-                if (labels.TryGetValue(staleBlock, out TextMeshProUGUI label) && label != null)
-                    Destroy(label.gameObject);
+                if (labels.TryGetValue(staleBlock, out LabelHandle label) && label != null && label.root != null)
+                    Destroy(label.root.gameObject);
                 labels.Remove(staleBlock);
             }
         }
 
-        private TextMeshProUGUI CreateLabel(RuntimeTileMeshDraggableBlock block)
+        private LabelHandle CreateLabel(RuntimeTileMeshDraggableBlock block)
         {
             GameObject labelObject = new GameObject(
                 "Block Info - " + (block != null ? block.name : "Missing"),
                 typeof(RectTransform),
                 typeof(CanvasRenderer),
-                typeof(TextMeshProUGUI));
+                typeof(Image));
             labelObject.transform.SetParent(labelRoot, false);
 
             RectTransform rect = labelObject.GetComponent<RectTransform>();
@@ -379,17 +397,35 @@ namespace DuoCurtain.RuntimeTileMesh
             rect.pivot = new Vector2(0f, 1f);
             rect.sizeDelta = labelSize;
 
-            TextMeshProUGUI label = labelObject.GetComponent<TextMeshProUGUI>();
+            Image background = labelObject.GetComponent<Image>();
+            background.raycastTarget = false;
+
+            GameObject textObject = new GameObject(
+                "Text",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(TextMeshProUGUI));
+            textObject.transform.SetParent(labelObject.transform, false);
+
+            RectTransform textRect = textObject.GetComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = Vector2.zero;
+            textRect.offsetMax = Vector2.zero;
+
+            TextMeshProUGUI label = textObject.GetComponent<TextMeshProUGUI>();
             label.raycastTarget = false;
-            ApplyLabelTypography(label);
-            return label;
+            LabelHandle handle = new LabelHandle(rect, background, label);
+            ApplyLabelTypography(handle);
+            return handle;
         }
 
-        private void ApplyLabelTypography(TextMeshProUGUI label)
+        private void ApplyLabelTypography(LabelHandle handle)
         {
-            if (label == null)
+            if (handle == null || handle.text == null)
                 return;
 
+            TextMeshProUGUI label = handle.text;
             if (labelFont != null)
                 label.font = labelFont;
             label.fontStyle = FontStyles.Normal;
@@ -402,9 +438,21 @@ namespace DuoCurtain.RuntimeTileMesh
             label.overflowMode = TextOverflowModes.Overflow;
             label.richText = true;
             label.margin = Vector4.zero;
+            label.outlineColor = outlineColor;
+            label.outlineWidth = useTextOutline ? outlineWidth : 0f;
 
+            handle.root.sizeDelta = labelSize;
             RectTransform rect = label.rectTransform;
-            rect.sizeDelta = labelSize;
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+
+            if (handle.background != null)
+            {
+                handle.background.enabled = useLabelBackground;
+                handle.background.color = labelBackgroundColor;
+            }
         }
 
         private string FormatWithLineHeight(string description)
@@ -420,16 +468,16 @@ namespace DuoCurtain.RuntimeTileMesh
             if (worldCamera == null || overlayCanvasRect == null)
                 return;
 
-            foreach (KeyValuePair<RuntimeTileMeshDraggableBlock, TextMeshProUGUI> pair in labels)
+            foreach (KeyValuePair<RuntimeTileMeshDraggableBlock, LabelHandle> pair in labels)
             {
                 RuntimeTileMeshDraggableBlock block = pair.Key;
-                TextMeshProUGUI label = pair.Value;
-                if (block == null || label == null)
+                LabelHandle label = pair.Value;
+                if (block == null || label == null || label.text == null)
                     continue;
 
                 if (!TryGetBlockLabelAnchorWorld(block, out Vector3 worldAnchor))
                 {
-                    label.enabled = false;
+                    SetLabelVisible(label, false);
                     continue;
                 }
 
@@ -437,8 +485,9 @@ namespace DuoCurtain.RuntimeTileMesh
                 bool inFront = screen.z >= 0f;
                 bool onScreen = screen.x >= 0f && screen.x <= Screen.width &&
                                 screen.y >= 0f && screen.y <= Screen.height;
-                label.enabled = inFront && (!hideLabelsOutsideScreen || onScreen);
-                if (!label.enabled)
+                bool labelVisible = inFront && (!hideLabelsOutsideScreen || onScreen);
+                SetLabelVisible(label, labelVisible);
+                if (!labelVisible)
                     continue;
 
                 Vector2 adjustedScreen = new Vector2(screen.x, screen.y) + topRightInset;
@@ -448,9 +497,36 @@ namespace DuoCurtain.RuntimeTileMesh
                     null,
                     out Vector2 localPoint))
                 {
-                    label.rectTransform.anchoredPosition = localPoint;
+                    label.root.anchoredPosition = localPoint;
                 }
             }
+        }
+
+        private void SetLabelVisible(LabelHandle label, bool visible)
+        {
+            if (label == null)
+                return;
+
+            if (label.text != null)
+                label.text.enabled = visible;
+            if (label.background != null)
+                label.background.enabled = visible && useLabelBackground;
+        }
+
+        private Camera ResolveActiveFusionCamera()
+        {
+            FusionModeCameraRig[] rigs = FindObjectsByType<FusionModeCameraRig>(FindObjectsSortMode.None);
+            for (int i = 0; i < rigs.Length; i++)
+            {
+                FusionModeCameraRig rig = rigs[i];
+                if (rig == null || rig.Camera == null)
+                    continue;
+
+                if (rig.gameObject.activeInHierarchy && rig.Camera.enabled)
+                    return rig.Camera;
+            }
+
+            return null;
         }
 
         private bool TryGetBlockLabelAnchorWorld(
@@ -483,6 +559,20 @@ namespace DuoCurtain.RuntimeTileMesh
                 fusionSandbox.gridOrigin.y + (anchorCell.y + 1) * gridSize,
                 block.transform.position.z);
             return true;
+        }
+
+        private sealed class LabelHandle
+        {
+            public readonly RectTransform root;
+            public readonly Image background;
+            public readonly TextMeshProUGUI text;
+
+            public LabelHandle(RectTransform root, Image background, TextMeshProUGUI text)
+            {
+                this.root = root;
+                this.background = background;
+                this.text = text;
+            }
         }
     }
 }

@@ -478,6 +478,8 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
 
             ConfigureCameraWeather(playerCamera, stageController);
             ConfigureCameraWeather(managementCamera, stageController);
+            ConfigureFusionBackground(playerCamera, stageController);
+            ConfigureFusionBackground(managementCamera, stageController);
             return stageController;
         }
 
@@ -506,6 +508,25 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                 new DayNightCameraWeather.StageCameraColor { stageId = StageIds.BeforeNight, color = new Color(0.18f, 0.18f, 0.2f, 1f) },
                 new DayNightCameraWeather.StageCameraColor { stageId = StageIds.Night, color = Color.black }
             };
+        }
+
+        private static void ConfigureFusionBackground(FusionModeCameraRig rig, StageCycleController stageController)
+        {
+            if (rig == null || rig.Camera == null)
+                return;
+
+            FusionBackgroundShaderController background =
+                rig.GetComponent<FusionBackgroundShaderController>();
+            if (background == null)
+                background = rig.gameObject.AddComponent<FusionBackgroundShaderController>();
+
+            background.targetCamera = rig.Camera;
+            background.stageController = stageController;
+            background.gridCellSize = new Vector2(1f, 5f);
+            background.gridLineWidth = 0.012f;
+            background.vignetteStrength = 0.16f;
+            background.planeDistance = 80f;
+            background.sizePadding = 1.08f;
         }
 
         private static void BindCameraReferences(
@@ -695,6 +716,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
 
             overlay.fusionSandbox = sandbox;
             overlay.worldCamera = targetCamera;
+            overlay.autoFollowActiveFusionCamera = true;
             overlay.labelFont = BayonFontAssetBuilder.EnsureFontAsset();
             overlay.displayKey = KeyCode.Tab;
             overlay.displayMode = RuntimeTileMeshBlockInfoOverlay.TabDisplayMode.ToggleOnPress;
@@ -705,6 +727,11 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             overlay.labelSize = new Vector2(82f, 51f);
             overlay.topRightInset = new Vector2(8f, -8f);
             overlay.textColor = Color.black;
+            overlay.useTextOutline = true;
+            overlay.outlineColor = new Color(1f, 1f, 1f, 0.92f);
+            overlay.outlineWidth = 0.16f;
+            overlay.useLabelBackground = true;
+            overlay.labelBackgroundColor = new Color(1f, 1f, 1f, 0.72f);
         }
 
         private static void CreateTopologyMap(RuntimeTileMeshFusionSandbox sandbox, PlayerControl playerControl)

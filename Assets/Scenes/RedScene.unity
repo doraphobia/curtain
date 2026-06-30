@@ -325,7 +325,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 13c89b0630878484ab6492de1f1e9eae, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::DuoCurtain.RuntimeTileMesh.RuntimeTileMeshFusionSandbox
   worldCamera: {fileID: 1518932443}
   blockLayerMask:
@@ -372,19 +372,25 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c64c0d6727471482c8a415b6e09e6532, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::DuoCurtain.RuntimeTileMesh.RuntimeTileMeshBlockInfoOverlay
   displayKey: 9
   displayMode: 0
   startVisible: 0
   fusionSandbox: {fileID: 31788941}
   worldCamera: {fileID: 1518932443}
+  autoFollowActiveFusionCamera: 1
   labelFont: {fileID: 11400000, guid: 39c0afe25adf141b3ae55154f1bd95e6, type: 2}
   resourcesFontPath: Fonts/Bayon-Regular SDF
   fontSize: 30
   lineHeight: 30
   letterSpacingPercent: -5
   textColor: {r: 0, g: 0, b: 0, a: 1}
+  useTextOutline: 1
+  outlineColor: {r: 1, g: 1, b: 1, a: 0.92}
+  outlineWidth: 0.16
+  useLabelBackground: 1
+  labelBackgroundColor: {r: 1, g: 1, b: 1, a: 0.72}
   labelSize: {x: 82, y: 51}
   topRightInset: {x: 8, y: -8}
   defaultBlockType: DEFAULT
@@ -1431,6 +1437,7 @@ GameObject:
   - component: {fileID: 186715664}
   - component: {fileID: 186715666}
   - component: {fileID: 186715665}
+  - component: {fileID: 2147483001}
   m_Layer: 0
   m_Name: Management Camera
   m_TagString: Untagged
@@ -1520,6 +1527,53 @@ MonoBehaviour:
     color: {r: 0, g: 0, b: 0, a: 1}
   cycleDuration: 10
   transitionDuration: 1
+--- !u!114 &2147483001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 186715663}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 86f83f1dbf07419bb9b513f83b3ee9a6, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::FusionBackgroundShaderController
+  targetCamera: {fileID: 186715667}
+  stageController: {fileID: 1166734108}
+  backgroundMaterial: {fileID: 0}
+  planeDistance: 80
+  sizePadding: 1.08
+  sortingOrder: -32000
+  gridCellSize: {x: 1, y: 5}
+  gridLineWidth: 0.012
+  vignetteStrength: 0.16
+  driftSpeed: {x: 0.015, y: -0.006}
+  stageStyles:
+  - stageId: DayTop
+    topColor: {r: 0.68, g: 0.69, b: 0.7, a: 1}
+    bottomColor: {r: 0.49, g: 0.5, b: 0.51, a: 1}
+    gridColor: {r: 1, g: 1, b: 1, a: 0.2}
+    gridOpacity: 0.23
+    pulseStrength: 0.03
+  - stageId: DayBottom
+    topColor: {r: 0.54, g: 0.54, b: 0.55, a: 1}
+    bottomColor: {r: 0.36, g: 0.37, b: 0.38, a: 1}
+    gridColor: {r: 0.95, g: 0.95, b: 0.95, a: 0.18}
+    gridOpacity: 0.2
+    pulseStrength: 0.025
+  - stageId: BeforeNight
+    topColor: {r: 0.13, g: 0.13, b: 0.16, a: 1}
+    bottomColor: {r: 0.06, g: 0.06, b: 0.08, a: 1}
+    gridColor: {r: 0.48, g: 0.5, b: 0.58, a: 0.22}
+    gridOpacity: 0.16
+    pulseStrength: 0.02
+  - stageId: Night
+    topColor: {r: 0.025, g: 0.027, b: 0.04, a: 1}
+    bottomColor: {r: 0.005, g: 0.006, b: 0.012, a: 1}
+    gridColor: {r: 0.16, g: 0.2, b: 0.32, a: 0.18}
+    gridOpacity: 0.12
+    pulseStrength: 0.012
 --- !u!81 &186715666
 AudioListener:
   m_ObjectHideFlags: 0
@@ -6524,6 +6578,7 @@ GameObject:
   - component: {fileID: 1518932442}
   - component: {fileID: 1518932445}
   - component: {fileID: 1518932444}
+  - component: {fileID: 2147483002}
   m_Layer: 0
   m_Name: Player Camera
   m_TagString: MainCamera
@@ -6664,6 +6719,53 @@ MonoBehaviour:
     color: {r: 0, g: 0, b: 0, a: 1}
   cycleDuration: 10
   transitionDuration: 1
+--- !u!114 &2147483002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1518932441}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 86f83f1dbf07419bb9b513f83b3ee9a6, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::FusionBackgroundShaderController
+  targetCamera: {fileID: 1518932443}
+  stageController: {fileID: 1166734108}
+  backgroundMaterial: {fileID: 0}
+  planeDistance: 80
+  sizePadding: 1.08
+  sortingOrder: -32000
+  gridCellSize: {x: 1, y: 5}
+  gridLineWidth: 0.012
+  vignetteStrength: 0.16
+  driftSpeed: {x: 0.015, y: -0.006}
+  stageStyles:
+  - stageId: DayTop
+    topColor: {r: 0.68, g: 0.69, b: 0.7, a: 1}
+    bottomColor: {r: 0.49, g: 0.5, b: 0.51, a: 1}
+    gridColor: {r: 1, g: 1, b: 1, a: 0.2}
+    gridOpacity: 0.23
+    pulseStrength: 0.03
+  - stageId: DayBottom
+    topColor: {r: 0.54, g: 0.54, b: 0.55, a: 1}
+    bottomColor: {r: 0.36, g: 0.37, b: 0.38, a: 1}
+    gridColor: {r: 0.95, g: 0.95, b: 0.95, a: 0.18}
+    gridOpacity: 0.2
+    pulseStrength: 0.025
+  - stageId: BeforeNight
+    topColor: {r: 0.13, g: 0.13, b: 0.16, a: 1}
+    bottomColor: {r: 0.06, g: 0.06, b: 0.08, a: 1}
+    gridColor: {r: 0.48, g: 0.5, b: 0.58, a: 0.22}
+    gridOpacity: 0.16
+    pulseStrength: 0.02
+  - stageId: Night
+    topColor: {r: 0.025, g: 0.027, b: 0.04, a: 1}
+    bottomColor: {r: 0.005, g: 0.006, b: 0.012, a: 1}
+    gridColor: {r: 0.16, g: 0.2, b: 0.32, a: 0.18}
+    gridOpacity: 0.12
+    pulseStrength: 0.012
 --- !u!81 &1518932445
 AudioListener:
   m_ObjectHideFlags: 0
