@@ -15,12 +15,13 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             RuntimeTileMeshSettings settings = RuntimeTileMeshSettings.Default;
 
             failures += ExpectSuccessfulComponents("Single", RuntimeTileMeshDemo.CreateShape(RuntimeTileMeshDemo.DemoShape.Single), settings, 1);
-            failures += ExpectSuccessfulComponents("OneByThree", RuntimeTileMeshDemo.CreateShape(RuntimeTileMeshDemo.DemoShape.OneByThree), settings, 1, expectedFirstVertexCount: 4);
+            failures += ExpectSuccessfulComponents("OneByThree", RuntimeTileMeshDemo.CreateShape(RuntimeTileMeshDemo.DemoShape.OneByThree), settings, 1, expectedFirstVertexCount: 12);
             failures += ExpectSuccessfulComponents("L", RuntimeTileMeshDemo.CreateShape(RuntimeTileMeshDemo.DemoShape.L), settings, 1);
             failures += ExpectSuccessfulComponents("T", RuntimeTileMeshDemo.CreateShape(RuntimeTileMeshDemo.DemoShape.T), settings, 1);
             failures += ExpectSuccessfulComponents("Z", RuntimeTileMeshDemo.CreateShape(RuntimeTileMeshDemo.DemoShape.Z), settings, 1);
+            failures += ExpectDeterministicBuild("Z", RuntimeTileMeshDemo.CreateShape(RuntimeTileMeshDemo.DemoShape.Z), settings);
             failures += ExpectSuccessfulComponents("DiagonalTouch", RuntimeTileMeshDemo.CreateShape(RuntimeTileMeshDemo.DemoShape.DiagonalTouch), settings, 2);
-            failures += ExpectHoleWarning("RingWithHole", RuntimeTileMeshDemo.CreateShape(RuntimeTileMeshDemo.DemoShape.RingWithHole), settings);
+            failures += ExpectSuccessfulComponents("RingWithHole", RuntimeTileMeshDemo.CreateShape(RuntimeTileMeshDemo.DemoShape.RingWithHole), settings, 1);
             failures += ExpectDefaultFallbackMaterial();
             failures += ExpectFusionConnectionRules();
             failures += ExpectFusionBlockMergeRules();
@@ -28,6 +29,8 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             failures += ExpectSelectedBlockCarriesPlayer();
             failures += ExpectBlockInfoDescription();
             failures += ExpectTopologyMapRuntimeFusionFallback();
+            failures += ExpectFusionIntegrityMerge();
+            failures += ExpectFusionIntegrityTileAccounting();
 
             if (failures == 0)
             {
@@ -104,11 +107,77 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             HashSet<Vector2Int> baseCells = new HashSet<Vector2Int> { Vector2Int.zero };
 
             failures += ExpectCellConnection("Overlap", baseCells, new HashSet<Vector2Int> { Vector2Int.zero }, true);
-            failures += ExpectCellConnection("HorizontalEdge", baseCells, new HashSet<Vector2Int> { Vector2Int.right }, true);
+            failures += ExpectCellConnection("ShareEdgeOnly", baseCells, new HashSet<Vector2Int> { Vector2Int.right }, true);
+            failures += ExpectCellShareEdgeOnly("ShareEdgeOnly", baseCells, new HashSet<Vector2Int> { Vector2Int.right }, true);
+            failures += ExpectCellShareEdgeOnly("OverlapDoesNotShareEdge", baseCells, new HashSet<Vector2Int> { Vector2Int.zero }, false);
             failures += ExpectCellConnection("VerticalEdge", baseCells, new HashSet<Vector2Int> { Vector2Int.up }, true);
             failures += ExpectCellConnection("DiagonalCorner", baseCells, new HashSet<Vector2Int> { Vector2Int.one }, false);
             failures += ExpectCellConnection("OneCellGap", baseCells, new HashSet<Vector2Int> { new Vector2Int(2, 0) }, false);
             return failures;
+        }
+
+        private static int ExpectCellShareEdgeOnly(
+            string name,
+            HashSet<Vector2Int> ownCells,
+            HashSet<Vector2Int> otherCells,
+            bool expected)
+        {
+            bool actual = RuntimeTileMeshDraggableBlock.CellSetsShareEdge(ownCells, otherCells);
+            if (actual == expected)
+                return 0;
+
+            Debug.LogError("[RuntimeTileMeshSelfTest] Fusion edge-only rule " + name + " expected " + expected + ", got " + actual + ".");
+            return 1;
+        }
+
+        private static int ExpectDeterministicBuild(
+            string name,
+            List<Vector2Int> tiles,
+            RuntimeTileMeshSettings settings)
+        {
+            RuntimeTileMeshBuildResult baseline = RuntimeTileMeshBuilder.Build(tiles, settings);
+            if (baseline.components.Count == 0 || !baseline.components[0].success)
+            {
+                Debug.LogError("[RuntimeTileMeshSelfTest] " + name + " deterministic baseline build failed.");
+                return 1;
+            }
+
+            RuntimeTileMeshData baselineMesh = baseline.components[0].meshData;
+            int baselineVertices = baselineMesh.vertices.Count;
+            int baselineTriangles = baselineMesh.triangles.Count;
+
+            for (int attempt = 0; attempt < 12; attempt++)
+            {
+                List<Vector2Int> shuffled = new List<Vector2Int>(tiles);
+                Shuffle(shuffled, attempt + 17);
+                RuntimeTileMeshBuildResult result = RuntimeTileMeshBuilder.Build(shuffled, settings);
+                if (result.components.Count == 0 || !result.components[0].success || result.components[0].meshData == null)
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] " + name + " deterministic build failed on attempt " + attempt + ".");
+                    return 1;
+                }
+
+                RuntimeTileMeshData meshData = result.components[0].meshData;
+                if (meshData.vertices.Count != baselineVertices || meshData.triangles.Count != baselineTriangles)
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] " + name + " deterministic build changed mesh topology on attempt " + attempt + ".");
+                    return 1;
+                }
+            }
+
+            return 0;
+        }
+
+        private static void Shuffle(List<Vector2Int> values, int seed)
+        {
+            System.Random random = new System.Random(seed);
+            for (int i = values.Count - 1; i > 0; i--)
+            {
+                int swapIndex = random.Next(i + 1);
+                Vector2Int temp = values[i];
+                values[i] = values[swapIndex];
+                values[swapIndex] = temp;
+            }
         }
 
         private static int ExpectCellConnection(
@@ -122,29 +191,6 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                 return 0;
 
             Debug.LogError("[RuntimeTileMeshSelfTest] Fusion connection rule " + name + " expected " + expected + ", got " + actual + ".");
-            return 1;
-        }
-
-        private static int ExpectHoleWarning(
-            string name,
-            List<Vector2Int> tiles,
-            RuntimeTileMeshSettings settings)
-        {
-            RuntimeTileMeshBuildResult result = RuntimeTileMeshBuilder.Build(tiles, settings);
-            bool sawHoleWarning = false;
-            for (int i = 0; i < result.warnings.Count; i++)
-            {
-                if (result.warnings[i].Contains("Hole loops were detected"))
-                {
-                    sawHoleWarning = true;
-                    break;
-                }
-            }
-
-            if (result.components.Count == 1 && !result.components[0].success && sawHoleWarning)
-                return 0;
-
-            Debug.LogError("[RuntimeTileMeshSelfTest] " + name + " should report an unsupported-hole warning instead of filling the hole.");
             return 1;
         }
 
@@ -499,6 +545,8 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                     },
                     expectedDoorCount: 0,
                     expectedDoorCenter: Vector2.zero);
+
+                failures += ExpectDoorWallSpanExtendsAfterLaterMerge(sandbox, cleanup);
             }
             finally
             {
@@ -506,6 +554,83 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                 {
                     if (cleanup[i] != null)
                         UnityEngine.Object.DestroyImmediate(cleanup[i]);
+                }
+            }
+
+            return failures;
+        }
+
+        private static int ExpectDoorWallSpanExtendsAfterLaterMerge(
+            RuntimeTileMeshFusionSandbox sandbox,
+            List<GameObject> cleanup)
+        {
+            RuntimeTileMeshDraggableBlock survivor = CreateSelfTestBlock(
+                "Door Span Extension Survivor",
+                new[]
+                {
+                    CreateBlockSpec(new Vector2Int(20, 0)),
+                    CreateBlockSpec(new Vector2Int(20, 1)),
+                    CreateBlockSpec(new Vector2Int(20, 2))
+                },
+                cleanup);
+            RuntimeTileMeshDraggableBlock candidate = CreateSelfTestBlock(
+                "Door Span Extension Candidate",
+                new[]
+                {
+                    CreateBlockSpec(new Vector2Int(21, 0)),
+                    CreateBlockSpec(new Vector2Int(21, 1)),
+                    CreateBlockSpec(new Vector2Int(21, 2)),
+                    CreateBlockSpec(new Vector2Int(22, 0)),
+                    CreateBlockSpec(new Vector2Int(22, 1)),
+                    CreateBlockSpec(new Vector2Int(22, 2))
+                },
+                cleanup);
+
+            List<RuntimeTileMeshDraggableBlock> blocks = new List<RuntimeTileMeshDraggableBlock> { survivor, candidate };
+            sandbox.MergeConnectedBlocks(survivor, blocks);
+
+            RuntimeTileMeshFusionDoor[] doors = survivor.GetComponentsInChildren<RuntimeTileMeshFusionDoor>(true);
+            if (doors.Length != 1)
+            {
+                Debug.LogError("[RuntimeTileMeshSelfTest] Door span extension expected one initial door, got " + doors.Length + ".");
+                return 1;
+            }
+
+            RuntimeTileMeshDraggableBlock extension = CreateSelfTestBlock(
+                "Door Span Extension Later Merge",
+                new[]
+                {
+                    CreateBlockSpec(new Vector2Int(20, 3)),
+                    CreateBlockSpec(new Vector2Int(21, 3))
+                },
+                cleanup);
+
+            blocks = new List<RuntimeTileMeshDraggableBlock> { survivor, extension };
+            sandbox.MergeConnectedBlocks(survivor, blocks);
+            doors = survivor.GetComponentsInChildren<RuntimeTileMeshFusionDoor>(true);
+
+            int failures = 0;
+            if (doors.Length != 1)
+            {
+                Debug.LogError("[RuntimeTileMeshSelfTest] Door span extension should preserve the original door count, got " + doors.Length + ".");
+                failures++;
+            }
+
+            if (doors.Length > 0)
+            {
+                RuntimeTileMeshFusionDoor door = doors[0];
+                if (door.wallVariableStart != 0 || door.wallCellLength != 4 || door.doorVariableOffset != 1)
+                {
+                    Debug.LogError(
+                        "[RuntimeTileMeshSelfTest] Door span extension expected wall start 0, length 4, door offset 1; got start " +
+                        door.wallVariableStart + ", length " + door.wallCellLength + ", offset " + door.doorVariableOffset + ".");
+                    failures++;
+                }
+
+                if (!sandbox.TryBlockDoorMovement(new Vector3(20.75f, 3.5f, 0f), new Vector3(21.25f, 3.5f, 0f), 0.05f))
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] Door span extension expected the extended upper wall segment to block movement.");
+                    failures++;
                 }
             }
 
@@ -694,6 +819,202 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                 formatted.Add("(" + sorted[i].x + "," + sorted[i].y + ")");
 
             return string.Join(", ", formatted);
+        }
+
+        private static int ExpectFusionIntegrityMerge()
+        {
+            GameObject controllerObject = new GameObject("RuntimeTileMeshSelfTest Integrity Controller");
+            RuntimeTileMeshFusionSandbox sandbox = controllerObject.AddComponent<RuntimeTileMeshFusionSandbox>();
+            RuntimeTileMeshFusionIntegrityMonitor monitor =
+                controllerObject.GetComponent<RuntimeTileMeshFusionIntegrityMonitor>();
+            if (monitor == null)
+                monitor = controllerObject.AddComponent<RuntimeTileMeshFusionIntegrityMonitor>();
+            sandbox.gridSize = 1f;
+            sandbox.gridOrigin = Vector2.zero;
+            sandbox.mergeAfterPlacement = true;
+            sandbox.mergeExistingBlocksOnAwake = false;
+            sandbox.snapExistingBlocksOnAwake = false;
+            sandbox.recordFusionIntegrity = true;
+            monitor.fusionSandbox = sandbox;
+            monitor.monitorEnabled = true;
+            monitor.monitorMergeGroups = true;
+            monitor.logIssuesToConsole = false;
+
+            List<GameObject> cleanup = new List<GameObject> { controllerObject };
+            try
+            {
+                RuntimeTileMeshDraggableBlock zA = CreateSelfTestBlock(
+                    "Integrity Z A",
+                    RuntimeTileMeshDemo.CreateShape(RuntimeTileMeshDemo.DemoShape.Z),
+                    cleanup,
+                    new Vector2Int(0, 0));
+                RuntimeTileMeshDraggableBlock zB = CreateSelfTestBlock(
+                    "Integrity Z B",
+                    RuntimeTileMeshDemo.CreateShape(RuntimeTileMeshDemo.DemoShape.Z),
+                    cleanup,
+                    new Vector2Int(1, 0));
+
+                HashSet<Vector2Int> expected = RuntimeTileMeshFusionIntegrityAnalyzer.CollectUnionTiles(
+                    new[] { zA, zB },
+                    sandbox.gridSize,
+                    sandbox.gridOrigin);
+                List<RuntimeTileMeshDraggableBlock> blocks = new List<RuntimeTileMeshDraggableBlock> { zA, zB };
+                sandbox.MergeConnectedBlocks(zB, blocks);
+
+                if (monitor.IssueReportCount > 0)
+                {
+                    monitor.TryGetLatestIssueReport(out FusionIntegrityReport report);
+                    Debug.LogError(
+                        "[RuntimeTileMeshSelfTest] Fusion integrity merge reported issues: " +
+                        RuntimeTileMeshFusionIntegrityAnalyzer.FormatReport(report));
+                    return 1;
+                }
+
+                HashSet<Vector2Int> actual = zB.GetWorldCells(sandbox.gridSize, sandbox.gridOrigin);
+                if (expected.Count != actual.Count)
+                {
+                    Debug.LogError(
+                        "[RuntimeTileMeshSelfTest] Fusion integrity merge tile count mismatch. Expected " +
+                        expected.Count + ", got " + actual.Count + ".");
+                    return 1;
+                }
+
+                return 0;
+            }
+            finally
+            {
+                for (int i = cleanup.Count - 1; i >= 0; i--)
+                {
+                    if (cleanup[i] != null)
+                        UnityEngine.Object.DestroyImmediate(cleanup[i]);
+                }
+            }
+        }
+
+        private static int ExpectFusionIntegrityTileAccounting()
+        {
+            GameObject controllerObject = new GameObject("RuntimeTileMeshSelfTest Tile Accounting Controller");
+            RuntimeTileMeshFusionSandbox sandbox = controllerObject.AddComponent<RuntimeTileMeshFusionSandbox>();
+            RuntimeTileMeshFusionIntegrityMonitor monitor =
+                controllerObject.GetComponent<RuntimeTileMeshFusionIntegrityMonitor>();
+            if (monitor == null)
+                monitor = controllerObject.AddComponent<RuntimeTileMeshFusionIntegrityMonitor>();
+            sandbox.gridSize = 1f;
+            sandbox.gridOrigin = Vector2.zero;
+            sandbox.mergeAfterPlacement = true;
+            sandbox.mergeExistingBlocksOnAwake = false;
+            sandbox.snapExistingBlocksOnAwake = false;
+            sandbox.recordFusionIntegrity = true;
+            monitor.fusionSandbox = sandbox;
+            monitor.monitorEnabled = true;
+            monitor.monitorMergeGroups = true;
+            monitor.logIssuesToConsole = false;
+
+            List<GameObject> cleanup = new List<GameObject> { controllerObject };
+            try
+            {
+                List<Vector2Int> duplicateLocalShape = new List<Vector2Int>
+                {
+                    Vector2Int.zero,
+                    Vector2Int.zero,
+                    new Vector2Int(1, 0)
+                };
+
+                RuntimeTileMeshDraggableBlock blockA = CreateSelfTestBlock(
+                    "Accounting A",
+                    duplicateLocalShape,
+                    cleanup,
+                    new Vector2Int(0, 0));
+                RuntimeTileMeshDraggableBlock blockB = CreateSelfTestBlock(
+                    "Accounting B",
+                    RuntimeTileMeshDemo.CreateShape(RuntimeTileMeshDemo.DemoShape.Single),
+                    cleanup,
+                    new Vector2Int(2, 0));
+
+                HashSet<Vector2Int> expectedUnion = RuntimeTileMeshFusionIntegrityAnalyzer.CollectUnionTiles(
+                    new[] { blockA, blockB },
+                    sandbox.gridSize,
+                    sandbox.gridOrigin);
+                List<RuntimeTileMeshDraggableBlock> blocks = new List<RuntimeTileMeshDraggableBlock> { blockA, blockB };
+                sandbox.MergeConnectedBlocks(blockB, blocks);
+
+                if (monitor.IssueReportCount > 0)
+                {
+                    monitor.TryGetLatestIssueReport(out FusionIntegrityReport issueReport);
+                    Debug.LogError(
+                        "[RuntimeTileMeshSelfTest] Tile accounting merge reported issues: " +
+                        RuntimeTileMeshFusionIntegrityAnalyzer.FormatReport(issueReport));
+                    return 1;
+                }
+
+                HashSet<Vector2Int> actual = blockB.GetWorldCells(sandbox.gridSize, sandbox.gridOrigin);
+                if (expectedUnion.Count != actual.Count)
+                {
+                    Debug.LogError(
+                        "[RuntimeTileMeshSelfTest] Tile accounting count mismatch. Expected union " +
+                        expectedUnion.Count + ", got " + actual.Count + ".");
+                    return 1;
+                }
+
+                RuntimeTileMeshView view = blockB.View;
+                int uniqueLocal = RuntimeTileMeshFusionIntegrityAnalyzer.CountUniqueLocalTiles(view.tiles);
+                if (view.tiles.Count != uniqueLocal)
+                {
+                    Debug.LogError(
+                        "[RuntimeTileMeshSelfTest] Merge should dedupe local tiles. Listed " +
+                        view.tiles.Count + ", unique " + uniqueLocal + ".");
+                    return 1;
+                }
+
+                FusionIntegrityReport latest = monitor.Reports.Count > 0
+                    ? monitor.Reports[monitor.Reports.Count - 1]
+                    : null;
+                FusionIntegrityTileAccounting accounting = latest != null ? latest.tileAccounting : null;
+                if (accounting == null ||
+                    accounting.triggerBlockTileCount != 1 ||
+                    accounting.expectedUnionTileCount != expectedUnion.Count ||
+                    accounting.extraGeneratedTileCount != 0)
+                {
+                    Debug.LogError(
+                        "[RuntimeTileMeshSelfTest] Tile accounting fields incorrect. " +
+                        (accounting != null
+                            ? "trigger=" + accounting.triggerBlockTileCount +
+                              " expectedUnion=" + accounting.expectedUnionTileCount +
+                              " extra=" + accounting.extraGeneratedTileCount
+                            : "accounting=null"));
+                    return 1;
+                }
+
+                return 0;
+            }
+            finally
+            {
+                for (int i = cleanup.Count - 1; i >= 0; i--)
+                {
+                    if (cleanup[i] != null)
+                        UnityEngine.Object.DestroyImmediate(cleanup[i]);
+                }
+            }
+        }
+
+        private static RuntimeTileMeshDraggableBlock CreateSelfTestBlock(
+            string name,
+            List<Vector2Int> localTiles,
+            List<GameObject> cleanup,
+            Vector2Int rootCell)
+        {
+            GameObject root = new GameObject(name);
+            root.transform.position = new Vector3(rootCell.x, rootCell.y, 0f);
+            cleanup.Add(root);
+
+            RuntimeTileMeshView view = root.AddComponent<RuntimeTileMeshView>();
+            view.tiles = new List<Vector2Int>(localTiles);
+            view.tileSize = Vector2.one;
+            view.rebuildOnStart = false;
+            view.buildPolygonCollider2D = false;
+            view.Rebuild();
+
+            return root.AddComponent<RuntimeTileMeshDraggableBlock>();
         }
 
         private struct BlockSpec

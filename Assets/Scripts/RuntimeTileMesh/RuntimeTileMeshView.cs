@@ -40,6 +40,9 @@ namespace DuoCurtain.RuntimeTileMesh
         public bool drawDebugTiles = true;
         public bool drawDebugBoundaryEdges = true;
         public bool drawDebugLoopPoints = true;
+#if UNITY_EDITOR
+        public bool enableBuildDebugLogging = false;
+#endif
         public Color debugTileColor = new Color(0.2f, 0.8f, 1f, 0.25f);
         public Color debugBoundaryColor = new Color(1f, 0.82f, 0.1f, 1f);
         public Color debugLoopPointColor = new Color(0.3f, 1f, 0.35f, 1f);
@@ -48,6 +51,8 @@ namespace DuoCurtain.RuntimeTileMesh
         private Material runtimeFallbackMaterial;
 
         public event Action<RuntimeTileMeshView> Rebuilt;
+
+        public RuntimeTileMeshBuildResult LastBuildResult => lastBuildResult;
 
         void Start()
         {
@@ -73,24 +78,86 @@ namespace DuoCurtain.RuntimeTileMesh
             RebuildFromTiles(tiles);
         }
 
+        public void ClearGeneratedMeshImmediate()
+        {
+            Transform root = transform.Find(GeneratedRootName);
+            if (root != null)
+                DestroyGeneratedRoot(root);
+        }
+
         public RuntimeTileMeshBuildResult RebuildFromTiles(IEnumerable<Vector2Int> inputTiles)
         {
-            DestroyGeneratedRoot();
+#if UNITY_EDITOR
+            RuntimeTileMeshBuildDebug.Enabled = enableBuildDebugLogging;
+#endif
+
+            Transform previousRoot = transform.Find(GeneratedRootName);
             RuntimeTileMeshSettings settings = CreateSettings();
             lastBuildResult = RuntimeTileMeshBuilder.Build(inputTiles, settings);
+
+#if UNITY_EDITOR
+            RuntimeTileMeshBuildDebug.LogBuild("RuntimeTileMeshView", lastBuildResult, this);
+#endif
+
+            if (!HasSuccessfulComponent(lastBuildResult))
+            {
+                if (previousRoot != null)
+                {
+                    for (int i = 0; i < lastBuildResult.warnings.Count; i++)
+                        Debug.LogWarning("[RuntimeTileMeshView] Rebuild failed; keeping previous mesh. " + lastBuildResult.warnings[i], this);
+                }
+                else if (lastBuildResult.HasWarnings)
+                {
+                    for (int i = 0; i < lastBuildResult.warnings.Count; i++)
+                        Debug.LogWarning("[RuntimeTileMeshView] " + lastBuildResult.warnings[i], this);
+                }
+
+                return lastBuildResult;
+            }
 
             Transform root = CreateGeneratedRoot();
             for (int i = 0; i < lastBuildResult.components.Count; i++)
                 CreateComponentObject(root, lastBuildResult.components[i], i, settings);
 
+            if (previousRoot != null)
+                DestroyGeneratedRoot(previousRoot);
+
             if (lastBuildResult.HasWarnings)
             {
                 for (int i = 0; i < lastBuildResult.warnings.Count; i++)
-                    Debug.LogWarning("[RuntimeTileMeshView] " + lastBuildResult.warnings[i], this);
+                {
+                    string warning = lastBuildResult.warnings[i];
+                    if (!buildPolygonCollider2D &&
+                        warning.IndexOf("Collider outline", System.StringComparison.Ordinal) >= 0)
+                    {
+                        continue;
+                    }
+
+                    Debug.LogWarning("[RuntimeTileMeshView] " + warning, this);
+                }
             }
 
             Rebuilt?.Invoke(this);
+            RuntimeTileMeshFusionIntegrityMonitor.TryRecordViewRebuild(this, lastBuildResult);
             return lastBuildResult;
+        }
+
+        private static bool HasSuccessfulComponent(RuntimeTileMeshBuildResult result)
+        {
+            if (result == null)
+                return false;
+
+            for (int i = 0; i < result.components.Count; i++)
+            {
+                RuntimeTileMeshComponentResult component = result.components[i];
+                if (component != null && component.success && component.meshData != null &&
+                    component.meshData.triangles.Count > 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         public void CollectGeneratedRenderers(List<Renderer> results)
@@ -230,6 +297,14 @@ namespace DuoCurtain.RuntimeTileMesh
         private void DestroyGeneratedRoot()
         {
             Transform root = transform.Find(GeneratedRootName);
+            if (root == null)
+                return;
+
+            DestroyGeneratedRoot(root);
+        }
+
+        private void DestroyGeneratedRoot(Transform root)
+        {
             if (root == null)
                 return;
 

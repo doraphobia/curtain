@@ -606,6 +606,14 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             sandbox.doorBlocksPlayer = true;
             sandbox.wallDebugColor = new Color(0f, 0f, 0f, 0.9f);
             sandbox.wallDebugLineWidth = 0.08f;
+
+            RuntimeTileMeshFusionIntegrityMonitor integrityMonitor =
+                controllerObject.AddComponent<RuntimeTileMeshFusionIntegrityMonitor>();
+            integrityMonitor.fusionSandbox = sandbox;
+            integrityMonitor.monitorEnabled = true;
+            integrityMonitor.monitorMergeGroups = true;
+            integrityMonitor.logIssuesToConsole = true;
+
             return sandbox;
         }
 

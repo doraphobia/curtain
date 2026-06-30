@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace DuoCurtain.RuntimeTileMesh
@@ -162,6 +163,33 @@ namespace DuoCurtain.RuntimeTileMesh
             hingeEnd = DoorHingeEnd.Negative;
 
             EnsureVisual();
+            RebuildWallVisual();
+            ApplyVisualState();
+        }
+
+        public void RefreshWallSpanFromCells(ICollection<Vector2Int> blockCells)
+        {
+            if (blockCells == null || blockCells.Count == 0)
+                return;
+
+            int doorVariable = DoorVariable;
+            if (!TryGetExpandedWallSpan(blockCells, doorVariable, out int expandedStart, out int expandedLength))
+                return;
+
+            int expandedOffset = doorVariable - expandedStart;
+            if (expandedOffset < 0 || expandedOffset >= expandedLength)
+                return;
+
+            if (expandedStart == wallVariableStart &&
+                expandedLength == wallCellLength &&
+                expandedOffset == doorVariableOffset)
+            {
+                return;
+            }
+
+            wallVariableStart = expandedStart;
+            wallCellLength = Mathf.Max(1, expandedLength);
+            doorVariableOffset = Mathf.Clamp(expandedOffset, 0, wallCellLength - 1);
             RebuildWallVisual();
             ApplyVisualState();
         }
@@ -331,10 +359,9 @@ namespace DuoCurtain.RuntimeTileMesh
 
         private float GetWallRunStartWorld()
         {
-            float safeGridSize = Mathf.Max(0.0001f, Mathf.Abs(gridSize));
             return axis == DoorAxis.Vertical
-                ? seamCenter.y - wallCellLength * safeGridSize * 0.5f
-                : seamCenter.x - wallCellLength * safeGridSize * 0.5f;
+                ? seamCenter.y + GetWallRunStartLocal()
+                : seamCenter.x + GetWallRunStartLocal();
         }
 
         private Vector2 GetPointOnWallRun(float alongCoordinate)
@@ -648,7 +675,7 @@ namespace DuoCurtain.RuntimeTileMesh
                 return;
 
             float safeGridSize = Mathf.Max(0.0001f, Mathf.Abs(gridSize));
-            float runStart = -wallCellLength * safeGridSize * 0.5f;
+            float runStart = GetWallRunStartLocal();
             float segmentStart = runStart + startCellOffset * safeGridSize;
             float segmentEnd = runStart + endCellOffset * safeGridSize;
             float cursor = segmentStart;
@@ -710,6 +737,53 @@ namespace DuoCurtain.RuntimeTileMesh
             Color contrast = luminance > 0.55f ? Color.black : Color.white;
             contrast.a = wallOutlineAlpha;
             return contrast;
+        }
+
+        private bool TryGetExpandedWallSpan(
+            ICollection<Vector2Int> blockCells,
+            int doorVariable,
+            out int start,
+            out int length)
+        {
+            start = wallVariableStart;
+            length = wallCellLength;
+
+            HashSet<Vector2Int> cellLookup = blockCells as HashSet<Vector2Int> ?? new HashSet<Vector2Int>(blockCells);
+            if (!IsWallLineSegmentCovered(cellLookup, doorVariable))
+                return false;
+
+            int expandedStart = doorVariable;
+            while (IsWallLineSegmentCovered(cellLookup, expandedStart - 1))
+                expandedStart--;
+
+            int expandedEnd = doorVariable + 1;
+            while (IsWallLineSegmentCovered(cellLookup, expandedEnd))
+                expandedEnd++;
+
+            start = expandedStart;
+            length = Mathf.Max(1, expandedEnd - expandedStart);
+            return true;
+        }
+
+        private bool IsWallLineSegmentCovered(HashSet<Vector2Int> cellLookup, int variable)
+        {
+            if (cellLookup == null)
+                return false;
+
+            if (axis == DoorAxis.Vertical)
+            {
+                return cellLookup.Contains(new Vector2Int(wallEdgeCoordinate - 1, variable)) ||
+                       cellLookup.Contains(new Vector2Int(wallEdgeCoordinate, variable));
+            }
+
+            return cellLookup.Contains(new Vector2Int(variable, wallEdgeCoordinate - 1)) ||
+                   cellLookup.Contains(new Vector2Int(variable, wallEdgeCoordinate));
+        }
+
+        private float GetWallRunStartLocal()
+        {
+            float safeGridSize = Mathf.Max(0.0001f, Mathf.Abs(gridSize));
+            return -(Mathf.Clamp(doorVariableOffset, 0, Mathf.Max(0, wallCellLength - 1)) + 0.5f) * safeGridSize;
         }
 
         private struct DoorPanelPose

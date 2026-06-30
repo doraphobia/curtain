@@ -4,7 +4,9 @@ This folder contains a runtime pipeline for turning occupied grid cells into con
 
 Pipeline:
 
-`Tile Occupancy -> Connected Components -> Boundary Edges -> Ordered Loops -> Collinear Cleanup -> Triangulation -> Continuous UV -> Mesh`
+`Tile Occupancy -> Connected Components -> Per-Tile Grid Quads -> UV -> Mesh`
+
+Boundary extraction is still used for collider/debug outlines, but render mesh is built directly from occupied grid cells so merged 1x1 (or any fixed `tileSize`) floors never lose concave detail.
 
 Current project integration:
 
@@ -34,9 +36,10 @@ Merging should reveal more of the same infinite pattern rather than changing UV 
 
 Triangulation:
 
-- The fallback triangulator is ear clipping.
-- It supports simple no-hole concave polygons such as `L`, `T`, and `Z`.
-- Hole loops are detected and reported, but not triangulated by the fallback path. Install or vendor `LibTessDotNet` later to support holes robustly.
+- Render mesh uses one quad (2 triangles) per occupied logical tile.
+- This preserves every concave corner and every Z/T/L detail after fusion.
+- Boundary loops are still extracted for collider paths and gizmo debug.
+- Ear clipping remains available for future non-grid shapes, but grid floors no longer depend on it.
 
 Testing:
 
@@ -56,6 +59,14 @@ legacy comparison.
 To rebuild that scene, use `Tools/Duo Curtain/Runtime Tile Mesh/Create RedScene`.
 To verify the mesh and fusion rules, use `Tools/Duo Curtain/Runtime Tile Mesh/Run Self Test`.
 
+Fusion integrity monitoring:
+
+- Add `RuntimeTileMeshFusionIntegrityMonitor` to the Fusion Sandbox object, or regenerate `RedScene`.
+- Open `Tools/Duo Curtain/Runtime Tile Mesh/Fusion Integrity Monitor` during Play Mode.
+- Every merge group records before/after tile snapshots, mesh counts, boundary stats, and issue codes.
+- Issues log missing tiles, mesh coverage gaps, unconsumed boundary edges, and merge tile loss/gain.
+- Use `Run Audit` for a full-scene check at any time, and `Export Log` to save the report history.
+
 To make a new manual test object:
 
 1. Create an empty GameObject.
@@ -70,5 +81,5 @@ Expected behavior:
 - `OneByThree` becomes one rectangle mesh, not three repeated-UV quads.
 - `L`, `T`, and `Z` triangulate as one concave mesh per connected component.
 - `DiagonalTouch` creates two separate component meshes because corner contact is not a four-neighbor connection.
-- `RingWithHole` logs a warning with the fallback triangulator instead of silently filling the hole.
+- `RingWithHole` renders only occupied tiles, leaving the empty center unmeshed.
 - In the fusion sandbox, overlap and exact edge contact merge blocks; diagonal corner contact does not.

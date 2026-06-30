@@ -108,6 +108,13 @@ namespace DuoCurtain.RuntimeTileMesh
             ICollection<Vector2Int> ownCells,
             ICollection<Vector2Int> otherCells)
         {
+            return CellSetsOverlap(ownCells, otherCells) || CellSetsShareEdge(ownCells, otherCells);
+        }
+
+        public static bool CellSetsOverlap(
+            ICollection<Vector2Int> ownCells,
+            ICollection<Vector2Int> otherCells)
+        {
             if (ownCells == null || otherCells == null || ownCells.Count == 0 || otherCells.Count == 0)
                 return false;
 
@@ -116,12 +123,28 @@ namespace DuoCurtain.RuntimeTileMesh
             {
                 if (ownLookup.Contains(cell))
                     return true;
+            }
 
+            return false;
+        }
+
+        public static bool CellSetsShareEdge(
+            ICollection<Vector2Int> ownCells,
+            ICollection<Vector2Int> otherCells)
+        {
+            if (ownCells == null || otherCells == null || ownCells.Count == 0 || otherCells.Count == 0)
+                return false;
+
+            HashSet<Vector2Int> ownLookup = ownCells as HashSet<Vector2Int> ?? new HashSet<Vector2Int>(ownCells);
+            foreach (Vector2Int cell in otherCells)
+            {
                 if (ownLookup.Contains(new Vector2Int(cell.x - 1, cell.y)) ||
                     ownLookup.Contains(new Vector2Int(cell.x + 1, cell.y)) ||
                     ownLookup.Contains(new Vector2Int(cell.x, cell.y - 1)) ||
                     ownLookup.Contains(new Vector2Int(cell.x, cell.y + 1)))
+                {
                     return true;
+                }
             }
 
             return false;
@@ -143,12 +166,13 @@ namespace DuoCurtain.RuntimeTileMesh
         {
             ResolveView();
             HashSet<Vector2Int> worldCells = new HashSet<Vector2Int>();
-            if (view == null)
+            if (view == null || view.tiles == null || view.tiles.Count == 0)
                 return worldCells;
 
             Vector2Int rootCell = WorldToCell(transform.position, gridSize, gridOrigin);
-            for (int i = 0; i < view.tiles.Count; i++)
-                worldCells.Add(rootCell + view.tiles[i]);
+            HashSet<Vector2Int> uniqueLocal = TileOccupancy.ToSet(view.tiles);
+            foreach (Vector2Int local in uniqueLocal)
+                worldCells.Add(rootCell + local);
 
             return worldCells;
         }
@@ -167,11 +191,20 @@ namespace DuoCurtain.RuntimeTileMesh
                 return false;
             }
 
-            minimumCell = view.tiles[0];
-            maximumCell = view.tiles[0];
-            for (int i = 1; i < view.tiles.Count; i++)
+            HashSet<Vector2Int> uniqueTiles = TileOccupancy.ToSet(view.tiles);
+            bool hasValue = false;
+            minimumCell = Vector2Int.zero;
+            maximumCell = Vector2Int.zero;
+            foreach (Vector2Int cell in uniqueTiles)
             {
-                Vector2Int cell = view.tiles[i];
+                if (!hasValue)
+                {
+                    minimumCell = cell;
+                    maximumCell = cell;
+                    hasValue = true;
+                    continue;
+                }
+
                 minimumCell = Vector2Int.Min(minimumCell, cell);
                 maximumCell = Vector2Int.Max(maximumCell, cell);
             }
@@ -193,14 +226,36 @@ namespace DuoCurtain.RuntimeTileMesh
                 return;
 
             Vector2Int min = FindMinimumCell(worldCells);
-            List<Vector2Int> localCells = new List<Vector2Int>(worldCells.Count);
+            HashSet<Vector2Int> uniqueLocal = new HashSet<Vector2Int>();
             foreach (Vector2Int cell in worldCells)
-                localCells.Add(cell - min);
+                uniqueLocal.Add(cell - min);
+
+            List<Vector2Int> localCells = new List<Vector2Int>(uniqueLocal.Count);
+            foreach (Vector2Int cell in uniqueLocal)
+                localCells.Add(cell);
 
             localCells.Sort(CompareCells);
             view.tiles = localCells;
-            transform.position = CellToWorld(min, gridSize, gridOrigin, transform.position.z);
+            transform.position = QuantizeRootWorldPosition(min, gridSize, gridOrigin, transform.position.z);
             RebuildAndRefresh();
+        }
+
+        public bool WorldCellsMatch(HashSet<Vector2Int> expectedWorldCells, float gridSize, Vector2 gridOrigin)
+        {
+            if (expectedWorldCells == null || expectedWorldCells.Count == 0)
+                return false;
+
+            HashSet<Vector2Int> actualWorldCells = GetWorldCells(gridSize, gridOrigin);
+            if (actualWorldCells.Count != expectedWorldCells.Count)
+                return false;
+
+            foreach (Vector2Int cell in expectedWorldCells)
+            {
+                if (!actualWorldCells.Contains(cell))
+                    return false;
+            }
+
+            return true;
         }
 
         private void RefreshRenderers()
@@ -275,12 +330,22 @@ namespace DuoCurtain.RuntimeTileMesh
         public static Vector2Int WorldToCell(Vector3 worldPosition, float gridSize, Vector2 gridOrigin)
         {
             float safeGridSize = Mathf.Max(0.0001f, Mathf.Abs(gridSize));
+            const float epsilon = 1e-4f;
             return new Vector2Int(
-                Mathf.RoundToInt((worldPosition.x - gridOrigin.x) / safeGridSize),
-                Mathf.RoundToInt((worldPosition.y - gridOrigin.y) / safeGridSize));
+                Mathf.FloorToInt((worldPosition.x - gridOrigin.x) / safeGridSize + epsilon),
+                Mathf.FloorToInt((worldPosition.y - gridOrigin.y) / safeGridSize + epsilon));
         }
 
         public static Vector3 CellToWorld(Vector2Int cell, float gridSize, Vector2 gridOrigin, float z)
+        {
+            return QuantizeRootWorldPosition(cell, gridSize, gridOrigin, z);
+        }
+
+        public static Vector3 QuantizeRootWorldPosition(
+            Vector2Int cell,
+            float gridSize,
+            Vector2 gridOrigin,
+            float z)
         {
             float safeGridSize = Mathf.Max(0.0001f, Mathf.Abs(gridSize));
             return new Vector3(

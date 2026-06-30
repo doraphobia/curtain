@@ -26,6 +26,9 @@ namespace DuoCurtain.RuntimeTileMesh
         public bool deactivateAbsorbedBlocksImmediately = true;
         public bool logFusionEvents = false;
 
+        [Header("Integrity Monitoring")]
+        public bool recordFusionIntegrity = true;
+
         [Header("Fusion Doors")]
         public bool generateDoorsOnFusion = true;
         [Min(1)]
@@ -85,6 +88,7 @@ namespace DuoCurtain.RuntimeTileMesh
                 worldCamera = Camera.main;
 
             ResolvePlayerControl();
+            EnsureIntegrityMonitor();
 
             RefreshBlocks();
             if (snapExistingBlocksOnAwake)
@@ -410,6 +414,19 @@ namespace DuoCurtain.RuntimeTileMesh
             playerCarrierLocalOffset = Vector3.zero;
         }
 
+        private void EnsureIntegrityMonitor()
+        {
+            if (!recordFusionIntegrity)
+                return;
+
+            RuntimeTileMeshFusionIntegrityMonitor monitor = GetComponent<RuntimeTileMeshFusionIntegrityMonitor>();
+            if (monitor == null)
+                monitor = gameObject.AddComponent<RuntimeTileMeshFusionIntegrityMonitor>();
+
+            if (monitor.fusionSandbox == null)
+                monitor.fusionSandbox = this;
+        }
+
         private void ResolvePlayerControl()
         {
             if (playerControl == null)
@@ -548,6 +565,14 @@ namespace DuoCurtain.RuntimeTileMesh
             if (group.Count <= 1)
                 return 0;
 
+            HashSet<Vector2Int> preSandboxUnion = CollectActiveBlockUnion(activeBlocks);
+            FusionIntegrityMergeContext mergeContext = new FusionIntegrityMergeContext
+            {
+                triggerBlock = seed,
+                groupCellSets = CloneGroupCellSets(groupCellSets),
+                preSandboxUnion = preSandboxUnion
+            };
+
             List<RuntimeTileMeshFusionDoor> carriedDoors = DetachGroupDoors(group);
             List<DoorCandidate> doorCandidates = generateDoorsOnFusion
                 ? CollectDoorCandidates(groupCellSets)
@@ -557,8 +582,17 @@ namespace DuoCurtain.RuntimeTileMesh
             seed.SetSelected(false);
             seed.SetSortingOrder(normalSortingOrder);
             seed.ApplyWorldCells(mergedCells, gridSize, gridOrigin);
+            if (!seed.WorldCellsMatch(mergedCells, gridSize, gridOrigin))
+            {
+                Debug.LogWarning(
+                    "[RuntimeTileMeshFusionSandbox] Post-merge world cells do not match merged union on " +
+                    seed.name + ". Expected " + mergedCells.Count + " cell(s).",
+                    seed);
+            }
+
             AttachDoorsToSeed(carriedDoors, seed);
             CreateFusionDoors(seed, doorCandidates);
+            RefreshFusionDoorWallSpans(seed, mergedCells);
 
             int absorbed = 0;
             for (int i = activeBlocks.Count - 1; i >= 0; i--)
@@ -572,10 +606,70 @@ namespace DuoCurtain.RuntimeTileMesh
                 absorbed++;
             }
 
+            mergeContext.postSandboxUnion = CollectActiveBlockUnion(activeBlocks);
+            RecordFusionIntegrityMerge(group, seed, mergedCells, mergeContext);
+
             if (logFusionEvents)
                 Debug.Log("[RuntimeTileMeshFusionSandbox] Merged " + (absorbed + 1) + " block(s) into " + seed.name + " with " + mergedCells.Count + " occupied cell(s).", seed);
 
             return absorbed;
+        }
+
+        private void RecordFusionIntegrityMerge(
+            HashSet<RuntimeTileMeshDraggableBlock> group,
+            RuntimeTileMeshDraggableBlock seed,
+            HashSet<Vector2Int> mergedCells,
+            FusionIntegrityMergeContext mergeContext)
+        {
+            if (!recordFusionIntegrity || group == null || seed == null || mergedCells == null)
+                return;
+
+            RuntimeTileMeshFusionIntegrityMonitor monitor = RuntimeTileMeshFusionIntegrityMonitor.Instance;
+            if (monitor == null)
+                monitor = FindFirstObjectByType<RuntimeTileMeshFusionIntegrityMonitor>();
+            if (monitor == null)
+                return;
+
+            List<RuntimeTileMeshDraggableBlock> groupBlocks = new List<RuntimeTileMeshDraggableBlock>(group.Count);
+            foreach (RuntimeTileMeshDraggableBlock block in group)
+            {
+                if (block != null)
+                    groupBlocks.Add(block);
+            }
+
+            RuntimeTileMeshView seedView = seed.View;
+            RuntimeTileMeshBuildResult buildResult = seedView != null ? seedView.LastBuildResult : null;
+            monitor.RecordMergeGroup(
+                groupBlocks,
+                seed,
+                mergedCells,
+                buildResult,
+                "MergeGroup -> " + seed.name + " (" + groupBlocks.Count + " blocks, " + mergedCells.Count + " cells)",
+                mergeContext);
+        }
+
+        private HashSet<Vector2Int> CollectActiveBlockUnion(List<RuntimeTileMeshDraggableBlock> activeBlocks)
+        {
+            return RuntimeTileMeshFusionIntegrityAnalyzer.CollectUnionTiles(activeBlocks, gridSize, gridOrigin);
+        }
+
+        private static Dictionary<RuntimeTileMeshDraggableBlock, HashSet<Vector2Int>> CloneGroupCellSets(
+            Dictionary<RuntimeTileMeshDraggableBlock, HashSet<Vector2Int>> source)
+        {
+            Dictionary<RuntimeTileMeshDraggableBlock, HashSet<Vector2Int>> clone =
+                new Dictionary<RuntimeTileMeshDraggableBlock, HashSet<Vector2Int>>();
+            if (source == null)
+                return clone;
+
+            foreach (KeyValuePair<RuntimeTileMeshDraggableBlock, HashSet<Vector2Int>> pair in source)
+            {
+                if (pair.Key == null || pair.Value == null)
+                    continue;
+
+                clone[pair.Key] = new HashSet<Vector2Int>(pair.Value);
+            }
+
+            return clone;
         }
 
         public bool ContainsWorldPoint(Vector3 worldPosition)
@@ -734,6 +828,21 @@ namespace DuoCurtain.RuntimeTileMesh
             }
 
             return false;
+        }
+
+        private static void RefreshFusionDoorWallSpans(
+            RuntimeTileMeshDraggableBlock seed,
+            HashSet<Vector2Int> mergedCells)
+        {
+            if (seed == null || mergedCells == null || mergedCells.Count == 0)
+                return;
+
+            RuntimeTileMeshFusionDoor[] doors = seed.GetComponentsInChildren<RuntimeTileMeshFusionDoor>(true);
+            for (int i = 0; i < doors.Length; i++)
+            {
+                if (doors[i] != null)
+                    doors[i].RefreshWallSpanFromCells(mergedCells);
+            }
         }
 
         private List<DoorCandidate> CollectDoorCandidates(
@@ -1151,6 +1260,10 @@ namespace DuoCurtain.RuntimeTileMesh
 
             block.SetHovered(false);
             block.SetSelected(false);
+
+            RuntimeTileMeshView view = block.View;
+            if (view != null)
+                view.ClearGeneratedMeshImmediate();
 
             if (deactivateAbsorbedBlocksImmediately)
                 block.gameObject.SetActive(false);

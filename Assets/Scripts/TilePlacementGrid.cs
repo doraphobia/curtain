@@ -159,9 +159,7 @@ public class TilePlacementGrid : MonoBehaviour
 
         HashSet<Vector2Int> candidateCells = new HashSet<Vector2Int>();
         for (int i = 0; i < definition.Cells.Count; i++)
-        {
             candidateCells.Add(anchorCell + definition.Cells[i]);
-        }
 
         if (occupiedCells.Count == 0)
             return true;
@@ -472,15 +470,33 @@ public class TilePlacementGrid : MonoBehaviour
     [ContextMenu("Rebuild Connected Room Planes")]
     public void RebuildConnectedRoomPlanes()
     {
-        DestroyConnectedRoomPlaneRoot();
+        Transform previousRoot = transform.Find(connectedPlaneRootName);
 
         if (!buildConnectedRoomPlanes || roomCells.Count == 0)
+        {
+            if (previousRoot != null)
+                DestroyConnectedRoomPlaneRoot(previousRoot);
             return;
+        }
 
         Transform root = CreateConnectedRoomPlaneRoot();
+        int successfulPlanes = 0;
         List<List<Vector2Int>> components = CollectConnectedRoomComponents();
         for (int i = 0; i < components.Count; i++)
-            CreateConnectedRoomPlane(root, components[i], i);
+        {
+            if (CreateConnectedRoomPlane(root, components[i], i))
+                successfulPlanes++;
+        }
+
+        if (successfulPlanes == 0 && previousRoot != null)
+        {
+            DestroyConnectedRoomPlaneRoot(root);
+            Debug.LogWarning("[TilePlacementGrid] Connected room plane rebuild failed; keeping previous floor mesh.", this);
+            return;
+        }
+
+        if (previousRoot != null)
+            DestroyConnectedRoomPlaneRoot(previousRoot);
 
         ApplyRoomPieceVisibilityForConnectedPlanes();
     }
@@ -507,6 +523,14 @@ public class TilePlacementGrid : MonoBehaviour
     private void DestroyConnectedRoomPlaneRoot()
     {
         Transform existingRoot = transform.Find(connectedPlaneRootName);
+        if (existingRoot == null)
+            return;
+
+        DestroyConnectedRoomPlaneRoot(existingRoot);
+    }
+
+    private void DestroyConnectedRoomPlaneRoot(Transform existingRoot)
+    {
         if (existingRoot == null)
             return;
 
@@ -569,10 +593,10 @@ public class TilePlacementGrid : MonoBehaviour
         return components;
     }
 
-    private void CreateConnectedRoomPlane(Transform root, List<Vector2Int> component, int index)
+    private bool CreateConnectedRoomPlane(Transform root, List<Vector2Int> component, int index)
     {
         if (component == null || component.Count == 0)
-            return;
+            return false;
 
         RuntimeTileMeshSettings settings = CreateConnectedPlaneMeshSettings();
         RuntimeTileMeshComponentResult result = RuntimeTileMeshBuilder.BuildComponent(component, settings);
@@ -580,7 +604,7 @@ public class TilePlacementGrid : MonoBehaviour
         {
             for (int i = 0; i < result.warnings.Count; i++)
                 Debug.LogWarning("[TilePlacementGrid] Connected room plane " + index + ": " + result.warnings[i], this);
-            return;
+            return false;
         }
 
         GameObject planeObject = new GameObject("Connected Room Plane " + index);
@@ -599,6 +623,8 @@ public class TilePlacementGrid : MonoBehaviour
 
         if (buildConnectedPlaneCollider)
             AddConnectedPlaneCollider(planeObject, result.meshData);
+
+        return true;
     }
 
     private RuntimeTileMeshSettings CreateConnectedPlaneMeshSettings()

@@ -198,12 +198,11 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::DuoCurtain.RuntimeTileMesh.RuntimeTileMeshView
   tiles:
+  - {x: 0, y: 0}
+  - {x: 0, y: 1}
   - {x: 0, y: 2}
-  - {x: 1, y: 2}
-  - {x: 1, y: 1}
-  - {x: 2, y: 1}
+  - {x: 1, y: 0}
   - {x: 2, y: 0}
-  - {x: 3, y: 0}
   rebuildOnStart: 1
   material: {fileID: 2100000, guid: b624f85efc20d4846b35ff3648e2f130, type: 2}
   buildPolygonCollider2D: 1
