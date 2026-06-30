@@ -718,9 +718,11 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             overlay.worldCamera = targetCamera;
             overlay.autoFollowActiveFusionCamera = true;
             overlay.labelFont = BayonFontAssetBuilder.EnsureFontAsset();
-            overlay.displayKey = KeyCode.Tab;
+            overlay.displayKey = KeyCode.None;
             overlay.displayMode = RuntimeTileMeshBlockInfoOverlay.TabDisplayMode.ToggleOnPress;
             overlay.startVisible = false;
+            overlay.allowManualDisplayInput = false;
+            overlay.showOnlyInManagementMode = true;
             overlay.fontSize = 30f;
             overlay.lineHeight = 30f;
             overlay.letterSpacingPercent = -5f;

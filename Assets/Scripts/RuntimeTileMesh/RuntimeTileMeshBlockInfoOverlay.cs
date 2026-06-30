@@ -23,13 +23,18 @@ namespace DuoCurtain.RuntimeTileMesh
         public KeyCode displayKey = KeyCode.Tab;
         public TabDisplayMode displayMode = TabDisplayMode.ToggleOnPress;
         public bool startVisible = false;
+        public bool allowManualDisplayInput = false;
 
         [Header("References")]
         public RuntimeTileMeshFusionSandbox fusionSandbox;
+        public FusionGameModeController modeController;
         public Camera worldCamera;
         public bool autoFollowActiveFusionCamera = true;
         public TMP_FontAsset labelFont;
         public string resourcesFontPath = "Fonts/Bayon-Regular SDF";
+
+        [Header("Visibility")]
+        public bool showOnlyInManagementMode = true;
 
         [Header("Figma Typography")]
         [Min(1f)]
@@ -79,13 +84,16 @@ namespace DuoCurtain.RuntimeTileMesh
         {
             ResolveReferences();
             EnsureOverlayCanvas();
-            SetVisible(startVisible, true);
+            SetVisible(showOnlyInManagementMode ? false : startVisible, true);
         }
 
         void Update()
         {
             ResolveReferences();
-            HandleDisplayInput();
+            if (showOnlyInManagementMode)
+                SetVisible(modeController != null && modeController.IsManagementMode, false);
+            else if (allowManualDisplayInput)
+                HandleDisplayInput();
 
             if (!isVisible || Time.unscaledTime < nextRefreshTime)
                 return;
@@ -104,6 +112,9 @@ namespace DuoCurtain.RuntimeTileMesh
 
         void OnGUI()
         {
+            if (showOnlyInManagementMode || !allowManualDisplayInput)
+                return;
+
             if (displayKey == KeyCode.None)
                 return;
 
@@ -286,6 +297,8 @@ namespace DuoCurtain.RuntimeTileMesh
                 fusionSandbox = GetComponent<RuntimeTileMeshFusionSandbox>();
             if (fusionSandbox == null)
                 fusionSandbox = FindFirstObjectByType<RuntimeTileMeshFusionSandbox>();
+            if (modeController == null)
+                modeController = FindFirstObjectByType<FusionGameModeController>();
 
             if (autoFollowActiveFusionCamera)
             {

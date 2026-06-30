@@ -374,14 +374,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c64c0d6727471482c8a415b6e09e6532, type: 3}
   m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::DuoCurtain.RuntimeTileMesh.RuntimeTileMeshBlockInfoOverlay
-  displayKey: 9
+  displayKey: 0
   displayMode: 0
   startVisible: 0
+  allowManualDisplayInput: 0
   fusionSandbox: {fileID: 31788941}
+  modeController: {fileID: 1577489644}
   worldCamera: {fileID: 1518932443}
   autoFollowActiveFusionCamera: 1
   labelFont: {fileID: 11400000, guid: 39c0afe25adf141b3ae55154f1bd95e6, type: 2}
   resourcesFontPath: Fonts/Bayon-Regular SDF
+  showOnlyInManagementMode: 1
   fontSize: 30
   lineHeight: 30
   letterSpacingPercent: -5
