@@ -813,7 +813,8 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                 CreateShopItem("L Block", assets != null ? assets.lPrefab : null, 16, KeyCode.Alpha2),
                 CreateShopItem("T Block", assets != null ? assets.tPrefab : null, 18, KeyCode.Alpha3),
                 CreateShopItem("Z Block", assets != null ? assets.zPrefab : null, 20, KeyCode.Alpha4),
-                CreateWindowShopItem("Window", 12, KeyCode.Alpha5)
+                CreateWindowShopItem("Window", 12, KeyCode.Alpha5),
+                CreateDoorShopItem("Door", 14, KeyCode.Alpha6)
             };
         }
 
@@ -841,6 +842,24 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             {
                 displayName = displayName,
                 itemKind = FusionGameModeController.ShopItemKind.WallAttachment,
+                wallAttachmentCategory = FusionGameModeController.WallAttachmentCategory.Window,
+                blockPrefab = null,
+                wallAttachmentPrefab = null,
+                price = price,
+                hotkey = hotkey
+            };
+        }
+
+        private static FusionGameModeController.BlockShopItem CreateDoorShopItem(
+            string displayName,
+            int price,
+            KeyCode hotkey)
+        {
+            return new FusionGameModeController.BlockShopItem
+            {
+                displayName = displayName,
+                itemKind = FusionGameModeController.ShopItemKind.WallAttachment,
+                wallAttachmentCategory = FusionGameModeController.WallAttachmentCategory.Door,
                 blockPrefab = null,
                 wallAttachmentPrefab = null,
                 price = price,

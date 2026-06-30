@@ -24,11 +24,18 @@ namespace DuoCurtain.RuntimeTileMesh
             WallAttachment
         }
 
+        public enum WallAttachmentCategory
+        {
+            Window,
+            Door
+        }
+
         [Serializable]
         public sealed class BlockShopItem
         {
             public string displayName = "Block";
             public ShopItemKind itemKind = ShopItemKind.Block;
+            public WallAttachmentCategory wallAttachmentCategory = WallAttachmentCategory.Window;
             public RuntimeTileMeshDraggableBlock blockPrefab;
             public GameObject wallAttachmentPrefab;
             [Min(0)]
@@ -132,6 +139,8 @@ namespace DuoCurtain.RuntimeTileMesh
         public Color windowOpenColor = new Color(0.55f, 0.85f, 1f, 1f);
         public Color wallAttachmentValidPreviewColor = new Color(1f, 0.92f, 0.08f, 0.72f);
         public Color wallAttachmentInvalidPreviewColor = new Color(1f, 0.15f, 0.1f, 0.45f);
+        public Color doorAttachmentValidPreviewColor = new Color(0f, 0f, 0f, 0.72f);
+        public Color doorAttachmentInvalidPreviewColor = new Color(1f, 0.15f, 0.1f, 0.45f);
 
         [Header("Fusion Shop Thumbnail Settings")]
         public FusionShopThumbnailRenderer.ThumbnailSettings shopThumbnailSettings =
@@ -557,9 +566,10 @@ namespace DuoCurtain.RuntimeTileMesh
             if (!PlayerControl.TryGetInteractionWorldPosition(out pointerWorld))
                 pointerWorld = fusionSandbox.GetPointerWorldPosition();
 
-            pendingWallAttachmentHasValidPlacement = fusionSandbox.TryFindNearestExteriorWallEdge(
+            pendingWallAttachmentHasValidPlacement = fusionSandbox.TryFindPurchasableExteriorWallEdge(
                 pointerWorld,
                 wallAttachmentSnapDistance,
+                pendingWallAttachmentItem.wallAttachmentCategory,
                 out pendingWallAttachmentPlacement);
 
             UpdateWallAttachmentPreview();
@@ -583,6 +593,26 @@ namespace DuoCurtain.RuntimeTileMesh
             if (pendingWallAttachmentItem == null || fusionSandbox == null || !pendingWallAttachmentHasValidPlacement)
                 return;
 
+            bool placed = pendingWallAttachmentItem.wallAttachmentCategory == WallAttachmentCategory.Door
+                ? PlacePendingDoorAttachment()
+                : PlacePendingWindowAttachment();
+
+            if (!placed)
+            {
+                if (pendingWallAttachmentPrice > 0 && currencySource != null)
+                    currencySource.AddValue(pendingWallAttachmentPrice);
+                return;
+            }
+
+            pendingWallAttachmentItem = null;
+            pendingWallAttachmentPrice = 0;
+            SetWallAttachmentPreviewVisible(false);
+            if (IsManagementMode)
+                SetShopExpanded(true, false);
+        }
+
+        private bool PlacePendingWindowAttachment()
+        {
             GameObject attachmentObject;
             if (pendingWallAttachmentItem.wallAttachmentPrefab != null)
             {
@@ -609,11 +639,15 @@ namespace DuoCurtain.RuntimeTileMesh
                 false);
 
             attachmentObject.transform.SetParent(fusionSandbox.transform, true);
-            pendingWallAttachmentItem = null;
-            pendingWallAttachmentPrice = 0;
-            SetWallAttachmentPreviewVisible(false);
-            if (IsManagementMode)
-                SetShopExpanded(true, false);
+            return true;
+        }
+
+        private bool PlacePendingDoorAttachment()
+        {
+            return fusionSandbox.TryPlaceExteriorFusionDoor(
+                pendingWallAttachmentPlacement,
+                pendingWallAttachmentItem.displayName,
+                out _);
         }
 
         private void CancelPendingWallAttachment(bool refund)
@@ -655,9 +689,18 @@ namespace DuoCurtain.RuntimeTileMesh
                 return;
 
             SetWallAttachmentPreviewVisible(true);
+            bool isDoor = pendingWallAttachmentItem != null &&
+                pendingWallAttachmentItem.wallAttachmentCategory == WallAttachmentCategory.Door;
+            Color invalidColor = isDoor
+                ? doorAttachmentInvalidPreviewColor
+                : wallAttachmentInvalidPreviewColor;
+            Color validColor = isDoor
+                ? doorAttachmentValidPreviewColor
+                : wallAttachmentValidPreviewColor;
+
             if (!pendingWallAttachmentHasValidPlacement)
             {
-                pendingWallAttachmentPreviewRenderer.color = wallAttachmentInvalidPreviewColor;
+                pendingWallAttachmentPreviewRenderer.color = invalidColor;
                 return;
             }
 
@@ -670,11 +713,26 @@ namespace DuoCurtain.RuntimeTileMesh
                 0f,
                 0f,
                 placement.axis == RuntimeTileMeshFusionDoor.DoorAxis.Vertical ? 90f : 0f);
-            pendingWallAttachmentPreview.transform.localScale = new Vector3(
-                Mathf.Max(0.01f, windowAttachmentLengthInCells * grid),
-                Mathf.Max(0.01f, windowAttachmentThicknessInCells * grid),
-                1f);
-            pendingWallAttachmentPreviewRenderer.color = wallAttachmentValidPreviewColor;
+
+            if (isDoor)
+            {
+                float doorThickness = fusionSandbox != null
+                    ? Mathf.Max(0.01f, fusionSandbox.doorThickness * grid)
+                    : grid * 0.25f;
+                pendingWallAttachmentPreview.transform.localScale = new Vector3(
+                    Mathf.Max(0.01f, grid),
+                    Mathf.Max(0.01f, doorThickness),
+                    1f);
+            }
+            else
+            {
+                pendingWallAttachmentPreview.transform.localScale = new Vector3(
+                    Mathf.Max(0.01f, windowAttachmentLengthInCells * grid),
+                    Mathf.Max(0.01f, windowAttachmentThicknessInCells * grid),
+                    1f);
+            }
+
+            pendingWallAttachmentPreviewRenderer.color = validColor;
         }
 
         private void SetWallAttachmentPreviewVisible(bool visible)
@@ -1641,6 +1699,7 @@ namespace DuoCurtain.RuntimeTileMesh
 
                     hash = hash * 31 + (item.displayName != null ? item.displayName.GetHashCode() : 0);
                     hash = hash * 31 + (int)item.itemKind;
+                    hash = hash * 31 + (int)item.wallAttachmentCategory;
                     hash = hash * 31 + (item.blockPrefab != null ? item.blockPrefab.GetInstanceID() : 0);
                     hash = hash * 31 + (item.wallAttachmentPrefab != null ? item.wallAttachmentPrefab.GetInstanceID() : 0);
                     hash = hash * 31 + item.price;

@@ -107,6 +107,8 @@ namespace DuoCurtain.RuntimeTileMesh
         private bool selectedThisFrame;
         private RuntimeTileMeshDraggableBlock playerCarrierBlock;
         private Vector3 playerCarrierLocalOffset;
+        private readonly List<RuntimeTileMeshFusionDoor> registeredRuntimeDoors =
+            new List<RuntimeTileMeshFusionDoor>();
         private readonly List<RuntimeTileMeshFusionDoor> doorBuffer = new List<RuntimeTileMeshFusionDoor>();
         private readonly HashSet<RuntimeTileMeshFusionDoor> playerContactingDoors =
             new HashSet<RuntimeTileMeshFusionDoor>();
@@ -278,7 +280,7 @@ namespace DuoCurtain.RuntimeTileMesh
             {
                 if (trackedDoor == null ||
                     !trackedDoor.isActiveAndEnabled ||
-                    !trackedDoor.IsPointTouchingCurrentPanel(playerWorldPoint, playerRadius))
+                    !trackedDoor.IsPointTouchingInteractionArea(playerWorldPoint, playerRadius))
                 {
                     playerDoorContactRemovalBuffer.Add(trackedDoor);
                 }
@@ -294,7 +296,7 @@ namespace DuoCurtain.RuntimeTileMesh
                 if (door == null || !door.isActiveAndEnabled)
                     continue;
 
-                if (!door.IsPointTouchingCurrentPanel(playerWorldPoint, playerRadius))
+                if (!door.IsPointTouchingInteractionArea(playerWorldPoint, playerRadius))
                     continue;
 
                 if (playerContactingDoors.Contains(door))
@@ -1005,6 +1007,128 @@ namespace DuoCurtain.RuntimeTileMesh
             return found;
         }
 
+        public bool TryFindPurchasableExteriorWallEdge(
+            Vector3 worldPoint,
+            float maxDistance,
+            FusionGameModeController.WallAttachmentCategory category,
+            out FusionWallEdgePlacement placement)
+        {
+            placement = default;
+            if (!TryFindNearestExteriorWallEdge(worldPoint, maxDistance, out placement))
+                return false;
+
+            return category == FusionGameModeController.WallAttachmentCategory.Door
+                ? CanPlaceExteriorFusionDoor(placement)
+                : CanPlaceExteriorWindow(placement);
+        }
+
+        public bool CanPlaceExteriorWindow(FusionWallEdgePlacement placement)
+        {
+            return TryFindBlockOwningCell(placement.ownerCell, out _);
+        }
+
+        public bool CanPlaceExteriorFusionDoor(FusionWallEdgePlacement placement)
+        {
+            if (!TryFindBlockOwningCell(placement.ownerCell, out _))
+                return false;
+
+            float duplicateEpsilon = Mathf.Max(0.001f, Mathf.Abs(gridSize) * 0.05f);
+            return !HasFusionDoorAt(placement.axis, placement.center, duplicateEpsilon);
+        }
+
+        public bool TryFindBlockOwningCell(Vector2Int cell, out RuntimeTileMeshDraggableBlock owner)
+        {
+            owner = null;
+            RefreshBlocks();
+            float safeGridSize = Mathf.Max(0.0001f, Mathf.Abs(gridSize));
+
+            for (int i = 0; i < blocks.Count; i++)
+            {
+                RuntimeTileMeshDraggableBlock block = blocks[i];
+                if (block == null || !block.isActiveAndEnabled)
+                    continue;
+
+                HashSet<Vector2Int> blockCells = block.GetWorldCells(safeGridSize, gridOrigin);
+                if (blockCells.Contains(cell))
+                {
+                    owner = block;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public bool HasFusionDoorAt(
+            RuntimeTileMeshFusionDoor.DoorAxis axis,
+            Vector2 center,
+            float epsilon)
+        {
+            PruneRegisteredDoors();
+            for (int i = 0; i < registeredRuntimeDoors.Count; i++)
+            {
+                RuntimeTileMeshFusionDoor door = registeredRuntimeDoors[i];
+                if (door != null && door.IsSameDoor(axis, center, epsilon))
+                    return true;
+            }
+
+            RefreshBlocks();
+            for (int i = 0; i < blocks.Count; i++)
+            {
+                RuntimeTileMeshDraggableBlock block = blocks[i];
+                if (block == null)
+                    continue;
+
+                RuntimeTileMeshFusionDoor[] blockDoors =
+                    block.GetComponentsInChildren<RuntimeTileMeshFusionDoor>(true);
+                if (HasDoorAt(blockDoors, axis, center, epsilon))
+                    return true;
+            }
+
+            return false;
+        }
+
+        public bool TryPlaceExteriorFusionDoor(
+            FusionWallEdgePlacement placement,
+            string displayName,
+            out RuntimeTileMeshFusionDoor door)
+        {
+            door = null;
+            if (!CanPlaceExteriorFusionDoor(placement))
+                return false;
+
+            if (!TryFindBlockOwningCell(placement.ownerCell, out RuntimeTileMeshDraggableBlock owner))
+                return false;
+
+            float safeGridSize = Mathf.Max(0.0001f, Mathf.Abs(gridSize));
+            string key = "Exterior:" + placement.axis + ":" + placement.edgeCoordinate + ":" + placement.variable;
+            string resolvedName = string.IsNullOrWhiteSpace(displayName) ? "Door" : displayName.Trim();
+
+            GameObject doorObject = new GameObject("Fusion Door - " + resolvedName);
+            doorObject.transform.SetParent(owner.transform, true);
+
+            door = doorObject.AddComponent<RuntimeTileMeshFusionDoor>();
+            door.includeWallVisual = false;
+            door.Configure(
+                placement.axis,
+                placement.center,
+                safeGridSize,
+                key,
+                doorThickness,
+                doorOpenAngleDegrees,
+                doorColor,
+                placement.edgeCoordinate,
+                placement.variable,
+                1,
+                null,
+                wallDebugColor,
+                wallDebugLineWidth);
+            door.ConfigureExteriorSwing(placement.normal);
+            ApplySandboxDoorAnimationSettings(door);
+            RegisterRuntimeDoor(door);
+            return true;
+        }
+
         private List<RuntimeTileMeshFusionDoor> DetachGroupDoors(HashSet<RuntimeTileMeshDraggableBlock> group)
         {
             List<RuntimeTileMeshFusionDoor> doors = new List<RuntimeTileMeshFusionDoor>();
@@ -1076,16 +1200,43 @@ namespace DuoCurtain.RuntimeTileMesh
                     wallVisualPrefab,
                     wallDebugColor,
                     wallDebugLineWidth);
-                door.animateDoor = animateDoors;
-                door.openDuration = doorOpenDuration;
-                door.closeDuration = doorCloseDuration;
-                door.swingCurve = doorSwingCurve;
-                door.doorwayPassableOpenAmount = doorPassableOpenAmount;
-                door.useEndWobble = useDoorEndWobble;
-                door.endWobbleDuration = doorEndWobbleDuration;
-                door.endWobbleAmplitudeDegrees = doorEndWobbleAmplitudeDegrees;
-                door.endWobbleOscillations = doorEndWobbleOscillations;
+                ApplySandboxDoorAnimationSettings(door);
+                RegisterRuntimeDoor(door);
             }
+        }
+
+        private void RegisterRuntimeDoor(RuntimeTileMeshFusionDoor door)
+        {
+            if (door == null || registeredRuntimeDoors.Contains(door))
+                return;
+
+            registeredRuntimeDoors.Add(door);
+        }
+
+        private void PruneRegisteredDoors()
+        {
+            for (int i = registeredRuntimeDoors.Count - 1; i >= 0; i--)
+            {
+                RuntimeTileMeshFusionDoor door = registeredRuntimeDoors[i];
+                if (door == null || !IsGameplayDoor(door))
+                    registeredRuntimeDoors.RemoveAt(i);
+            }
+        }
+
+        private void ApplySandboxDoorAnimationSettings(RuntimeTileMeshFusionDoor door)
+        {
+            if (door == null)
+                return;
+
+            door.animateDoor = animateDoors;
+            door.openDuration = doorOpenDuration;
+            door.closeDuration = doorCloseDuration;
+            door.swingCurve = doorSwingCurve;
+            door.doorwayPassableOpenAmount = doorPassableOpenAmount;
+            door.useEndWobble = useDoorEndWobble;
+            door.endWobbleDuration = doorEndWobbleDuration;
+            door.endWobbleAmplitudeDegrees = doorEndWobbleAmplitudeDegrees;
+            door.endWobbleOscillations = doorEndWobbleOscillations;
         }
 
         private static bool HasDoorAt(
@@ -1378,6 +1529,10 @@ namespace DuoCurtain.RuntimeTileMesh
         private List<RuntimeTileMeshFusionDoor> CollectActiveDoors()
         {
             doorBuffer.Clear();
+            PruneRegisteredDoors();
+            for (int i = 0; i < registeredRuntimeDoors.Count; i++)
+                AddDoorIfGameplay(registeredRuntimeDoors[i]);
+
             if (blocks.Count == 0)
                 RefreshBlocks();
 
@@ -1390,21 +1545,42 @@ namespace DuoCurtain.RuntimeTileMesh
                 RuntimeTileMeshFusionDoor[] blockDoors = block.GetComponentsInChildren<RuntimeTileMeshFusionDoor>(true);
                 for (int j = 0; j < blockDoors.Length; j++)
                 {
-                    RuntimeTileMeshFusionDoor door = blockDoors[j];
-                    if (door != null && !doorBuffer.Contains(door))
-                        doorBuffer.Add(door);
+                    AddDoorIfGameplay(blockDoors[j]);
                 }
             }
 
             RuntimeTileMeshFusionDoor[] sandboxDoors = GetComponentsInChildren<RuntimeTileMeshFusionDoor>(true);
             for (int i = 0; i < sandboxDoors.Length; i++)
             {
-                RuntimeTileMeshFusionDoor door = sandboxDoors[i];
-                if (door != null && !doorBuffer.Contains(door))
-                    doorBuffer.Add(door);
+                AddDoorIfGameplay(sandboxDoors[i]);
             }
 
             return doorBuffer;
+        }
+
+        private void AddDoorIfGameplay(RuntimeTileMeshFusionDoor door)
+        {
+            if (!IsGameplayDoor(door) || doorBuffer.Contains(door))
+                return;
+
+            ApplySandboxDoorAnimationSettings(door);
+            doorBuffer.Add(door);
+        }
+
+        private bool IsGameplayDoor(RuntimeTileMeshFusionDoor door)
+        {
+            if (door == null || !door.isActiveAndEnabled)
+                return false;
+
+            HideFlags flags = door.gameObject.hideFlags;
+            if ((flags & HideFlags.HideAndDontSave) == HideFlags.HideAndDontSave ||
+                (flags & HideFlags.DontSaveInEditor) == HideFlags.DontSaveInEditor ||
+                (flags & HideFlags.DontSaveInBuild) == HideFlags.DontSaveInBuild)
+            {
+                return false;
+            }
+
+            return door.gameObject.scene.IsValid();
         }
 
         private int GetSegmentSampleCount(Vector3 from, Vector3 to)

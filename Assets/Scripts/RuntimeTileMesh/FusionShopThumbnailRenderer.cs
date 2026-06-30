@@ -135,7 +135,11 @@ namespace DuoCurtain.RuntimeTileMesh
             clone.transform.localRotation = Quaternion.Euler(settings.previewRotationEuler);
             clone.transform.localScale = Vector3.one * Mathf.Max(0.01f, settings.previewScale);
             SetHideFlagsRecursively(clone, HideFlags.HideAndDontSave);
-            StripGameplayComponents(clone);
+            bool preserveFusionDoor = item.itemKind == FusionGameModeController.ShopItemKind.WallAttachment &&
+                item.wallAttachmentCategory == FusionGameModeController.WallAttachmentCategory.Door;
+            StripGameplayComponents(clone, preserveFusionDoor);
+            if (preserveFusionDoor)
+                EnsurePreviewRenderersEnabled(clone);
 
             RuntimeTileMeshView[] views = clone.GetComponentsInChildren<RuntimeTileMeshView>(true);
             for (int i = 0; i < views.Length; i++)
@@ -210,6 +214,12 @@ namespace DuoCurtain.RuntimeTileMesh
             if (item.wallAttachmentPrefab != null)
                 return Instantiate(item.wallAttachmentPrefab, parent);
 
+            if (item.itemKind == FusionGameModeController.ShopItemKind.WallAttachment &&
+                item.wallAttachmentCategory == FusionGameModeController.WallAttachmentCategory.Door)
+            {
+                return RuntimeTileMeshFusionDoor.CreatePanelOnlyShopPreview(parent).gameObject;
+            }
+
             GameObject attachment = new GameObject("Default Window Attachment Preview");
             attachment.transform.SetParent(parent, false);
             SpriteRenderer sprite = attachment.AddComponent<SpriteRenderer>();
@@ -230,7 +240,7 @@ namespace DuoCurtain.RuntimeTileMesh
             return 1;
         }
 
-        private static void StripGameplayComponents(GameObject clone)
+        private static void StripGameplayComponents(GameObject clone, bool preserveFusionDoor = false)
         {
             RuntimeTileMeshDraggableBlock[] blocks = clone.GetComponentsInChildren<RuntimeTileMeshDraggableBlock>(true);
             for (int i = 0; i < blocks.Length; i++)
@@ -247,6 +257,12 @@ namespace DuoCurtain.RuntimeTileMesh
             {
                 if (doors[i] == null)
                     continue;
+
+                if (preserveFusionDoor)
+                {
+                    doors[i].enabled = false;
+                    continue;
+                }
 
                 doors[i].enabled = false;
                 Destroy(doors[i]);
@@ -281,7 +297,7 @@ namespace DuoCurtain.RuntimeTileMesh
             GameObject clone,
             RuntimeTileMeshDraggableBlock prefab)
         {
-            Renderer[] renderers = clone.GetComponentsInChildren<Renderer>(false);
+            Renderer[] renderers = clone.GetComponentsInChildren<Renderer>(true);
             bool found = false;
             Bounds bounds = new Bounds(clone.transform.position, Vector3.one);
             for (int i = 0; i < renderers.Length; i++)
@@ -328,6 +344,19 @@ namespace DuoCurtain.RuntimeTileMesh
                 (minX + maxX + 1) * 0.5f * sourceView.tileSize.x,
                 (minY + maxY + 1) * 0.5f * sourceView.tileSize.y);
             return new Bounds(clone.transform.position + (Vector3)center, new Vector3(size.x, size.y, 0.1f));
+        }
+
+        private static void EnsurePreviewRenderersEnabled(GameObject clone)
+        {
+            if (clone == null)
+                return;
+
+            Renderer[] renderers = clone.GetComponentsInChildren<Renderer>(true);
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                if (renderers[i] != null)
+                    renderers[i].enabled = true;
+            }
         }
 
         private static void SetHideFlagsRecursively(GameObject root, HideFlags flags)

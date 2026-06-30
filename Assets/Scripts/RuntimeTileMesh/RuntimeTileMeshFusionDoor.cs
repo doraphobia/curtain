@@ -64,6 +64,7 @@ namespace DuoCurtain.RuntimeTileMesh
         public int doorVariableOffset = 1;
 
         [Header("Wall Visual")]
+        public bool includeWallVisual = true;
         public bool useDefaultWallDebugVisual = true;
         public GameObject wallVisualPrefab;
         public Color wallColor = new Color(0.38f, 0.38f, 0.38f, 0.95f);
@@ -230,8 +231,63 @@ namespace DuoCurtain.RuntimeTileMesh
             ApplyVisualState();
         }
 
+        public void ConfigureExteriorSwing(Vector2 outwardNormal)
+        {
+            Vector2 inward = outwardNormal.sqrMagnitude > 0.0001f
+                ? -outwardNormal.normalized
+                : Vector2.zero;
+            if (axis == DoorAxis.Vertical)
+            {
+                float sign = Mathf.Abs(inward.x) > 0.0001f ? Mathf.Sign(inward.x) : 1f;
+                openDirection = new Vector2(sign, 0f);
+            }
+            else
+            {
+                float sign = Mathf.Abs(inward.y) > 0.0001f ? Mathf.Sign(inward.y) : 1f;
+                openDirection = new Vector2(0f, sign);
+            }
+
+            hingeEnd = DoorHingeEnd.Negative;
+        }
+
+        public static RuntimeTileMeshFusionDoor CreatePanelOnlyShopPreview(Transform parent)
+        {
+            GameObject doorObject = new GameObject("Door Shop Preview");
+            doorObject.transform.SetParent(parent, false);
+
+            GameObject backdropObject = new GameObject("Door Shop Preview Backdrop");
+            backdropObject.transform.SetParent(doorObject.transform, false);
+            SpriteRenderer backdropRenderer = backdropObject.AddComponent<SpriteRenderer>();
+            backdropRenderer.sprite = FusionWallAttachment.GetDefaultWindowSprite();
+            backdropRenderer.color = new Color(1f, 1f, 1f, 0.22f);
+            backdropRenderer.sortingOrder = 29;
+            backdropObject.transform.localScale = new Vector3(1.08f, 0.34f, 1f);
+
+            RuntimeTileMeshFusionDoor door = doorObject.AddComponent<RuntimeTileMeshFusionDoor>();
+            door.includeWallVisual = false;
+            door.Configure(
+                DoorAxis.Vertical,
+                Vector2.zero,
+                1f,
+                "ShopPreview",
+                0.25f,
+                90f,
+                Color.black,
+                0,
+                0,
+                1,
+                null,
+                new Color(0.38f, 0.38f, 0.38f, 0.95f),
+                0.035f);
+            door.ConfigureExteriorSwing(Vector2.right);
+            return door;
+        }
+
         public void RefreshWallSpanFromCells(ICollection<Vector2Int> blockCells)
         {
+            if (!includeWallVisual)
+                return;
+
             if (blockCells == null || blockCells.Count == 0)
                 return;
 
@@ -291,8 +347,11 @@ namespace DuoCurtain.RuntimeTileMesh
 
             Vector2 point = interactionWorldPoint;
             DoorPanelPose panelPose = GetCurrentPanelPose();
-            if (!PointTouchesPanel(point, panelPose, interactionRadius))
+            if (!PointTouchesPanel(point, panelPose, interactionRadius) &&
+                !PointTouchesDoorway(point, interactionRadius))
+            {
                 return false;
+            }
 
             if (isOpen)
             {
@@ -314,10 +373,21 @@ namespace DuoCurtain.RuntimeTileMesh
             return PointTouchesPanel(worldPoint, panelPose, radius);
         }
 
+        public bool IsPointTouchingInteractionArea(Vector3 worldPoint, float radius)
+        {
+            DoorPanelPose panelPose = GetCurrentPanelPose();
+            return PointTouchesPanel(worldPoint, panelPose, radius) ||
+                   PointTouchesDoorway(worldPoint, radius);
+        }
+
         public bool TryToggleFromPlayerContact(Vector3 playerWorldPoint, float playerRadius)
         {
-            if (!CanToggleNow() || !IsPointTouchingCurrentPanel(playerWorldPoint, playerRadius))
+            if (!CanToggleNow() ||
+                (!IsPointTouchingCurrentPanel(playerWorldPoint, playerRadius) &&
+                 !PointTouchesDoorway(playerWorldPoint, playerRadius)))
+            {
                 return false;
+            }
 
             if (isOpen)
             {
@@ -733,6 +803,20 @@ namespace DuoCurtain.RuntimeTileMesh
                    across <= pose.thickness * 0.5f + inflate;
         }
 
+        private bool PointTouchesDoorway(Vector2 point, float inflate)
+        {
+            inflate = Mathf.Max(0f, inflate);
+            Vector2 direction = GetClosedLengthDirection();
+            Vector2 normal = axis == DoorAxis.Vertical ? Vector2.right : Vector2.up;
+            Vector2 delta = point - seamCenter;
+            float along = Mathf.Abs(Vector2.Dot(delta, direction));
+            float across = Mathf.Abs(Vector2.Dot(delta, normal));
+            float doorwayRadius = Mathf.Max(GetWorldDoorThickness() * 0.5f, gridSize * 0.1f);
+
+            return along <= GetWorldDoorLength() * 0.5f + inflate &&
+                   across <= doorwayRadius + inflate;
+        }
+
         private void EnsureVisual()
         {
             transform.position = new Vector3(seamCenter.x, seamCenter.y, -0.15f);
@@ -879,6 +963,8 @@ namespace DuoCurtain.RuntimeTileMesh
         private void RebuildWallVisual()
         {
             DestroyWallVisualRoot();
+            if (!includeWallVisual)
+                return;
 
             GameObject rootObject = new GameObject(WallVisualName);
             wallVisualRoot = rootObject.transform;
@@ -972,6 +1058,7 @@ namespace DuoCurtain.RuntimeTileMesh
             line.numCapVertices = 0;
             line.numCornerVertices = 0;
             Color color = foreground ? wallColor : GetContrastWallColor(wallColor);
+            ApplyWallMaterialColor(color);
             line.startColor = color;
             line.endColor = color;
             line.sortingOrder = foreground ? 29 : 28;
@@ -994,6 +1081,18 @@ namespace DuoCurtain.RuntimeTileMesh
             Color contrast = luminance > 0.55f ? Color.black : Color.white;
             contrast.a = wallOutlineAlpha;
             return contrast;
+        }
+
+        private void ApplyWallMaterialColor(Color color)
+        {
+            Material material = GetWallMaterial();
+            if (material == null)
+                return;
+
+            if (material.HasProperty("_BaseColor"))
+                material.SetColor("_BaseColor", color);
+            if (material.HasProperty("_Color"))
+                material.SetColor("_Color", color);
         }
 
         private void CacheDefaultWallSupport()

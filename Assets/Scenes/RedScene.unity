@@ -7370,10 +7370,18 @@ MonoBehaviour:
     hotkey: 52
   - displayName: Window
     itemKind: 1
+    wallAttachmentCategory: 0
     blockPrefab: {fileID: 0}
     wallAttachmentPrefab: {fileID: 0}
     price: 12
     hotkey: 53
+  - displayName: Door
+    itemKind: 1
+    wallAttachmentCategory: 1
+    blockPrefab: {fileID: 0}
+    wallAttachmentPrefab: {fileID: 0}
+    price: 14
+    hotkey: 54
   createShopPanelIfMissing: 1
   showShopOnlyInManagementMode: 1
   shopPanelRoot: {fileID: 0}

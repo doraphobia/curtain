@@ -19,6 +19,7 @@ public class FootprintInstance : MonoBehaviour
     public FootprintSide Side { get; private set; }
     public int DecayIndex { get; private set; }
     public bool IsLatest { get; private set; }
+    public Color BaseColor => baseColor;
 
     void Awake()
     {

@@ -9,6 +9,9 @@ namespace DuoCurtain.RuntimeTileMesh
         {
             WanderOutside,
             WatchingWindow,
+            TargetingDoor,
+            BreakingDoor,
+            EnteredRoom,
             ChasingPlayer
         }
 
@@ -35,10 +38,39 @@ namespace DuoCurtain.RuntimeTileMesh
         public float playerWindowDistance = 8f;
         [Min(0.01f)]
         public float windowCheckInterval = 0.2f;
-        public bool chasePlayerAfterWindowDetection = true;
+        public bool targetFusionDoorAfterWindowDetection = true;
+
+        [Header("Door Flow")]
+        [Min(0.01f)]
+        public float doorTargetStopDistance = 0.25f;
+        [Min(0f)]
+        public float doorBreakDuration = 1.2f;
+        [Min(0f)]
+        public float enterRoomDelay = 0.25f;
+        public bool openFusionDoorAfterBreak = true;
+        public bool showDoorBreakProgress = true;
+        public Vector3 doorBreakProgressOffset = new Vector3(0f, 0.75f, 0f);
+        [Min(0.01f)]
+        public float doorBreakProgressSmoothSpeed = 8f;
 
         [Header("Debug")]
         public bool drawDebug;
+        public bool debugEnemyFlow;
+
+        [Header("Vision Debug")]
+        public bool drawVisionConeInEditor = true;
+        public bool drawLineOfSightInEditor = true;
+        public bool drawWindowSamplesInEditor = true;
+
+        [Header("Runtime Vision Visual")]
+        public bool showVisionInGame = true;
+        public bool showWindowProjection = true;
+        public Material visionLineMaterial;
+        public Color searchingVisionColor = new Color(1f, 0.82f, 0.15f, 0.32f);
+        public Color detectedVisionColor = new Color(0.15f, 1f, 0.45f, 0.85f);
+        public Color blockedVisionColor = new Color(1f, 0.15f, 0.1f, 0.45f);
+        [Min(0.001f)]
+        public float visionLineWidth = 0.025f;
 
         [SerializeField]
         private TraceEnemyState currentState = TraceEnemyState.WanderOutside;
@@ -46,6 +78,19 @@ namespace DuoCurtain.RuntimeTileMesh
         private Vector3 waypoint;
         private float waypointTimer;
         private float windowCheckTimer;
+        private float doorBreakTimer;
+        private float enterRoomTimer;
+        private bool confirmedPlayerByVision;
+        private RuntimeTileMeshFusionDoor targetDoor;
+        private Vector3 lastValidOutdoorPosition;
+        private WindowPortal lastUsedWindow;
+        private Vector3 lastKnownPlayerPosition;
+        private Material runtimeVisionMaterial;
+        private Transform visionVisualRoot;
+        private LineRenderer visionPrimaryLine;
+        private LineRenderer visionWindowProjectionLine;
+        private RuntimeTileMeshFusionDoor progressBarDoor;
+        private DoorBreakProgressBar doorBreakProgressBar;
 
         public TraceEnemyState CurrentState => currentState;
 
@@ -58,6 +103,7 @@ namespace DuoCurtain.RuntimeTileMesh
                 footprintTrace = gameObject.AddComponent<EnemyFootprintTrace>();
 
             footprintTrace.SetTraceState(EnemyTraceState.NormalMoving);
+            lastValidOutdoorPosition = transform.position;
             PickOutsideWaypoint();
         }
 
@@ -69,6 +115,37 @@ namespace DuoCurtain.RuntimeTileMesh
             ResolveReferences();
             TickWindowDetection();
             TickMovement();
+            UpdateRuntimeVisionVisual();
+        }
+
+        void OnDestroy()
+        {
+            if (runtimeVisionMaterial == null)
+            {
+                DestroyDoorBreakProgressBar();
+                return;
+            }
+
+            if (Application.isPlaying)
+                Destroy(runtimeVisionMaterial);
+            else
+                DestroyImmediate(runtimeVisionMaterial);
+
+            DestroyDoorBreakProgressBar();
+        }
+
+        private void DestroyDoorBreakProgressBar()
+        {
+            if (doorBreakProgressBar == null)
+                return;
+
+            if (Application.isPlaying)
+                Destroy(doorBreakProgressBar.gameObject);
+            else
+                DestroyImmediate(doorBreakProgressBar.gameObject);
+
+            doorBreakProgressBar = null;
+            progressBarDoor = null;
         }
 
         public void Configure(
@@ -87,55 +164,134 @@ namespace DuoCurtain.RuntimeTileMesh
 
             footprintTrace.ConfigureFootprintPrefabs(leftFootprintPrefab, rightFootprintPrefab, footprintParent);
             footprintTrace.SetTraceState(EnemyTraceState.NormalMoving);
+            lastValidOutdoorPosition = transform.position;
+        }
+
+        public bool HasEnemyEnteredRoom()
+        {
+            return currentState == TraceEnemyState.EnteredRoom ||
+                   currentState == TraceEnemyState.ChasingPlayer;
+        }
+
+        public bool HasEnemyConfirmedPlayerByVision()
+        {
+            return confirmedPlayerByVision;
+        }
+
+        public bool IsInsideAnyFusionRoom(Vector3 worldPosition)
+        {
+            if (RoomManager.IsInsideAnyRoom(worldPosition))
+                return true;
+
+            return fusionSandbox != null && fusionSandbox.ContainsWorldPoint(worldPosition, 0f);
         }
 
         private void TickWindowDetection()
         {
+            if (currentState == TraceEnemyState.TargetingDoor ||
+                currentState == TraceEnemyState.BreakingDoor ||
+                currentState == TraceEnemyState.EnteredRoom ||
+                currentState == TraceEnemyState.ChasingPlayer)
+            {
+                return;
+            }
+
             windowCheckTimer -= Time.deltaTime;
             if (windowCheckTimer > 0f)
                 return;
 
             windowCheckTimer = Mathf.Max(0.01f, windowCheckInterval);
-            bool detected = CanDetectPlayerThroughOpenWindow();
-            if (detected && chasePlayerAfterWindowDetection)
-            {
-                SetState(TraceEnemyState.ChasingPlayer);
-                return;
-            }
-
+            bool detected = CanDetectPlayerThroughOpenWindow(out WindowPortal usedWindow);
             if (detected)
             {
+                confirmedPlayerByVision = true;
+                lastUsedWindow = usedWindow;
+                if (debugEnemyFlow)
+                {
+                    Debug.Log(
+                        "[EnemyVision] CanSeePlayer=true Source=OpenWindow Window=" +
+                        (usedWindow != null ? usedWindow.name : "unknown"),
+                        this);
+                }
+
+                if (targetFusionDoorAfterWindowDetection && TrySelectNearestFusionDoor(out targetDoor))
+                {
+                    SetState(TraceEnemyState.TargetingDoor);
+                    return;
+                }
+
                 SetState(TraceEnemyState.WatchingWindow);
                 return;
             }
 
+            if (debugEnemyFlow)
+                Debug.Log("[EnemyVision] CanSeePlayer=false Source=None", this);
+
             if (currentState != TraceEnemyState.WanderOutside)
+            {
+                confirmedPlayerByVision = false;
+                lastUsedWindow = null;
                 SetState(TraceEnemyState.WanderOutside);
+            }
         }
 
         private void TickMovement()
         {
             Vector3 target = waypoint;
-            if (currentState == TraceEnemyState.ChasingPlayer && playerControl != null && playerControl.HasPlayerWorldPosition)
+            switch (currentState)
             {
-                target = playerControl.PlayerWorldPosition;
-            }
-            else
-            {
-                waypointTimer -= Time.deltaTime;
-                if (waypointTimer <= 0f || Vector2.Distance(transform.position, waypoint) <= waypointStopDistance)
-                    PickOutsideWaypoint();
+                case TraceEnemyState.TargetingDoor:
+                    if (targetDoor == null)
+                    {
+                        SetState(TraceEnemyState.WatchingWindow);
+                        return;
+                    }
+
+                    target = targetDoor.transform.position;
+                    if (MoveTowards(target, false) || Vector2.Distance(transform.position, target) <= doorTargetStopDistance)
+                        SetState(TraceEnemyState.BreakingDoor);
+                    return;
+
+                case TraceEnemyState.BreakingDoor:
+                    doorBreakTimer += Time.deltaTime;
+                    UpdateDoorBreakProgress();
+                    if (doorBreakTimer >= doorBreakDuration)
+                    {
+                        if (openFusionDoorAfterBreak && targetDoor != null)
+                            targetDoor.OpenToward((Vector2)(targetDoor.transform.position - transform.position));
+                        SetState(TraceEnemyState.EnteredRoom);
+                    }
+                    return;
+
+                case TraceEnemyState.EnteredRoom:
+                    enterRoomTimer += Time.deltaTime;
+                    if (enterRoomTimer >= enterRoomDelay)
+                        SetState(TraceEnemyState.ChasingPlayer);
+                    return;
+
+                case TraceEnemyState.ChasingPlayer:
+                    if (playerControl != null && playerControl.HasPlayerWorldPosition)
+                        MoveTowards(playerControl.PlayerWorldPosition, true);
+                    return;
+
+                default:
+                    waypointTimer -= Time.deltaTime;
+                    if (waypointTimer <= 0f || Vector2.Distance(transform.position, waypoint) <= waypointStopDistance)
+                        PickOutsideWaypoint();
+                    break;
             }
 
-            MoveTowards(target);
+            MoveTowards(target, false);
         }
 
-        private bool CanDetectPlayerThroughOpenWindow()
+        private bool CanDetectPlayerThroughOpenWindow(out WindowPortal usedWindow)
         {
+            usedWindow = null;
             if (playerControl == null || !playerControl.HasPlayerWorldPosition)
                 return false;
 
             Vector2 playerPosition = playerControl.PlayerWorldPosition;
+            lastKnownPlayerPosition = playerPosition;
             WindowPortal[] windows = FindObjectsByType<WindowPortal>(FindObjectsSortMode.None);
             for (int i = 0; i < windows.Length; i++)
             {
@@ -153,6 +309,7 @@ namespace DuoCurtain.RuntimeTileMesh
                 if (Vector2.Distance(windowPosition, playerPosition) > playerWindowDistance)
                     continue;
 
+                usedWindow = window;
                 return true;
             }
 
@@ -173,26 +330,48 @@ namespace DuoCurtain.RuntimeTileMesh
                 random = Vector2.right * radius;
 
             waypoint = new Vector3(center.x + random.x, center.y + random.y, transform.position.z);
+            if (IsInsideAnyFusionRoom(waypoint))
+            {
+                waypoint = lastValidOutdoorPosition;
+                waypoint += new Vector3(random.x, random.y, 0f).normalized * Mathf.Max(1f, radius);
+            }
         }
 
-        private void MoveTowards(Vector3 target)
+        private bool MoveTowards(Vector3 target, bool allowIndoor)
         {
             Vector2 delta = (Vector2)(target - transform.position);
             float distance = delta.magnitude;
             if (distance <= waypointStopDistance)
-                return;
+                return true;
 
             Vector2 step = delta.normalized * (moveSpeed * Time.deltaTime);
             if (step.magnitude > distance)
                 step = delta;
 
-            transform.position += new Vector3(step.x, step.y, 0f);
+            Vector3 nextPosition = transform.position + new Vector3(step.x, step.y, 0f);
+            if (!allowIndoor && IsInsideAnyFusionRoom(nextPosition))
+            {
+                transform.position = lastValidOutdoorPosition;
+                PickOutsideWaypoint();
+                if (debugEnemyFlow)
+                    Debug.Log("[EnemyFlow] Outdoor movement clamped before entering room. Position=" + nextPosition, this);
+                return false;
+            }
+
+            transform.position = nextPosition;
+            if (!IsInsideAnyFusionRoom(transform.position))
+                lastValidOutdoorPosition = transform.position;
+
+            return Vector2.Distance(transform.position, target) <= waypointStopDistance;
         }
 
         private void SetState(TraceEnemyState state)
         {
             if (currentState == state)
                 return;
+
+            if (debugEnemyFlow)
+                Debug.Log("[EnemyFlow] State=" + currentState + " -> " + state, this);
 
             currentState = state;
             if (footprintTrace == null)
@@ -201,15 +380,112 @@ namespace DuoCurtain.RuntimeTileMesh
             switch (currentState)
             {
                 case TraceEnemyState.WatchingWindow:
+                    HideDoorBreakProgress();
                     footprintTrace.SetTraceState(EnemyTraceState.Watching);
                     break;
+                case TraceEnemyState.TargetingDoor:
+                    HideDoorBreakProgress();
+                    footprintTrace.SetTraceState(EnemyTraceState.TargetingDoor);
+                    break;
+                case TraceEnemyState.BreakingDoor:
+                    doorBreakTimer = 0f;
+                    EnsureDoorBreakProgress();
+                    if (doorBreakProgressBar != null)
+                        doorBreakProgressBar.SetProgress(0f, true);
+                    footprintTrace.SetTraceState(EnemyTraceState.BreakingDoor);
+                    break;
+                case TraceEnemyState.EnteredRoom:
+                    enterRoomTimer = 0f;
+                    if (doorBreakProgressBar != null)
+                        doorBreakProgressBar.SetProgress(1f, true);
+                    footprintTrace.SetTraceState(EnemyTraceState.ChasingPlayer);
+                    break;
                 case TraceEnemyState.ChasingPlayer:
+                    HideDoorBreakProgress();
                     footprintTrace.SetTraceState(EnemyTraceState.ChasingPlayer);
                     break;
                 default:
+                    HideDoorBreakProgress();
                     footprintTrace.SetTraceState(EnemyTraceState.NormalMoving);
                     break;
             }
+        }
+
+        private void EnsureDoorBreakProgress()
+        {
+            if (!showDoorBreakProgress || targetDoor == null)
+                return;
+
+            if (doorBreakProgressBar != null && progressBarDoor == targetDoor)
+                return;
+
+            if (doorBreakProgressBar != null)
+                Destroy(doorBreakProgressBar.gameObject);
+
+            progressBarDoor = targetDoor;
+            doorBreakProgressBar = DoorBreakProgressBar.CreateDefault(targetDoor.transform, doorBreakProgressOffset);
+            doorBreakProgressBar.smoothSpeed = Mathf.Max(0.01f, doorBreakProgressSmoothSpeed);
+        }
+
+        private void UpdateDoorBreakProgress()
+        {
+            if (!showDoorBreakProgress)
+                return;
+
+            EnsureDoorBreakProgress();
+            if (doorBreakProgressBar == null)
+                return;
+
+            float normalized = doorBreakDuration > 0.0001f
+                ? Mathf.Clamp01(doorBreakTimer / doorBreakDuration)
+                : 1f;
+            doorBreakProgressBar.SetProgress(normalized, true);
+        }
+
+        private void HideDoorBreakProgress()
+        {
+            if (doorBreakProgressBar != null)
+                doorBreakProgressBar.SetVisible(false);
+        }
+
+        private bool TrySelectNearestFusionDoor(out RuntimeTileMeshFusionDoor nearestDoor)
+        {
+            nearestDoor = null;
+            RuntimeTileMeshFusionDoor[] doors = FindObjectsByType<RuntimeTileMeshFusionDoor>(FindObjectsSortMode.None);
+            float bestDistanceSqr = float.MaxValue;
+            for (int i = 0; i < doors.Length; i++)
+            {
+                RuntimeTileMeshFusionDoor door = doors[i];
+                if (door == null || !door.isActiveAndEnabled || IsHiddenPreviewDoor(door))
+                    continue;
+
+                float distanceSqr = ((Vector2)door.transform.position - (Vector2)transform.position).sqrMagnitude;
+                if (distanceSqr >= bestDistanceSqr)
+                    continue;
+
+                bestDistanceSqr = distanceSqr;
+                nearestDoor = door;
+            }
+
+            if (debugEnemyFlow)
+            {
+                Debug.Log(
+                    nearestDoor != null
+                        ? "[EnemyFlow] Target door=" + nearestDoor.name
+                        : "[EnemyFlow] No fusion door available after vision confirmation.",
+                    this);
+            }
+
+            return nearestDoor != null;
+        }
+
+        private static bool IsHiddenPreviewDoor(RuntimeTileMeshFusionDoor door)
+        {
+            HideFlags flags = door.gameObject.hideFlags;
+            return (flags & HideFlags.HideAndDontSave) == HideFlags.HideAndDontSave ||
+                   (flags & HideFlags.DontSaveInEditor) == HideFlags.DontSaveInEditor ||
+                   (flags & HideFlags.DontSaveInBuild) == HideFlags.DontSaveInBuild ||
+                   !door.gameObject.scene.IsValid();
         }
 
         private void ResolveReferences()
@@ -220,15 +496,156 @@ namespace DuoCurtain.RuntimeTileMesh
                 playerControl = PlayerControl.Active != null ? PlayerControl.Active : FindFirstObjectByType<PlayerControl>();
         }
 
+        private void UpdateRuntimeVisionVisual()
+        {
+            if (!showVisionInGame)
+            {
+                SetVisionLinesVisible(false);
+                return;
+            }
+
+            EnsureVisionLines();
+            if (visionPrimaryLine == null || playerControl == null || !playerControl.HasPlayerWorldPosition)
+            {
+                SetVisionLinesVisible(false);
+                return;
+            }
+
+            SetVisionLinesVisible(true);
+            Vector3 origin = transform.position;
+            Vector3 playerPosition = playerControl.PlayerWorldPosition;
+            lastKnownPlayerPosition = playerPosition;
+            Color color = confirmedPlayerByVision ? detectedVisionColor : searchingVisionColor;
+
+            if (lastUsedWindow != null)
+            {
+                Vector3 windowPosition = lastUsedWindow.transform.position;
+                ConfigureVisionLine(visionPrimaryLine, origin, windowPosition, color);
+                if (showWindowProjection && visionWindowProjectionLine != null)
+                    ConfigureVisionLine(visionWindowProjectionLine, windowPosition, playerPosition, color);
+                else if (visionWindowProjectionLine != null)
+                    visionWindowProjectionLine.enabled = false;
+            }
+            else
+            {
+                ConfigureVisionLine(
+                    visionPrimaryLine,
+                    origin,
+                    playerPosition,
+                    confirmedPlayerByVision ? detectedVisionColor : blockedVisionColor);
+                if (visionWindowProjectionLine != null)
+                    visionWindowProjectionLine.enabled = false;
+            }
+        }
+
+        private void EnsureVisionLines()
+        {
+            if (visionVisualRoot == null)
+            {
+                GameObject root = new GameObject("Fusion Enemy Vision Visuals");
+                root.transform.SetParent(transform, false);
+                visionVisualRoot = root.transform;
+            }
+
+            if (visionPrimaryLine == null)
+                visionPrimaryLine = CreateVisionLine("Vision Primary Line");
+            if (visionWindowProjectionLine == null)
+                visionWindowProjectionLine = CreateVisionLine("Vision Window Projection");
+        }
+
+        private LineRenderer CreateVisionLine(string lineName)
+        {
+            GameObject lineObject = new GameObject(lineName);
+            lineObject.transform.SetParent(visionVisualRoot, false);
+            LineRenderer line = lineObject.AddComponent<LineRenderer>();
+            line.useWorldSpace = true;
+            line.positionCount = 2;
+            line.numCapVertices = 0;
+            line.numCornerVertices = 0;
+            line.sharedMaterial = GetVisionMaterial();
+            line.sortingOrder = 55;
+            return line;
+        }
+
+        private void ConfigureVisionLine(LineRenderer line, Vector3 start, Vector3 end, Color color)
+        {
+            if (line == null)
+                return;
+
+            line.enabled = true;
+            line.sharedMaterial = GetVisionMaterial();
+            line.widthMultiplier = Mathf.Max(0.001f, visionLineWidth);
+            line.startColor = color;
+            line.endColor = color;
+            line.SetPosition(0, new Vector3(start.x, start.y, -0.25f));
+            line.SetPosition(1, new Vector3(end.x, end.y, -0.25f));
+        }
+
+        private void SetVisionLinesVisible(bool visible)
+        {
+            if (visionPrimaryLine != null)
+                visionPrimaryLine.enabled = visible;
+            if (visionWindowProjectionLine != null)
+                visionWindowProjectionLine.enabled = visible && showWindowProjection;
+        }
+
+        private Material GetVisionMaterial()
+        {
+            if (visionLineMaterial != null)
+                return visionLineMaterial;
+            if (runtimeVisionMaterial != null)
+                return runtimeVisionMaterial;
+
+            Shader shader = Shader.Find("Sprites/Default");
+            if (shader == null)
+                shader = Shader.Find("Universal Render Pipeline/Unlit");
+            if (shader == null)
+                shader = Shader.Find("Unlit/Color");
+
+            if (shader == null)
+                return null;
+
+            runtimeVisionMaterial = new Material(shader)
+            {
+                name = "Fusion Enemy Vision Line",
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            return runtimeVisionMaterial;
+        }
+
         void OnDrawGizmosSelected()
         {
             if (!drawDebug)
                 return;
 
-            Gizmos.color = Color.red;
-            Gizmos.DrawWireSphere(transform.position, windowDetectionDistance);
+            if (drawVisionConeInEditor)
+            {
+                Gizmos.color = Color.red;
+                Gizmos.DrawWireSphere(transform.position, windowDetectionDistance);
+            }
+
             Gizmos.color = Color.yellow;
             Gizmos.DrawLine(transform.position, waypoint);
+
+            if (drawLineOfSightInEditor)
+            {
+                Gizmos.color = confirmedPlayerByVision ? Color.green : Color.red;
+                Gizmos.DrawLine(transform.position, lastKnownPlayerPosition);
+            }
+
+            if (drawWindowSamplesInEditor && lastUsedWindow != null)
+            {
+                Gizmos.color = Color.cyan;
+                Gizmos.DrawSphere(lastUsedWindow.transform.position, 0.08f);
+                Gizmos.DrawLine(transform.position, lastUsedWindow.transform.position);
+                Gizmos.DrawLine(lastUsedWindow.transform.position, lastKnownPlayerPosition);
+            }
+
+            if (targetDoor != null)
+            {
+                Gizmos.color = Color.magenta;
+                Gizmos.DrawSphere(targetDoor.transform.position, 0.1f);
+            }
         }
     }
 }

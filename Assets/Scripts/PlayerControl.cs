@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.Serialization;
+using TMPro;
 using UnityEngine.UI;
 using DuoCurtain.RuntimeTileMesh;
 
@@ -44,6 +45,7 @@ public class PlayerControl : MonoBehaviour
     [Header("Player Point")]
     public bool playerInputEnabled = true;
     public bool clampCursorToRoom = true;
+    public bool allowOutdoorMovementFromRuntimeRooms = true;
     public bool freezeWorldCursorWhenPointerOverUI = true;
     public bool showPlayerAtHeadingPointOverUI = false;
     public bool spawnAtRandomRuntimeTileBlockCenter = false;
@@ -87,6 +89,18 @@ public class PlayerControl : MonoBehaviour
     [Min(0.01f)]
     public float cursorInputResponsePower = 1f;
     public bool normalizePointerOffsetByScreenSize = true;
+
+    [Header("Outdoor Movement")]
+    [Range(0.05f, 1f)]
+    public float outsideMoveSpeedMultiplier = 0.5f;
+    public bool showOutdoorWarning = true;
+    public string outdoorWarningMessage = "type: 现在你在屋子外面，目前的你很脆弱！";
+    public TMP_FontAsset outdoorWarningFont;
+    public string outdoorWarningFontResourcesPath = CjkUiFontUtility.DefaultResourcesFontPath;
+    [Min(1f)]
+    public float outdoorWarningFontSize = 34f;
+    public Color outdoorWarningColor = new Color(1f, 0.92f, 0.68f, 1f);
+    public Vector2 outdoorWarningAnchoredPosition = new Vector2(0f, -64f);
 
     [Header("Player Visual")]
     public CursorVisualMode cursorVisualMode = CursorVisualMode.ImageSprite;
@@ -166,6 +180,9 @@ public class PlayerControl : MonoBehaviour
     private bool stepTriggeredThisFrame;
     private bool lastPointerOverUI;
     private FoleyStepClock.StepData currentStepData;
+    private bool playerIsOutsideRuntimeRoom;
+    private TextMeshProUGUI outdoorWarningText;
+    private Canvas outdoorWarningCanvas;
 
     public Vector3 PlayerWorldPosition => currentWorldPosition;
     public Vector3 CurrentWorldPosition => PlayerWorldPosition;
@@ -176,6 +193,7 @@ public class PlayerControl : MonoBehaviour
     public bool HasHeadingWorldPosition => hasHeadingWorldPosition;
     public float PlayerCollisionRadius => usePlayerCollisionRadius ? Mathf.Max(0f, playerCollisionRadius) : 0f;
     public float CurrentCursorSpeed => currentCursorSpeed;
+    public bool IsOutsideRuntimeRoom => playerIsOutsideRuntimeRoom;
     public bool LimitHeadingPointReach
     {
         get => limitHeadingPointReach;
@@ -265,6 +283,7 @@ public class PlayerControl : MonoBehaviour
         if (playerInputEnabled)
             ApplyCameraPan(lastPointerOverUI, deltaTime);
         UpdateCursorMotionEffects(movedDistance);
+        UpdateOutdoorWarningVisual();
     }
 
     void LateUpdate()
@@ -492,7 +511,17 @@ public class PlayerControl : MonoBehaviour
 
         if (clampCursorToRoom)
         {
-            if (ShouldUseRuntimeTileWalkableAreaFirst())
+            if (ShouldAllowOutdoorRuntimeMovement())
+            {
+                nextWorld = runtimeTileWalkableArea.TryBlockDoorMovement(
+                    currentWorldPosition,
+                    desiredWorld,
+                    PlayerCollisionRadius)
+                    ? currentWorldPosition
+                    : desiredWorld;
+                warnedAboutMissingRoomArea = false;
+            }
+            else if (ShouldUseRuntimeTileWalkableAreaFirst())
             {
                 nextWorld = runtimeTileWalkableArea.ClampPlayerWorldPoint(desiredWorld, currentWorldPosition, PlayerCollisionRadius);
                 warnedAboutMissingRoomArea = false;
@@ -517,6 +546,7 @@ public class PlayerControl : MonoBehaviour
         nextWorld.z = 0f;
         currentWorldPosition = nextWorld;
         hasWorldPosition = true;
+        playerIsOutsideRuntimeRoom = IsOutsideRuntimeRoomAt(currentWorldPosition);
         float movedDistance = hadWorldPosition ? Vector2.Distance(previousWorldPosition, currentWorldPosition) : 0f;
         currentCursorSpeed = deltaTime > 0f ? movedDistance / deltaTime : 0f;
         return movedDistance;
@@ -537,8 +567,31 @@ public class PlayerControl : MonoBehaviour
             return ScreenToWorld(Input.mousePosition);
 
         Vector2 velocityInput = GetPointerOffsetVelocity(Input.mousePosition);
-        Vector3 worldVelocity = new Vector3(velocityInput.x, velocityInput.y, 0f) * maxCursorMoveSpeed;
+        Vector3 worldVelocity = new Vector3(velocityInput.x, velocityInput.y, 0f) *
+            maxCursorMoveSpeed *
+            GetMovementSpeedMultiplier();
         return currentWorldPosition + worldVelocity * Mathf.Max(0f, deltaTime);
+    }
+
+    private float GetMovementSpeedMultiplier()
+    {
+        return IsOutsideRuntimeRoomAt(currentWorldPosition)
+            ? Mathf.Clamp(outsideMoveSpeedMultiplier, 0.05f, 1f)
+            : 1f;
+    }
+
+    private bool ShouldAllowOutdoorRuntimeMovement()
+    {
+        return allowOutdoorMovementFromRuntimeRooms &&
+               ShouldUseRuntimeTileWalkableAreaFirst();
+    }
+
+    private bool IsOutsideRuntimeRoomAt(Vector3 worldPosition)
+    {
+        return allowOutdoorMovementFromRuntimeRooms &&
+               runtimeTileWalkableArea != null &&
+               runtimeTileWalkableArea.HasWalkableCells &&
+               !runtimeTileWalkableArea.ContainsWorldPoint(worldPosition, PlayerCollisionRadius);
     }
 
     private Vector2 GetPointerOffsetVelocity(Vector2 screenPosition)
@@ -774,6 +827,86 @@ public class PlayerControl : MonoBehaviour
         scaler.matchWidthOrHeight = 0.5f;
 
         return canvas;
+    }
+
+    private void UpdateOutdoorWarningVisual()
+    {
+        if (!showOutdoorWarning)
+        {
+            if (outdoorWarningText != null)
+                outdoorWarningText.gameObject.SetActive(false);
+            return;
+        }
+
+        bool shouldShow = playerInputEnabled && playerIsOutsideRuntimeRoom;
+        if (!shouldShow)
+        {
+            if (outdoorWarningText != null)
+                outdoorWarningText.gameObject.SetActive(false);
+            return;
+        }
+
+        EnsureOutdoorWarningText();
+        if (outdoorWarningText == null)
+            return;
+
+        outdoorWarningText.gameObject.SetActive(true);
+        ApplyOutdoorWarningTypography();
+    }
+
+    private void ApplyOutdoorWarningTypography()
+    {
+        if (outdoorWarningText == null)
+            return;
+
+        TMP_FontAsset warningFont = CjkUiFontUtility.Resolve(
+            outdoorWarningFont,
+            outdoorWarningFontResourcesPath,
+            outdoorWarningMessage);
+        if (warningFont != null)
+            outdoorWarningText.font = warningFont;
+
+        outdoorWarningText.text = outdoorWarningMessage;
+        outdoorWarningText.fontSize = outdoorWarningFontSize;
+        outdoorWarningText.color = outdoorWarningColor;
+        outdoorWarningText.rectTransform.anchoredPosition = outdoorWarningAnchoredPosition;
+    }
+
+    private void EnsureOutdoorWarningText()
+    {
+        if (outdoorWarningText != null)
+            return;
+
+        Canvas canvas = playerCanvas != null ? playerCanvas : FindFirstObjectByType<Canvas>();
+        if (canvas == null)
+            canvas = CreatePlayerControlCanvas();
+
+        outdoorWarningCanvas = canvas;
+        RectTransform parentRect = canvas.transform as RectTransform;
+        if (parentRect == null)
+            return;
+
+        GameObject warningObject = new GameObject(
+            "Outdoor Vulnerability Warning",
+            typeof(RectTransform),
+            typeof(CanvasRenderer),
+            typeof(TextMeshProUGUI));
+        warningObject.transform.SetParent(parentRect, false);
+        warningObject.transform.SetAsLastSibling();
+
+        RectTransform rect = warningObject.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.5f, 1f);
+        rect.anchorMax = new Vector2(0.5f, 1f);
+        rect.pivot = new Vector2(0.5f, 1f);
+        rect.anchoredPosition = outdoorWarningAnchoredPosition;
+        rect.sizeDelta = new Vector2(1200f, 92f);
+
+        outdoorWarningText = warningObject.GetComponent<TextMeshProUGUI>();
+        outdoorWarningText.raycastTarget = false;
+        outdoorWarningText.alignment = TextAlignmentOptions.Center;
+        outdoorWarningText.textWrappingMode = TextWrappingModes.NoWrap;
+        ApplyOutdoorWarningTypography();
+        outdoorWarningText.gameObject.SetActive(false);
     }
 
     private void ApplyHeadingPointVisualSettings()

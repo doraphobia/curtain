@@ -36,6 +36,14 @@ namespace DuoCurtain.RuntimeTileMesh
         public float spawnWarningFontSize = 42f;
         public Vector2 spawnWarningAnchoredPosition = new Vector2(0f, 300f);
         public int spawnWarningCanvasSortingOrder = 1350;
+        public bool showGridCellSpawnWarning = true;
+        public GameObject spawnWarningPrefab;
+        public Color spawnWarningColor = new Color(1f, 0.1f, 0.08f, 0.68f);
+        public AnimationCurve warningPulseCurve = AnimationCurve.EaseInOut(0f, 0.35f, 1f, 1f);
+        public bool blockSpawnIfPlayerEntersWarningCell = true;
+        public bool cancelSpawnIfCellBecomesInvalid = true;
+        [Min(1)]
+        public int spawnCandidateAttempts = 32;
 
         [Header("Enemy Defaults")]
         [Min(0f)]
@@ -68,6 +76,7 @@ namespace DuoCurtain.RuntimeTileMesh
         private CanvasGroup warningCanvasGroup;
         private RectTransform warningPanelRect;
         private TextMeshProUGUI warningText;
+        private Sprite spawnWarningSprite;
 
         void Awake()
         {
@@ -112,13 +121,52 @@ namespace DuoCurtain.RuntimeTileMesh
                 if (!TryGetSpawnPosition(out Vector3 spawnPosition))
                     spawnPosition = transform.position;
 
+                if (logSpawns)
+                {
+                    Debug.Log(
+                        "[EnemySpawn] Candidate selected position=" + spawnPosition +
+                        " insideRoom=" + IsInsideAnyRoomOrFusionFloor(spawnPosition),
+                        this);
+                }
+
                 bool shouldWarn = warnBeforeOffscreenSpawn &&
                     (!warnOnlyWhenOffscreen || IsOutsidePlayerView(spawnPosition));
+                GameObject gridWarning = null;
                 if (shouldWarn && spawnWarningLeadTime > 0.0001f)
                 {
+                    if (showGridCellSpawnWarning)
+                    {
+                        gridWarning = CreateSpawnWarningVisual(spawnPosition);
+                        if (logSpawns)
+                            Debug.Log("[EnemySpawn] Warning started position=" + spawnPosition, this);
+                    }
+
                     ShowSpawnWarning(true);
-                    yield return new WaitForSecondsRealtime(spawnWarningLeadTime);
+                    float start = Time.realtimeSinceStartup;
+                    bool cancelled = false;
+                    while (Time.realtimeSinceStartup - start < spawnWarningLeadTime)
+                    {
+                        float normalized = Mathf.Clamp01((Time.realtimeSinceStartup - start) / Mathf.Max(0.0001f, spawnWarningLeadTime));
+                        UpdateSpawnWarningVisual(gridWarning, normalized);
+
+                        if (ShouldCancelSpawnWarning(spawnPosition))
+                        {
+                            cancelled = true;
+                            break;
+                        }
+
+                        yield return null;
+                    }
+
                     ShowSpawnWarning(false);
+                    DestroySpawnWarningVisual(gridWarning);
+
+                    if (cancelled)
+                    {
+                        if (logSpawns)
+                            Debug.Log("[EnemySpawn] Warning cancelled position=" + spawnPosition, this);
+                        yield break;
+                    }
                 }
 
                 SpawnEnemyAt(spawnPosition);
@@ -146,7 +194,7 @@ namespace DuoCurtain.RuntimeTileMesh
 
             activeEnemies.Add(enemy);
             if (logSpawns)
-                Debug.Log("[FusionNightEnemySpawner] Spawned footprint enemy at " + spawnPosition + ".", enemy);
+                Debug.Log("[EnemySpawn] Enemy spawned at " + spawnPosition + " outside=" + !IsInsideAnyRoomOrFusionFloor(spawnPosition), enemy);
         }
 
         private bool IsOutsidePlayerView(Vector3 worldPosition)
@@ -239,29 +287,211 @@ namespace DuoCurtain.RuntimeTileMesh
             if (fusionSandbox == null || !fusionSandbox.TryGetWorldBounds(out bounds))
                 return false;
 
-            int side = Random.Range(0, 4);
-            float x = Random.Range(bounds.min.x, bounds.max.x);
-            float y = Random.Range(bounds.min.y, bounds.max.y);
-            float padding = Mathf.Max(0.5f, spawnPadding);
-
-            switch (side)
+            int attempts = Mathf.Max(1, spawnCandidateAttempts);
+            for (int attempt = 0; attempt < attempts; attempt++)
             {
-                case 0:
-                    y = bounds.max.y + padding;
-                    break;
-                case 1:
-                    y = bounds.min.y - padding;
-                    break;
-                case 2:
-                    x = bounds.min.x - padding;
-                    break;
-                default:
-                    x = bounds.max.x + padding;
-                    break;
+                int side = Random.Range(0, 4);
+                float x = Random.Range(bounds.min.x, bounds.max.x);
+                float y = Random.Range(bounds.min.y, bounds.max.y);
+                float padding = Mathf.Max(0.5f, spawnPadding);
+
+                switch (side)
+                {
+                    case 0:
+                        y = bounds.max.y + padding;
+                        break;
+                    case 1:
+                        y = bounds.min.y - padding;
+                        break;
+                    case 2:
+                        x = bounds.min.x - padding;
+                        break;
+                    default:
+                        x = bounds.max.x + padding;
+                        break;
+                }
+
+                Vector3 candidate = SnapToSpawnCellCenter(new Vector3(x, y, 0f));
+                if (!IsValidSpawnCell(candidate))
+                    continue;
+
+                spawnPosition = candidate;
+                return true;
             }
 
-            spawnPosition = new Vector3(x, y, 0f);
-            return true;
+            Vector3 fallback = SnapToSpawnCellCenter(new Vector3(bounds.max.x + Mathf.Max(0.5f, spawnPadding), bounds.center.y, 0f));
+            if (IsValidSpawnCell(fallback))
+            {
+                spawnPosition = fallback;
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool IsValidSpawnCell(Vector3 position)
+        {
+            if (IsInsideAnyRoomOrFusionFloor(position))
+                return false;
+
+            if (!PlayerControl.TryGetPlayerWorldPosition(out Vector3 playerPosition))
+                return true;
+
+            Vector2Int spawnCell = WorldToSpawnCell(position);
+            Vector2Int playerCell = WorldToSpawnCell(playerPosition);
+            return spawnCell != playerCell;
+        }
+
+        private bool ShouldCancelSpawnWarning(Vector3 spawnPosition)
+        {
+            if (cancelSpawnIfCellBecomesInvalid && !IsValidSpawnCell(spawnPosition))
+                return true;
+
+            if (!blockSpawnIfPlayerEntersWarningCell ||
+                !PlayerControl.TryGetPlayerWorldPosition(out Vector3 playerPosition))
+            {
+                return false;
+            }
+
+            return WorldToSpawnCell(spawnPosition) == WorldToSpawnCell(playerPosition);
+        }
+
+        private bool IsInsideAnyRoomOrFusionFloor(Vector3 position)
+        {
+            if (RoomManager.IsInsideAnyRoom(position))
+                return true;
+
+            return fusionSandbox != null && fusionSandbox.ContainsWorldPoint(position, 0f);
+        }
+
+        private Vector3 SnapToSpawnCellCenter(Vector3 worldPosition)
+        {
+            Vector2Int cell = WorldToSpawnCell(worldPosition);
+            float grid = fusionSandbox != null ? Mathf.Max(0.0001f, Mathf.Abs(fusionSandbox.gridSize)) : 1f;
+            Vector2 origin = fusionSandbox != null ? fusionSandbox.gridOrigin : Vector2.zero;
+            return new Vector3(
+                origin.x + (cell.x + 0.5f) * grid,
+                origin.y + (cell.y + 0.5f) * grid,
+                0f);
+        }
+
+        private Vector2Int WorldToSpawnCell(Vector3 worldPosition)
+        {
+            float grid = fusionSandbox != null ? Mathf.Max(0.0001f, Mathf.Abs(fusionSandbox.gridSize)) : 1f;
+            Vector2 origin = fusionSandbox != null ? fusionSandbox.gridOrigin : Vector2.zero;
+            return new Vector2Int(
+                Mathf.FloorToInt((worldPosition.x - origin.x) / grid),
+                Mathf.FloorToInt((worldPosition.y - origin.y) / grid));
+        }
+
+        private GameObject CreateSpawnWarningVisual(Vector3 spawnPosition)
+        {
+            GameObject visual = spawnWarningPrefab != null
+                ? Instantiate(spawnWarningPrefab)
+                : CreateDefaultSpawnWarningVisual();
+
+            if (visual == null)
+                return null;
+
+            visual.name = "Fusion Enemy Spawn Cell Warning";
+            visual.transform.SetParent(transform, true);
+            visual.transform.position = new Vector3(spawnPosition.x, spawnPosition.y, -0.2f);
+
+            float grid = fusionSandbox != null ? Mathf.Max(0.0001f, Mathf.Abs(fusionSandbox.gridSize)) : 1f;
+            visual.transform.localScale = Vector3.one * grid;
+            ApplySpawnWarningColor(visual, spawnWarningColor);
+            return visual;
+        }
+
+        private GameObject CreateDefaultSpawnWarningVisual()
+        {
+            GameObject visual = new GameObject("Default Spawn Warning");
+            SpriteRenderer renderer = visual.AddComponent<SpriteRenderer>();
+            renderer.sprite = GetSpawnWarningSprite();
+            renderer.color = spawnWarningColor;
+            renderer.sortingOrder = 70;
+            return visual;
+        }
+
+        private void UpdateSpawnWarningVisual(GameObject visual, float normalized)
+        {
+            if (visual == null)
+                return;
+
+            float pulse = warningPulseCurve != null
+                ? warningPulseCurve.Evaluate(Mathf.Repeat(normalized * 3f, 1f))
+                : Mathf.PingPong(normalized * 3f, 1f);
+            Color color = spawnWarningColor;
+            color.a *= Mathf.Lerp(0.35f, 1f, pulse);
+            ApplySpawnWarningColor(visual, color);
+            visual.transform.localScale = Vector3.one *
+                ((fusionSandbox != null ? Mathf.Max(0.0001f, Mathf.Abs(fusionSandbox.gridSize)) : 1f) *
+                 Mathf.Lerp(0.85f, 1.05f, pulse));
+        }
+
+        private static void ApplySpawnWarningColor(GameObject visual, Color color)
+        {
+            SpriteRenderer[] spriteRenderers = visual.GetComponentsInChildren<SpriteRenderer>(true);
+            for (int i = 0; i < spriteRenderers.Length; i++)
+            {
+                if (spriteRenderers[i] != null)
+                    spriteRenderers[i].color = color;
+            }
+
+            LineRenderer[] lineRenderers = visual.GetComponentsInChildren<LineRenderer>(true);
+            for (int i = 0; i < lineRenderers.Length; i++)
+            {
+                if (lineRenderers[i] == null)
+                    continue;
+
+                lineRenderers[i].startColor = color;
+                lineRenderers[i].endColor = color;
+            }
+        }
+
+        private void DestroySpawnWarningVisual(GameObject visual)
+        {
+            if (visual == null)
+                return;
+
+            if (Application.isPlaying)
+                Destroy(visual);
+            else
+                DestroyImmediate(visual);
+        }
+
+        private Sprite GetSpawnWarningSprite()
+        {
+            if (spawnWarningSprite != null)
+                return spawnWarningSprite;
+
+            Texture2D texture = new Texture2D(8, 8, TextureFormat.RGBA32, false)
+            {
+                name = "Fusion Enemy Spawn Warning Cell",
+                filterMode = FilterMode.Point,
+                wrapMode = TextureWrapMode.Clamp,
+                hideFlags = HideFlags.HideAndDontSave
+            };
+
+            Color clear = new Color(1f, 1f, 1f, 0f);
+            Color fill = Color.white;
+            for (int y = 0; y < 8; y++)
+            {
+                for (int x = 0; x < 8; x++)
+                {
+                    bool border = x == 0 || y == 0 || x == 7 || y == 7;
+                    texture.SetPixel(x, y, border ? fill : clear);
+                }
+            }
+
+            texture.Apply();
+            spawnWarningSprite = Sprite.Create(
+                texture,
+                new Rect(0f, 0f, 8f, 8f),
+                new Vector2(0.5f, 0.5f),
+                8f);
+            spawnWarningSprite.hideFlags = HideFlags.HideAndDontSave;
+            return spawnWarningSprite;
         }
 
         private void CleanupEnemyList()

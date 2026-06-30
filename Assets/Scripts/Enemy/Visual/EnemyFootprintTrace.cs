@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using DuoCurtain.RuntimeTileMesh;
 using UnityEngine;
 
 /// <summary>
@@ -61,6 +62,9 @@ public class EnemyFootprintTrace : MonoBehaviour
     [SerializeField] private float minimumResidualAlpha = 0.05f;
     [SerializeField] private Color normalFootprintColor = Color.white;
     [SerializeField] private Color breakingDoorFootprintColor = Color.red;
+    [SerializeField] private bool autoContrastFootprintColor = true;
+    [SerializeField] private Color lightSurfaceFootprintColor = new Color(0f, 0f, 0f, 0.78f);
+    [SerializeField] private Color darkSurfaceFootprintColor = new Color(1f, 1f, 1f, 0.9f);
     [SerializeField] private bool tintLastPairRedWhenBreakingDoor = true;
 
     [Header("Enemy State Integration")]
@@ -69,11 +73,13 @@ public class EnemyFootprintTrace : MonoBehaviour
     [SerializeField] private bool pauseWhenBreakingDoor = true;
     [SerializeField] private bool useFastStepsWhenTargetingDoor = true;
     [SerializeField] private bool preserveLastPairWhenStopped = true;
+    [SerializeField] private bool denyIndoorFootprintsBeforeEntry = true;
 
     [Header("Debug")]
     [SerializeField] private bool debugDrawStepPositions = true;
     [SerializeField] private bool debugLogFootprintStateChanges = false;
     [SerializeField] private bool debugShowCurrentTraceState = true;
+    [SerializeField] private bool debugLogFootprintDenials = false;
     [SerializeField] private EnemyTraceState currentTraceState = EnemyTraceState.NormalMoving;
 
     private IFootprintSurfaceModifier SurfaceModifier =>
@@ -88,6 +94,7 @@ public class EnemyFootprintTrace : MonoBehaviour
     private bool nextStepIsLeft = true;
     private bool breakingDoorTintApplied;
     private float spawnTimeAccumulator;
+    private FusionNightFootprintEnemy fusionTraceEnemy;
 
     public EnemyTraceState CurrentTraceState => currentTraceState;
     public int ActiveFootprintCount => footprints.Count;
@@ -126,6 +133,8 @@ public class EnemyFootprintTrace : MonoBehaviour
     {
         if (enemyController == null)
             enemyController = GetComponent<EnemyController>();
+        if (fusionTraceEnemy == null)
+            fusionTraceEnemy = GetComponent<FusionNightFootprintEnemy>();
 
         if (footprintRenderer == null)
             footprintRenderer = GetComponent<PrefabFootprintRenderer>();
@@ -292,18 +301,19 @@ public class EnemyFootprintTrace : MonoBehaviour
             rotation = rotation,
             side = side,
             isLatest = true,
-            color = normalFootprintColor,
+            color = ResolveFootprintColor(spawnPosition),
             alpha = latestAlpha,
             parent = runtimeFootprintParent,
             surfaceContext = null
         };
-
         SurfaceModifier?.ModifyFootprint(ref data);
+        Color displayColor = new Color(data.color.r, data.color.g, data.color.b, 1f);
+        float displayAlpha = Mathf.Clamp01(data.alpha * data.color.a);
         FootprintInstance instance = footprintRenderer.SpawnFootprint(data);
         if (instance == null)
             return;
 
-        instance.SetAsLatest(latestAlpha, normalFootprintColor);
+        instance.SetAsLatest(displayAlpha, displayColor);
         footprints.Add(instance);
         EnforceMaxFootprintCount();
         footstepAudio?.PlayFootstep(spawnPosition, side);
@@ -322,8 +332,26 @@ public class EnemyFootprintTrace : MonoBehaviour
 
             int decayIndex = footprint.IsLatest ? 1 : footprint.DecayIndex + 1;
             float alpha = CalculateResidualAlpha(decayIndex);
-            footprint.SetResidual(decayIndex, alpha, normalFootprintColor);
+            footprint.SetResidual(decayIndex, alpha, footprint.BaseColor);
         }
+    }
+
+    private Color ResolveFootprintColor(Vector3 spawnPosition)
+    {
+        if (!autoContrastFootprintColor)
+            return normalFootprintColor;
+
+        return IsLightSurface(spawnPosition)
+            ? lightSurfaceFootprintColor
+            : darkSurfaceFootprintColor;
+    }
+
+    private bool IsLightSurface(Vector3 worldPosition)
+    {
+        if (RoomManager.IsInsideAnyRoom(worldPosition))
+            return true;
+
+        return fusionTraceEnemy != null && fusionTraceEnemy.IsInsideAnyFusionRoom(worldPosition);
     }
 
     private float CalculateResidualAlpha(int decayIndex)
@@ -383,7 +411,47 @@ public class EnemyFootprintTrace : MonoBehaviour
         if (spawnOnlyWhenMoving && distanceSinceLastStep < movementThreshold)
             return false;
 
+        if (denyIndoorFootprintsBeforeEntry && IsIndoorFootprintDenied(transform.position))
+            return false;
+
         return true;
+    }
+
+    private bool IsIndoorFootprintDenied(Vector3 worldPosition)
+    {
+        if (CanSpawnIndoorFootprints())
+            return false;
+
+        bool insideRoom = RoomManager.IsInsideAnyRoom(worldPosition);
+        if (!insideRoom && fusionTraceEnemy != null)
+            insideRoom = fusionTraceEnemy.IsInsideAnyFusionRoom(worldPosition);
+
+        if (!insideRoom)
+            return false;
+
+        if (debugLogFootprintDenials)
+        {
+            Debug.Log(
+                "[Footprint] Spawn denied: indoor footprint while enemy has not entered room. Position=" +
+                worldPosition,
+                this);
+        }
+
+        return true;
+    }
+
+    private bool CanSpawnIndoorFootprints()
+    {
+        if (fusionTraceEnemy != null)
+            return fusionTraceEnemy.HasEnemyEnteredRoom();
+
+        if (enemyController == null)
+            return true;
+
+        EnemyController.EnemyState state = enemyController.CurrentState;
+        return state == EnemyController.EnemyState.EnterRoom ||
+               state == EnemyController.EnemyState.ChasePlayer ||
+               state == EnemyController.EnemyState.AttackPlayer;
     }
 
     private float GetCurrentStepInterval()
