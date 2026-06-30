@@ -1071,6 +1071,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
         private static int ExpectVisionConeAndProceduralRenderer()
         {
             GameObject rendererObject = null;
+            GameObject visibilityWorldObject = null;
             try
             {
                 VisionSnapshot snapshot = new VisionSnapshot();
@@ -1095,6 +1096,54 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                 {
                     Debug.LogError(
                         "[RuntimeTileMeshSelfTest] Vision cone containment should include points ahead and reject points behind or outside the cone.");
+                    return 1;
+                }
+
+                visibilityWorldObject = new GameObject("RuntimeTileMeshSelfTest Visibility World");
+                VisibilityWorld visibilityWorld = visibilityWorldObject.AddComponent<VisibilityWorld>();
+                visibilityWorld.autoFindSourcesOnRebuild = false;
+                FixedVisibilitySegmentSource source = new FixedVisibilitySegmentSource();
+                source.segments.Add(new VisibilitySegment(
+                    new Vector2(1f, -1f),
+                    new Vector2(1f, 1f),
+                    VisibilitySegmentType.Wall,
+                    visibilityWorldObject,
+                    null));
+                visibilityWorld.RegisterSource(source);
+                sampler.Sample(
+                    snapshot,
+                    Vector2.zero,
+                    Vector2.right,
+                    90f,
+                    5f,
+                    16,
+                    64,
+                    2,
+                    0.35f,
+                    0,
+                    false,
+                    null,
+                    visibilityWorld,
+                    false);
+
+                bool foundBlockingHit = false;
+                for (int i = 0; i < snapshot.RaySamples.Count; i++)
+                {
+                    VisionRaySample sample = snapshot.RaySamples[i];
+                    if (sample.hit &&
+                        sample.visibilitySegmentType == VisibilitySegmentType.Wall &&
+                        Mathf.Abs(sample.point.x - 1f) <= 0.02f)
+                    {
+                        foundBlockingHit = true;
+                        break;
+                    }
+                }
+
+                if (!foundBlockingHit ||
+                    !snapshot.ContainsWorldPoint(new Vector2(0.5f, 0f)) ||
+                    snapshot.ContainsWorldPoint(new Vector2(2f, 0f)))
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] VisibilityWorld segment sampling should clip the vision polygon at the nearest wall segment.");
                     return 1;
                 }
 
@@ -1127,6 +1176,21 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             {
                 if (rendererObject != null)
                     UnityEngine.Object.DestroyImmediate(rendererObject);
+                if (visibilityWorldObject != null)
+                    UnityEngine.Object.DestroyImmediate(visibilityWorldObject);
+            }
+        }
+
+        private sealed class FixedVisibilitySegmentSource : IVisibilitySegmentSource
+        {
+            public readonly List<VisibilitySegment> segments = new List<VisibilitySegment>();
+
+            public void CollectVisibilitySegments(List<VisibilitySegment> results)
+            {
+                if (results == null)
+                    return;
+
+                results.AddRange(segments);
             }
         }
 

@@ -15,3 +15,21 @@ window or linked-portal projection is deliberately not implemented in the first 
 
 The sensor reuses its snapshot, sample lists, and raycast buffer. The mesh backend reuses a dynamic
 mesh and vertex/index/UV/color lists to avoid routine per-frame garbage.
+
+## Visibility inputs
+
+`VisionSensor2D` now samples through `VisibilityWorld` by default. `VisibilityWorld` asks every
+`IVisibilitySegmentSource` for world-space line segments, then `RadialVisionSampler2D` builds a real
+visibility polygon against those segments. The old `Physics2D.Raycast` path remains as a fallback
+only when no visibility segments are registered.
+
+Runtime/fusion room blocks are not expected to rely on colliders or layers for enemy sight. The
+primary source is `RuntimeTileMeshFusionSandbox`, which converts every merged block's outer occupied
+cell boundary into `Wall` segments. `RuntimeTileMeshFusionDoor` contributes closed/open door and
+safe-wall segments. `FusionWallAttachment` contributes closed/open window segments for future portal
+work.
+
+This matters because generated room meshes and gameplay triggers are not guaranteed to be complete
+vision occluders. A block can be visible and walkable while still missing a collider or being on a
+layer ignored by `Physics2D.Raycast`. The visibility solver should therefore treat the block/grid
+topology as the source of truth, not selected-room state or renderer/collider side effects.

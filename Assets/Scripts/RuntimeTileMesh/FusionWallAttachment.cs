@@ -1,9 +1,11 @@
+using System.Collections.Generic;
+using DuoCurtain.Vision;
 using UnityEngine;
 
 namespace DuoCurtain.RuntimeTileMesh
 {
     [DisallowMultipleComponent]
-    public sealed class FusionWallAttachment : MonoBehaviour
+    public sealed class FusionWallAttachment : MonoBehaviour, IVisibilitySegmentSource
     {
         private const string DefaultSpriteName = "Fusion Runtime Window Sprite";
 
@@ -43,6 +45,9 @@ namespace DuoCurtain.RuntimeTileMesh
         public bool useLogicalCursorHover = true;
         public bool allowLocalHoverInput = true;
 
+        [Header("Visibility")]
+        public bool registerForVisibility = true;
+
         private static Sprite defaultSprite;
         private SpriteRenderer spriteRenderer;
         private BoxCollider2D windowCollider;
@@ -59,6 +64,21 @@ namespace DuoCurtain.RuntimeTileMesh
             ApplyWindowSettings();
         }
 
+        void OnEnable()
+        {
+            if (!registerForVisibility)
+                return;
+
+            VisibilityWorld.GetOrCreate().RegisterSource(this);
+            MarkVisibilityDirty();
+        }
+
+        void OnDisable()
+        {
+            if (VisibilityWorld.Instance != null)
+                VisibilityWorld.Instance.UnregisterSource(this);
+        }
+
         void OnValidate()
         {
             gridSize = Mathf.Max(0.01f, gridSize);
@@ -71,6 +91,7 @@ namespace DuoCurtain.RuntimeTileMesh
                 EnsureWindowComponents();
                 ApplyPlacement();
                 ApplyWindowSettings();
+                MarkVisibilityDirty();
             }
         }
 
@@ -99,6 +120,27 @@ namespace DuoCurtain.RuntimeTileMesh
             EnsureWindowComponents();
             ApplyPlacement();
             ApplyWindowSettings();
+            MarkVisibilityDirty();
+        }
+
+        public void CollectVisibilitySegments(List<VisibilitySegment> results)
+        {
+            if (results == null)
+                return;
+            if (!registerForVisibility)
+                return;
+
+            Vector2 safeTangent = tangent.sqrMagnitude > 0.0001f ? tangent.normalized : Vector2.up;
+            float halfLength = Mathf.Max(0.01f, lengthInCells) * Mathf.Max(0.01f, gridSize) * 0.5f;
+            VisibilitySegmentType type = windowPortal != null && windowPortal.IsOpen
+                ? VisibilitySegmentType.OpenWindow
+                : VisibilitySegmentType.ClosedWindow;
+            results.Add(new VisibilitySegment(
+                edgeCenter - safeTangent * halfLength,
+                edgeCenter + safeTangent * halfLength,
+                type,
+                gameObject,
+                this));
         }
 
         private void EnsureWindowComponents()
@@ -172,6 +214,13 @@ namespace DuoCurtain.RuntimeTileMesh
                 windowPortal.windowCollider = windowCollider;
                 windowPortal.manualIsOpen = startsOpen;
             }
+
+            MarkVisibilityDirty();
+        }
+
+        private static void MarkVisibilityDirty()
+        {
+            VisibilityWorld.MarkActiveWorldDirty();
         }
 
         public static Sprite GetDefaultWindowSprite()

@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
+using DuoCurtain.Vision;
 
 [RequireComponent(typeof(Collider2D))]
 [RequireComponent(typeof(SpriteRenderer))]
@@ -238,10 +239,13 @@ public class HoverScrollColorLerp2D : MonoBehaviour
 
     public void SetProgress(float progress)
     {
+        float previous = t;
         t = Mathf.Clamp01(progress);
         ApplyColor();
         ApplySyncedRotations();
         ApplyParentSpriteAlpha();
+        if (Mathf.Abs(previous - t) > 0.0001f)
+            VisibilityWorld.MarkActiveWorldDirty();
     }
 
     void SetupScrollAudioSource()

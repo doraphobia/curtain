@@ -1,12 +1,13 @@
 using System;
 using System.Collections.Generic;
+using DuoCurtain.Vision;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
 namespace DuoCurtain.RuntimeTileMesh
 {
     [DisallowMultipleComponent]
-    public class RuntimeTileMeshFusionSandbox : MonoBehaviour
+    public class RuntimeTileMeshFusionSandbox : MonoBehaviour, IVisibilitySegmentSource
     {
         [Header("Input")]
         public Camera worldCamera;
@@ -30,6 +31,11 @@ namespace DuoCurtain.RuntimeTileMesh
 
         [Header("Integrity Monitoring")]
         public bool recordFusionIntegrity = true;
+
+        [Header("Visibility")]
+        public bool registerFusionBlocksForVisibility = true;
+        public bool includeSelectedBlockInVisibility = true;
+        public bool logVisibilitySourceSegments = false;
 
         [Header("Fusion Doors")]
         public bool generateDoorsOnFusion = true;
@@ -153,6 +159,19 @@ namespace DuoCurtain.RuntimeTileMesh
 
             if (mergeExistingBlocksOnAwake)
                 MergeAllConnectedBlocks();
+
+            MarkVisibilityDirty();
+        }
+
+        void OnEnable()
+        {
+            VisibilityWorld.GetOrCreate().RegisterSource(this);
+        }
+
+        void OnDisable()
+        {
+            if (VisibilityWorld.Instance != null)
+                VisibilityWorld.Instance.UnregisterSource(this);
         }
 
         void Update()
@@ -367,6 +386,7 @@ namespace DuoCurtain.RuntimeTileMesh
             if (beginDragging && managementInputEnabled)
                 BeginDraggingBlockInternal(block, worldPosition, false, false);
 
+            MarkVisibilityDirty();
             return block;
         }
 
@@ -404,6 +424,7 @@ namespace DuoCurtain.RuntimeTileMesh
                     DestroyImmediate(cancelled.gameObject);
             }
 
+            MarkVisibilityDirty();
             return true;
         }
 
@@ -543,6 +564,7 @@ namespace DuoCurtain.RuntimeTileMesh
             if (mergeAfterPlacement)
                 MergeConnectedBlocks(placed);
 
+            MarkVisibilityDirty();
             BlockPlaced?.Invoke(placed);
         }
 
@@ -666,6 +688,8 @@ namespace DuoCurtain.RuntimeTileMesh
 
             blocks.Clear();
             blocks.AddRange(activeBlocks);
+            if (absorbedTotal > 0)
+                MarkVisibilityDirty();
             return absorbedTotal;
         }
 
@@ -683,6 +707,7 @@ namespace DuoCurtain.RuntimeTileMesh
             if (!blocks.Contains(placed))
                 blocks.Add(placed);
 
+            MarkVisibilityDirty();
             return absorbed;
         }
 
@@ -708,6 +733,7 @@ namespace DuoCurtain.RuntimeTileMesh
 
             blocks.Clear();
             blocks.AddRange(activeBlocks);
+            MarkVisibilityDirty();
             return absorbed;
         }
 
@@ -802,6 +828,7 @@ namespace DuoCurtain.RuntimeTileMesh
             if (logFusionEvents)
                 Debug.Log("[RuntimeTileMeshFusionSandbox] Merged " + (absorbed + 1) + " block(s) into " + seed.name + " with " + mergedCells.Count + " occupied cell(s).", seed);
 
+            MarkVisibilityDirty();
             return absorbed;
         }
 
@@ -1177,6 +1204,7 @@ namespace DuoCurtain.RuntimeTileMesh
             door.ConfigureExteriorSwing(placement.normal);
             ApplySandboxDoorAnimationSettings(door);
             RegisterRuntimeDoor(door);
+            MarkVisibilityDirty();
             return true;
         }
 
@@ -1303,6 +1331,7 @@ namespace DuoCurtain.RuntimeTileMesh
                 return;
 
             registeredRuntimeDoors.Add(door);
+            MarkVisibilityDirty();
         }
 
         private void PruneRegisteredDoors()
@@ -1932,6 +1961,173 @@ namespace DuoCurtain.RuntimeTileMesh
                 Destroy(block.gameObject);
             else
                 DestroyImmediate(block.gameObject);
+            MarkVisibilityDirty();
+        }
+
+        public void MarkVisibilityDirty()
+        {
+            VisibilityWorld.MarkActiveWorldDirty();
+        }
+
+        public void CollectVisibilitySegments(List<VisibilitySegment> results)
+        {
+            if (!registerFusionBlocksForVisibility || results == null)
+                return;
+
+            RefreshBlocks();
+            int before = results.Count;
+            float safeGridSize = Mathf.Max(0.0001f, Mathf.Abs(gridSize));
+            List<RuntimeTileMeshFusionDoor> doors = CollectActiveDoors();
+
+            for (int i = 0; i < blocks.Count; i++)
+            {
+                RuntimeTileMeshDraggableBlock block = blocks[i];
+                if (block == null || !block.isActiveAndEnabled)
+                    continue;
+
+                if (!includeSelectedBlockInVisibility && block == selectedBlock)
+                    continue;
+
+                HashSet<Vector2Int> blockCells = block.GetWorldCells(safeGridSize, gridOrigin);
+                foreach (Vector2Int cell in blockCells)
+                {
+                    AddVisibilityBoundaryIfExterior(
+                        results,
+                        block,
+                        blockCells,
+                        cell,
+                        Vector2Int.right,
+                        RuntimeTileMeshFusionDoor.DoorAxis.Vertical,
+                        cell.x + 1,
+                        cell.y,
+                        safeGridSize,
+                        doors);
+                    AddVisibilityBoundaryIfExterior(
+                        results,
+                        block,
+                        blockCells,
+                        cell,
+                        Vector2Int.left,
+                        RuntimeTileMeshFusionDoor.DoorAxis.Vertical,
+                        cell.x,
+                        cell.y,
+                        safeGridSize,
+                        doors);
+                    AddVisibilityBoundaryIfExterior(
+                        results,
+                        block,
+                        blockCells,
+                        cell,
+                        Vector2Int.up,
+                        RuntimeTileMeshFusionDoor.DoorAxis.Horizontal,
+                        cell.y + 1,
+                        cell.x,
+                        safeGridSize,
+                        doors);
+                    AddVisibilityBoundaryIfExterior(
+                        results,
+                        block,
+                        blockCells,
+                        cell,
+                        Vector2Int.down,
+                        RuntimeTileMeshFusionDoor.DoorAxis.Horizontal,
+                        cell.y,
+                        cell.x,
+                        safeGridSize,
+                        doors);
+                }
+            }
+
+            if (logVisibilitySourceSegments)
+            {
+                Debug.Log(
+                    "[VisibilitySource] " + name +
+                    " fusionBlockBoundarySegments=" + (results.Count - before) +
+                    " blocks=" + blocks.Count,
+                    this);
+            }
+        }
+
+        private void AddVisibilityBoundaryIfExterior(
+            List<VisibilitySegment> results,
+            RuntimeTileMeshDraggableBlock sourceBlock,
+            HashSet<Vector2Int> blockCells,
+            Vector2Int cell,
+            Vector2Int neighborOffset,
+            RuntimeTileMeshFusionDoor.DoorAxis axis,
+            int edgeCoordinate,
+            int variable,
+            float safeGridSize,
+            List<RuntimeTileMeshFusionDoor> doors)
+        {
+            if (blockCells.Contains(cell + neighborOffset))
+                return;
+
+            Vector2 start;
+            Vector2 end;
+            if (axis == RuntimeTileMeshFusionDoor.DoorAxis.Vertical)
+            {
+                float x = gridOrigin.x + edgeCoordinate * safeGridSize;
+                float y = gridOrigin.y + variable * safeGridSize;
+                start = new Vector2(x, y);
+                end = new Vector2(x, y + safeGridSize);
+            }
+            else
+            {
+                float x = gridOrigin.x + variable * safeGridSize;
+                float y = gridOrigin.y + edgeCoordinate * safeGridSize;
+                start = new Vector2(x, y);
+                end = new Vector2(x + safeGridSize, y);
+            }
+
+            if (IsExteriorDoorwaySegment(axis, start, end, doors, safeGridSize))
+                return;
+
+            results.Add(new VisibilitySegment(
+                start,
+                end,
+                VisibilitySegmentType.Wall,
+                sourceBlock.gameObject,
+                sourceBlock));
+        }
+
+        private static bool IsExteriorDoorwaySegment(
+            RuntimeTileMeshFusionDoor.DoorAxis axis,
+            Vector2 start,
+            Vector2 end,
+            List<RuntimeTileMeshFusionDoor> doors,
+            float safeGridSize)
+        {
+            if (doors == null || doors.Count == 0)
+                return false;
+
+            float epsilon = Mathf.Max(0.001f, safeGridSize * 0.03f);
+            float lineCoordinate = axis == RuntimeTileMeshFusionDoor.DoorAxis.Vertical ? start.x : start.y;
+            float segmentCenterAlong = axis == RuntimeTileMeshFusionDoor.DoorAxis.Vertical
+                ? (start.y + end.y) * 0.5f
+                : (start.x + end.x) * 0.5f;
+
+            for (int i = 0; i < doors.Count; i++)
+            {
+                RuntimeTileMeshFusionDoor door = doors[i];
+                if (door == null || !door.isActiveAndEnabled || door.axis != axis)
+                    continue;
+
+                float doorLine = axis == RuntimeTileMeshFusionDoor.DoorAxis.Vertical
+                    ? door.seamCenter.x
+                    : door.seamCenter.y;
+                float doorCenterAlong = axis == RuntimeTileMeshFusionDoor.DoorAxis.Vertical
+                    ? door.seamCenter.y
+                    : door.seamCenter.x;
+
+                if (Mathf.Abs(lineCoordinate - doorLine) <= epsilon &&
+                    Mathf.Abs(segmentCenterAlong - doorCenterAlong) <= epsilon)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private void SnapAllBlocksToGrid()

@@ -38,6 +38,11 @@ namespace DuoCurtain.Vision
         public bool hitTriggers = false;
         public bool sampleAutomatically = true;
 
+        [Header("Visibility World")]
+        public bool useVisibilityWorld = true;
+        public VisibilityWorld visibilityWorld;
+        public bool fallbackToPhysicsWhenNoVisibilitySegments = true;
+
         private readonly VisionSnapshot latestSnapshot = new VisionSnapshot();
         private readonly RadialVisionSampler2D sampler = new RadialVisionSampler2D();
         private float nextSampleTime;
@@ -73,19 +78,43 @@ namespace DuoCurtain.Vision
         {
             Vector2 origin = GetWorldOrigin();
             Vector2 forward = GetWorldForward();
-            sampler.Sample(
-                latestSnapshot,
-                origin,
-                forward,
-                viewAngle,
-                viewDistance,
-                rayCount,
-                Mathf.Max(rayCount, maxRayCount),
-                edgeRefinementIterations,
-                edgeDistanceThreshold,
-                obstacleMask,
-                hitTriggers,
-                transform);
+            if (useVisibilityWorld)
+            {
+                VisibilityWorld resolvedWorld = visibilityWorld != null
+                    ? visibilityWorld
+                    : VisibilityWorld.GetOrCreate();
+                sampler.Sample(
+                    latestSnapshot,
+                    origin,
+                    forward,
+                    viewAngle,
+                    viewDistance,
+                    rayCount,
+                    Mathf.Max(rayCount, maxRayCount),
+                    edgeRefinementIterations,
+                    edgeDistanceThreshold,
+                    obstacleMask,
+                    hitTriggers,
+                    transform,
+                    resolvedWorld,
+                    fallbackToPhysicsWhenNoVisibilitySegments);
+            }
+            else
+            {
+                sampler.Sample(
+                    latestSnapshot,
+                    origin,
+                    forward,
+                    viewAngle,
+                    viewDistance,
+                    rayCount,
+                    Mathf.Max(rayCount, maxRayCount),
+                    edgeRefinementIterations,
+                    edgeDistanceThreshold,
+                    obstacleMask,
+                    hitTriggers,
+                    transform);
+            }
 
             nextSampleTime = updateFrequency > 0f
                 ? Time.time + 1f / Mathf.Max(0.01f, updateFrequency)

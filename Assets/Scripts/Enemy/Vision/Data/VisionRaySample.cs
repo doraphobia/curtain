@@ -15,5 +15,9 @@ namespace DuoCurtain.Vision
         public float normalizedDistance;
         public bool hit;
         public int colliderInstanceId;
+        public VisibilitySegmentType visibilitySegmentType;
+        public int visibilitySegmentSourceId;
+        public GameObject visibilitySourceObject;
+        public Component visibilitySourceComponent;
     }
 }

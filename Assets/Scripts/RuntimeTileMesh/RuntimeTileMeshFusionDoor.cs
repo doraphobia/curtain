@@ -1,10 +1,11 @@
 using System.Collections.Generic;
+using DuoCurtain.Vision;
 using UnityEngine;
 
 namespace DuoCurtain.RuntimeTileMesh
 {
     [DisallowMultipleComponent]
-    public class RuntimeTileMeshFusionDoor : MonoBehaviour
+    public class RuntimeTileMeshFusionDoor : MonoBehaviour, IVisibilitySegmentSource
     {
         private const string DoorPanelName = "Door Panel";
         private const string WallVisualName = "Wall Visual";
@@ -80,6 +81,9 @@ namespace DuoCurtain.RuntimeTileMesh
         [Min(0.01f)]
         public float wallGapLength = 0.16f;
 
+        [Header("Visibility")]
+        public bool registerForVisibility = true;
+
         [SerializeField]
         private bool isOpen;
         [SerializeField]
@@ -127,7 +131,25 @@ namespace DuoCurtain.RuntimeTileMesh
         void Update()
         {
             if (UpdateDoorAnimation())
+            {
                 ApplyVisualState();
+                MarkVisibilityDirty();
+            }
+        }
+
+        void OnEnable()
+        {
+            if (!registerForVisibility)
+                return;
+
+            VisibilityWorld.GetOrCreate().RegisterSource(this);
+            MarkVisibilityDirty();
+        }
+
+        void OnDisable()
+        {
+            if (VisibilityWorld.Instance != null)
+                VisibilityWorld.Instance.UnregisterSource(this);
         }
 
         void OnValidate()
@@ -159,6 +181,7 @@ namespace DuoCurtain.RuntimeTileMesh
                 if (!isAnimating && !isWobbling)
                     currentOpenAmount = isOpen ? 1f : 0f;
                 ApplyVisualState();
+                MarkVisibilityDirty();
             }
         }
 
@@ -229,6 +252,7 @@ namespace DuoCurtain.RuntimeTileMesh
             EnsureVisual();
             RebuildWallVisual();
             ApplyVisualState();
+            MarkVisibilityDirty();
         }
 
         public void ConfigureExteriorSwing(Vector2 outwardNormal)
@@ -254,9 +278,11 @@ namespace DuoCurtain.RuntimeTileMesh
         {
             GameObject doorObject = new GameObject("Door Shop Preview");
             doorObject.transform.SetParent(parent, false);
+            doorObject.hideFlags = HideFlags.HideAndDontSave;
 
             GameObject backdropObject = new GameObject("Door Shop Preview Backdrop");
             backdropObject.transform.SetParent(doorObject.transform, false);
+            backdropObject.hideFlags = HideFlags.HideAndDontSave;
             SpriteRenderer backdropRenderer = backdropObject.AddComponent<SpriteRenderer>();
             backdropRenderer.sprite = FusionWallAttachment.GetDefaultWindowSprite();
             backdropRenderer.color = new Color(1f, 1f, 1f, 0.22f);
@@ -264,6 +290,7 @@ namespace DuoCurtain.RuntimeTileMesh
             backdropObject.transform.localScale = new Vector3(1.08f, 0.34f, 1f);
 
             RuntimeTileMeshFusionDoor door = doorObject.AddComponent<RuntimeTileMeshFusionDoor>();
+            door.registerForVisibility = false;
             door.includeWallVisual = false;
             door.Configure(
                 DoorAxis.Vertical,
@@ -320,6 +347,7 @@ namespace DuoCurtain.RuntimeTileMesh
             {
                 RebuildWallVisual();
                 ApplyVisualState();
+                MarkVisibilityDirty();
                 return;
             }
 
@@ -328,6 +356,7 @@ namespace DuoCurtain.RuntimeTileMesh
             doorVariableOffset = Mathf.Clamp(expandedOffset, 0, wallCellLength - 1);
             RebuildWallVisual();
             ApplyVisualState();
+            MarkVisibilityDirty();
         }
 
         public bool IsSameDoor(DoorAxis otherAxis, Vector2 otherSeamCenter, float epsilon)
@@ -487,6 +516,7 @@ namespace DuoCurtain.RuntimeTileMesh
             isOpen = true;
             lastToggleTime = Time.time;
             StartDoorTransition(1f, openDuration);
+            MarkVisibilityDirty();
         }
 
         public void Close()
@@ -494,6 +524,47 @@ namespace DuoCurtain.RuntimeTileMesh
             isOpen = false;
             lastToggleTime = Time.time;
             StartDoorTransition(0f, closeDuration);
+            MarkVisibilityDirty();
+        }
+
+        public void CollectVisibilitySegments(List<VisibilitySegment> results)
+        {
+            if (results == null || wallCellLength <= 0)
+                return;
+            if (!registerForVisibility)
+                return;
+
+            float safeGridSize = Mathf.Max(0.0001f, Mathf.Abs(gridSize));
+            float runStart = GetWallRunStartWorld();
+            for (int i = 0; i < wallCellLength; i++)
+            {
+                int variable = wallVariableStart + i;
+                if (supportedWallVariables.Count > 0 && !supportedWallVariables.Contains(variable))
+                    continue;
+
+                Vector2 start;
+                Vector2 end;
+                if (axis == DoorAxis.Vertical)
+                {
+                    start = new Vector2(seamCenter.x, runStart + i * safeGridSize);
+                    end = new Vector2(seamCenter.x, runStart + (i + 1) * safeGridSize);
+                }
+                else
+                {
+                    start = new Vector2(runStart + i * safeGridSize, seamCenter.y);
+                    end = new Vector2(runStart + (i + 1) * safeGridSize, seamCenter.y);
+                }
+
+                VisibilitySegmentType type = i == doorVariableOffset
+                    ? (IsDoorwayPassable() ? VisibilitySegmentType.OpenDoor : VisibilitySegmentType.ClosedDoor)
+                    : VisibilitySegmentType.Wall;
+                results.Add(new VisibilitySegment(start, end, type, gameObject, this));
+            }
+        }
+
+        private static void MarkVisibilityDirty()
+        {
+            VisibilityWorld.MarkActiveWorldDirty();
         }
 
         private bool CanToggleNow()
