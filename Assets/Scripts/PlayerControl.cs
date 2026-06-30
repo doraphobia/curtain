@@ -95,6 +95,7 @@ public class PlayerControl : MonoBehaviour
     public float outsideMoveSpeedMultiplier = 0.5f;
     public bool showOutdoorWarning = true;
     public string outdoorWarningMessage = "type: 现在你在屋子外面，目前的你很脆弱！";
+    public string outdoorWarningMessageEnglish = "type: You are outside. You are vulnerable!";
     public TMP_FontAsset outdoorWarningFont;
     public string outdoorWarningFontResourcesPath = CjkUiFontUtility.DefaultResourcesFontPath;
     [Min(1f)]
@@ -513,12 +514,11 @@ public class PlayerControl : MonoBehaviour
         {
             if (ShouldAllowOutdoorRuntimeMovement())
             {
-                nextWorld = runtimeTileWalkableArea.TryBlockDoorMovement(
-                    currentWorldPosition,
+                nextWorld = runtimeTileWalkableArea.ResolvePlayerWorldPoint(
                     desiredWorld,
-                    PlayerCollisionRadius)
-                    ? currentWorldPosition
-                    : desiredWorld;
+                    currentWorldPosition,
+                    PlayerCollisionRadius,
+                    true);
                 warnedAboutMissingRoomArea = false;
             }
             else if (ShouldUseRuntimeTileWalkableAreaFirst())
@@ -859,14 +859,18 @@ public class PlayerControl : MonoBehaviour
         if (outdoorWarningText == null)
             return;
 
+        string message = DuoCurtainLocalization.Text(
+            "player.outsideWarning",
+            outdoorWarningMessage,
+            outdoorWarningMessageEnglish);
         TMP_FontAsset warningFont = CjkUiFontUtility.Resolve(
             outdoorWarningFont,
             outdoorWarningFontResourcesPath,
-            outdoorWarningMessage);
+            message);
         if (warningFont != null)
             outdoorWarningText.font = warningFont;
 
-        outdoorWarningText.text = outdoorWarningMessage;
+        outdoorWarningText.text = message;
         outdoorWarningText.fontSize = outdoorWarningFontSize;
         outdoorWarningText.color = outdoorWarningColor;
         outdoorWarningText.rectTransform.anchoredPosition = outdoorWarningAnchoredPosition;

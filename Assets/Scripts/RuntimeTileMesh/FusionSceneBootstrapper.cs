@@ -34,7 +34,14 @@ namespace DuoCurtain.RuntimeTileMesh
             RuntimeTileMeshFusionSandbox sandbox = EnsureFusionSandbox(hasGameplaySurface, mainCamera);
             PlayerControl playerControl = EnsurePlayerControl(hasGameplaySurface, mainCamera, sandbox);
             ConfigurePauseManagers(hasGameplaySurface, mainCamera);
+            FusionSanityController sanityController = EnsureFusionSanityController(
+                hasGameplaySurface,
+                hasFusionModeController,
+                playerControl,
+                sandbox,
+                mainCamera);
             BindFusionReferences(sandbox, playerControl, mainCamera);
+            BindFusionSanityReferences(sanityController, sandbox, playerControl, mainCamera);
         }
 
         private static RuntimeTileMeshFusionSandbox EnsureFusionSandbox(bool hasGameplaySurface, Camera mainCamera)
@@ -110,6 +117,34 @@ namespace DuoCurtain.RuntimeTileMesh
                 pauseManager.blurSourceCamera = mainCamera;
         }
 
+        private static FusionSanityController EnsureFusionSanityController(
+            bool hasGameplaySurface,
+            bool hasFusionModeController,
+            PlayerControl playerControl,
+            RuntimeTileMeshFusionSandbox sandbox,
+            Camera mainCamera)
+        {
+            bool shouldInstall = hasGameplaySurface &&
+                (hasFusionModeController || SceneManager.GetActiveScene().name == "RedScene");
+            if (!shouldInstall)
+                return Object.FindFirstObjectByType<FusionSanityController>();
+
+            FusionSanityController sanityController = Object.FindFirstObjectByType<FusionSanityController>();
+            if (sanityController == null)
+            {
+                GameObject sanityObject = new GameObject("Fusion Sanity Controller");
+                sanityController = sanityObject.AddComponent<FusionSanityController>();
+            }
+
+            if (sanityController.playerControl == null)
+                sanityController.playerControl = playerControl;
+            if (sanityController.fusionSandbox == null)
+                sanityController.fusionSandbox = sandbox;
+            if (sanityController.blurSourceCamera == null)
+                sanityController.blurSourceCamera = mainCamera;
+            return sanityController;
+        }
+
         private static void BindFusionReferences(
             RuntimeTileMeshFusionSandbox sandbox,
             PlayerControl playerControl,
@@ -145,6 +180,31 @@ namespace DuoCurtain.RuntimeTileMesh
                 if (overlay.worldCamera == null)
                     overlay.worldCamera = mainCamera;
             }
+        }
+
+        private static void BindFusionSanityReferences(
+            FusionSanityController sanityController,
+            RuntimeTileMeshFusionSandbox sandbox,
+            PlayerControl playerControl,
+            Camera mainCamera)
+        {
+            if (sanityController == null)
+                return;
+
+            if (sanityController.playerControl == null)
+                sanityController.playerControl = playerControl;
+            if (sanityController.fusionSandbox == null)
+                sanityController.fusionSandbox = sandbox;
+            if (sanityController.blurSourceCamera == null)
+                sanityController.blurSourceCamera = mainCamera;
+
+            FusionGameModeController modeController = Object.FindFirstObjectByType<FusionGameModeController>();
+            if (sanityController.gameModeController == null)
+                sanityController.gameModeController = modeController;
+            if (sanityController.currencySource == null && modeController != null)
+                sanityController.currencySource = modeController.currencySource;
+            if (sanityController.stageController == null)
+                sanityController.stageController = Object.FindFirstObjectByType<StageCycleController>();
         }
     }
 }

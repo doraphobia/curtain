@@ -90,7 +90,11 @@ namespace DuoCurtain.RuntimeTileMesh
         public RectTransform shopContentRoot;
         public TextMeshProUGUI shopConfirmationText;
         public string confirmPurchaseFormat = "Buy {0}? Click again to confirm.";
+        public string confirmPurchaseFormatChinese = "购买 {0}？再次点击确认。";
+        public string confirmPurchaseFormatEnglish = "Buy {0}? Click again to confirm.";
         public string cannotAffordFormat = "Not enough money: {0}";
+        public string cannotAffordFormatChinese = "钱不够：{0}";
+        public string cannotAffordFormatEnglish = "Not enough money: {0}";
         [Min(120f)]
         public float shopBannerHeight = 300f;
         [Min(0f)]
@@ -160,6 +164,8 @@ namespace DuoCurtain.RuntimeTileMesh
         public TextMeshProUGUI moneyText;
         public bool createMoneyHudIfMissing = true;
         public string moneyFormat = "Money: {0}";
+        public string moneyFormatChinese = "金钱：{0}";
+        public string moneyFormatEnglish = "Money: {0}";
         [Min(0f)]
         public float defaultStartingMoney = 100f;
         public Vector2 moneyHudAnchoredPosition = new Vector2(32f, 24f);
@@ -219,6 +225,7 @@ namespace DuoCurtain.RuntimeTileMesh
             BindSandboxEvents();
             if (currencySource != null)
                 currencySource.ValueChanged += HandleCurrencyChanged;
+            DuoCurtainLocalization.LanguageChanged += HandleLanguageChanged;
             RefreshMoneyHud();
         }
 
@@ -227,6 +234,7 @@ namespace DuoCurtain.RuntimeTileMesh
             UnbindSandboxEvents();
             if (currencySource != null)
                 currencySource.ValueChanged -= HandleCurrencyChanged;
+            DuoCurtainLocalization.LanguageChanged -= HandleLanguageChanged;
         }
 
         void OnDestroy()
@@ -495,14 +503,14 @@ namespace DuoCurtain.RuntimeTileMesh
             if (pendingShopIndex != index)
             {
                 pendingShopIndex = index;
-                SetConfirmationText(string.Format(confirmPurchaseFormat, item.displayName));
+                SetConfirmationText(GetPurchaseConfirmationText(item));
                 RefreshShopPanel();
                 return;
             }
 
             if (!allowFreePurchases && currencySource != null && !currencySource.CanAfford(item.price))
             {
-                SetConfirmationText(string.Format(cannotAffordFormat, item.displayName));
+                SetConfirmationText(GetCannotAffordText(item));
                 RefreshShopPanel();
                 return;
             }
@@ -607,6 +615,7 @@ namespace DuoCurtain.RuntimeTileMesh
             pendingWallAttachmentItem = null;
             pendingWallAttachmentPrice = 0;
             SetWallAttachmentPreviewVisible(false);
+            fusionSandbox.SuppressPointerInputForCurrentFrame();
             if (IsManagementMode)
                 SetShopExpanded(true, false);
         }
@@ -638,7 +647,18 @@ namespace DuoCurtain.RuntimeTileMesh
                 windowOpenColor,
                 false);
 
-            attachmentObject.transform.SetParent(fusionSandbox.transform, true);
+            if (fusionSandbox.TryFindBlockOwningCell(
+                    pendingWallAttachmentPlacement.ownerCell,
+                    out RuntimeTileMeshDraggableBlock ownerBlock) &&
+                ownerBlock != null)
+            {
+                attachmentObject.transform.SetParent(ownerBlock.transform, true);
+            }
+            else
+            {
+                attachmentObject.transform.SetParent(fusionSandbox.transform, true);
+            }
+
             return true;
         }
 
@@ -748,6 +768,60 @@ namespace DuoCurtain.RuntimeTileMesh
             if (outwardNormal.x < -0.25f)
                 return HoverScrollColorLerp2D.SideType.Left;
             return HoverScrollColorLerp2D.SideType.None;
+        }
+
+        private string GetPurchaseConfirmationText(BlockShopItem item)
+        {
+            string itemName = GetLocalizedItemName(item);
+            return DuoCurtainLocalization.Format(
+                "shop.confirmPurchase",
+                string.IsNullOrWhiteSpace(confirmPurchaseFormatChinese)
+                    ? confirmPurchaseFormat
+                    : confirmPurchaseFormatChinese,
+                string.IsNullOrWhiteSpace(confirmPurchaseFormatEnglish)
+                    ? confirmPurchaseFormat
+                    : confirmPurchaseFormatEnglish,
+                itemName);
+        }
+
+        private string GetCannotAffordText(BlockShopItem item)
+        {
+            string itemName = GetLocalizedItemName(item);
+            return DuoCurtainLocalization.Format(
+                "shop.cannotAfford",
+                string.IsNullOrWhiteSpace(cannotAffordFormatChinese)
+                    ? cannotAffordFormat
+                    : cannotAffordFormatChinese,
+                string.IsNullOrWhiteSpace(cannotAffordFormatEnglish)
+                    ? cannotAffordFormat
+                    : cannotAffordFormatEnglish,
+                itemName);
+        }
+
+        private string GetLocalizedItemName(BlockShopItem item)
+        {
+            if (item == null)
+                return DuoCurtainLocalization.Text("shop.item.block", "方块", "Block");
+
+            string displayName = item.displayName ?? string.Empty;
+            string trimmed = displayName.Trim();
+            switch (trimmed)
+            {
+                case "Window":
+                    return DuoCurtainLocalization.Text("shop.item.window", "窗户", "Window");
+                case "Door":
+                    return DuoCurtainLocalization.Text("shop.item.door", "门", "Door");
+                case "1x3 Block":
+                    return DuoCurtainLocalization.Text("shop.item.1x3", "1x3 方块", "1x3 Block");
+                case "L Block":
+                    return DuoCurtainLocalization.Text("shop.item.l", "L 方块", "L Block");
+                case "T Block":
+                    return DuoCurtainLocalization.Text("shop.item.t", "T 方块", "T Block");
+                case "Z Block":
+                    return DuoCurtainLocalization.Text("shop.item.z", "Z 方块", "Z Block");
+                default:
+                    return string.IsNullOrWhiteSpace(trimmed) ? DuoCurtainLocalization.Text("shop.item.block", "方块", "Block") : trimmed;
+            }
         }
 
         private void ApplyCursorState(bool management)
@@ -1287,7 +1361,7 @@ namespace DuoCurtain.RuntimeTileMesh
             GameObject nameText = CreateTmpTextObject(
                 "Name",
                 buttonObject.transform,
-                item != null ? item.displayName : "Block",
+                GetLocalizedItemName(item),
                 26f,
                 shopTextColor,
                 TextAlignmentOptions.MidlineLeft);
@@ -1369,6 +1443,7 @@ namespace DuoCurtain.RuntimeTileMesh
             tmp.color = color;
             tmp.alignment = alignment;
             tmp.raycastTarget = false;
+            DuoCurtainLocalization.ApplyFont(tmp, text);
             return textObject;
         }
 
@@ -1377,13 +1452,27 @@ namespace DuoCurtain.RuntimeTileMesh
             RefreshMoneyHud();
         }
 
+        private void HandleLanguageChanged()
+        {
+            RebuildShopButtons();
+            RefreshMoneyHud();
+            if (pendingShopIndex >= 0 && pendingShopIndex < shopItems.Count)
+                SetConfirmationText(GetPurchaseConfirmationText(shopItems[pendingShopIndex]));
+        }
+
         private void RefreshMoneyHud()
         {
             if (moneyText == null)
                 return;
 
             int value = currencySource != null ? currencySource.CurrentWholeValue : Mathf.FloorToInt(defaultStartingMoney);
-            moneyText.text = string.Format(moneyFormat, value);
+            string text = DuoCurtainLocalization.Format(
+                "hud.money",
+                string.IsNullOrWhiteSpace(moneyFormatChinese) ? moneyFormat : moneyFormatChinese,
+                string.IsNullOrWhiteSpace(moneyFormatEnglish) ? moneyFormat : moneyFormatEnglish,
+                value);
+            moneyText.text = text;
+            DuoCurtainLocalization.ApplyFont(moneyText, text);
             ApplyMoneyHudPosition();
         }
 
@@ -1482,7 +1571,10 @@ namespace DuoCurtain.RuntimeTileMesh
         private void SetConfirmationText(string text)
         {
             if (shopConfirmationText != null)
+            {
                 shopConfirmationText.text = string.IsNullOrEmpty(text) ? " " : text;
+                DuoCurtainLocalization.ApplyFont(shopConfirmationText, shopConfirmationText.text);
+            }
         }
 
         private bool IsShopInteractive()

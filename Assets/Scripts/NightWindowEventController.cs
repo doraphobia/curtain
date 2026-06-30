@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using DuoCurtain.RuntimeTileMesh;
 
 [DisallowMultipleComponent]
 public class NightWindowEventController : MonoBehaviour
@@ -22,6 +23,7 @@ public class NightWindowEventController : MonoBehaviour
     public string windowTag = "Window";
     public TimeCounterUI currencySource;
     public SanitySystem sanitySystem;
+    public FusionSanityController fusionSanitySystem;
     public GameObject eventPanel;
     public GameObject leftSideIndicator;
     public GameObject rightSideIndicator;
@@ -78,6 +80,10 @@ public class NightWindowEventController : MonoBehaviour
 
         if (sanitySystem == null)
             sanitySystem = FindFirstObjectByType<SanitySystem>();
+        if (fusionSanitySystem == null)
+            fusionSanitySystem = FusionSanityController.Active != null
+                ? FusionSanityController.Active
+                : FindFirstObjectByType<FusionSanityController>();
 
         SetPanelVisible(false);
         SetSideIndicatorsVisible(HoverScrollColorLerp2D.SideType.None);
@@ -230,8 +236,18 @@ public class NightWindowEventController : MonoBehaviour
 
     private void EndEvent(bool applyPenalty)
     {
-        if (applyPenalty && sanitySystem != null)
-            sanitySystem.ApplyHalfSanityPenalty();
+        if (applyPenalty)
+        {
+            if (fusionSanitySystem == null)
+                fusionSanitySystem = FusionSanityController.Active != null
+                    ? FusionSanityController.Active
+                    : FindFirstObjectByType<FusionSanityController>();
+
+            if (fusionSanitySystem != null)
+                fusionSanitySystem.ApplyHalfSanityPenalty();
+            else if (sanitySystem != null)
+                sanitySystem.ApplyHalfSanityPenalty();
+        }
 
         isEventActive = false;
         sentenceRevealed = false;

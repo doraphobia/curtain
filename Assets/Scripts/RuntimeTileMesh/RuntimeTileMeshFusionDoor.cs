@@ -447,6 +447,31 @@ namespace DuoCurtain.RuntimeTileMesh
             return false;
         }
 
+        public bool AllowsMovementThroughDoorway(Vector3 fromWorld, Vector3 toWorld, float playerRadius)
+        {
+            if (!IsDoorwayPassable())
+                return false;
+
+            Vector2 from = fromWorld;
+            Vector2 to = toWorld;
+            Vector2 motion = to - from;
+            if (motion.sqrMagnitude <= 0.000001f)
+                return false;
+
+            if (!TryGetWallCrossingAlongCoordinate(from, to, out float alongCoordinate))
+                return false;
+
+            if (!TryGetWallSegmentIndex(alongCoordinate, out int segmentIndex))
+                return false;
+
+            if (segmentIndex != doorVariableOffset)
+                return false;
+
+            float inflatedHalfLength = GetWorldDoorLength() * 0.5f + Mathf.Max(0f, playerRadius);
+            float alongDelta = Mathf.Abs(alongCoordinate - GetDoorwayCenterAlongCoordinate());
+            return alongDelta <= inflatedHalfLength;
+        }
+
         public void OpenToward(Vector2 movement)
         {
             OpenToward(movement, seamCenter);
@@ -612,6 +637,11 @@ namespace DuoCurtain.RuntimeTileMesh
             return axis == DoorAxis.Vertical
                 ? new Vector2(seamCenter.x, alongCoordinate)
                 : new Vector2(alongCoordinate, seamCenter.y);
+        }
+
+        private float GetDoorwayCenterAlongCoordinate()
+        {
+            return axis == DoorAxis.Vertical ? seamCenter.y : seamCenter.x;
         }
 
         private DoorPanelPose GetClosedPanelPose()

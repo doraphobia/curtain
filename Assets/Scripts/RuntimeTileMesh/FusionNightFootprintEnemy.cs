@@ -53,6 +53,18 @@ namespace DuoCurtain.RuntimeTileMesh
         [Min(0.01f)]
         public float doorBreakProgressSmoothSpeed = 8f;
 
+        [Header("Sanity Pressure")]
+        public bool damageSanityOnWindowDetection = true;
+        [Min(0f)]
+        public float windowDetectionSanityDamage = 8f;
+        public bool damageSanityOnPlayerContact = true;
+        [Min(0f)]
+        public float contactSanityDamage = 10f;
+        [Min(0.01f)]
+        public float contactDamageCooldown = 1f;
+        [Min(0f)]
+        public float contactDamageDistance = 0.55f;
+
         [Header("Debug")]
         public bool drawDebug;
         public bool debugEnemyFlow;
@@ -91,6 +103,8 @@ namespace DuoCurtain.RuntimeTileMesh
         private LineRenderer visionWindowProjectionLine;
         private RuntimeTileMeshFusionDoor progressBarDoor;
         private DoorBreakProgressBar doorBreakProgressBar;
+        private bool windowSanityDamageApplied;
+        private float lastContactDamageTime = -999f;
 
         public TraceEnemyState CurrentState => currentState;
 
@@ -206,6 +220,7 @@ namespace DuoCurtain.RuntimeTileMesh
             {
                 confirmedPlayerByVision = true;
                 lastUsedWindow = usedWindow;
+                TryApplyWindowDetectionSanityDamage();
                 if (debugEnemyFlow)
                 {
                     Debug.Log(
@@ -231,8 +246,24 @@ namespace DuoCurtain.RuntimeTileMesh
             {
                 confirmedPlayerByVision = false;
                 lastUsedWindow = null;
+                windowSanityDamageApplied = false;
                 SetState(TraceEnemyState.WanderOutside);
             }
+        }
+
+        private void TryApplyWindowDetectionSanityDamage()
+        {
+            if (!damageSanityOnWindowDetection || windowSanityDamageApplied || windowDetectionSanityDamage <= 0f)
+                return;
+
+            FusionSanityController sanity = FusionSanityController.Active != null
+                ? FusionSanityController.Active
+                : FindFirstObjectByType<FusionSanityController>();
+            if (sanity == null)
+                return;
+
+            sanity.DrainSanity(windowDetectionSanityDamage);
+            windowSanityDamageApplied = true;
         }
 
         private void TickMovement()
@@ -271,7 +302,10 @@ namespace DuoCurtain.RuntimeTileMesh
 
                 case TraceEnemyState.ChasingPlayer:
                     if (playerControl != null && playerControl.HasPlayerWorldPosition)
+                    {
                         MoveTowards(playerControl.PlayerWorldPosition, true);
+                        TryApplyContactSanityDamage();
+                    }
                     return;
 
                 default:
@@ -282,6 +316,30 @@ namespace DuoCurtain.RuntimeTileMesh
             }
 
             MoveTowards(target, false);
+        }
+
+        private void TryApplyContactSanityDamage()
+        {
+            if (!damageSanityOnPlayerContact ||
+                contactSanityDamage <= 0f ||
+                playerControl == null ||
+                !playerControl.HasPlayerWorldPosition ||
+                Time.time < lastContactDamageTime + contactDamageCooldown)
+            {
+                return;
+            }
+
+            if (Vector2.Distance(transform.position, playerControl.PlayerWorldPosition) > contactDamageDistance)
+                return;
+
+            FusionSanityController sanity = FusionSanityController.Active != null
+                ? FusionSanityController.Active
+                : FindFirstObjectByType<FusionSanityController>();
+            if (sanity == null)
+                return;
+
+            sanity.DrainSanity(contactSanityDamage);
+            lastContactDamageTime = Time.time;
         }
 
         private bool CanDetectPlayerThroughOpenWindow(out WindowPortal usedWindow)

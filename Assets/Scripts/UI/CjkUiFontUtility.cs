@@ -71,6 +71,17 @@ public static class CjkUiFontUtility
             }
         }
 
+#if UNITY_EDITOR
+        TMP_FontAsset editorFont = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(DefaultEditorFontAssetPath);
+        if (editorFont != null)
+        {
+            cachedFont = editorFont;
+            if (CanPopulateAtlas(cachedFont))
+                PrimeCharacters(cachedFont, textToPrime);
+            return cachedFont;
+        }
+#endif
+
         cachedFont = CreateRuntimeOsFont(textToPrime);
         return cachedFont;
     }

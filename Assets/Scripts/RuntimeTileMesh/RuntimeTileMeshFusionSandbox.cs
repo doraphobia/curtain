@@ -762,6 +762,7 @@ namespace DuoCurtain.RuntimeTileMesh
             };
 
             List<RuntimeTileMeshFusionDoor> carriedDoors = DetachGroupDoors(group);
+            List<FusionWallAttachment> carriedWallAttachments = DetachGroupWallAttachments(group);
             List<DoorCandidate> doorCandidates = generateDoorsOnFusion
                 ? CollectDoorCandidates(groupCellSets)
                 : null;
@@ -779,6 +780,7 @@ namespace DuoCurtain.RuntimeTileMesh
             }
 
             AttachDoorsToSeed(carriedDoors, seed);
+            AttachWallAttachmentsToSeed(carriedWallAttachments, seed);
             CreateFusionDoors(seed, doorCandidates);
             RefreshFusionDoorWallSpans(seed, mergedCells);
 
@@ -887,6 +889,55 @@ namespace DuoCurtain.RuntimeTileMesh
                 return desiredWorldPoint;
 
             return GetNearestWalkablePoint(desiredWorldPoint, playerRadius, walkableCells);
+        }
+
+        public Vector3 ResolvePlayerWorldPoint(
+            Vector3 desiredWorldPoint,
+            Vector3 previousWorldPoint,
+            float playerRadius,
+            bool allowOutdoorMovement)
+        {
+            if (!allowOutdoorMovement)
+                return ClampPlayerWorldPoint(desiredWorldPoint, previousWorldPoint, playerRadius);
+
+            HashSet<Vector2Int> walkableCells = CollectWalkableCells();
+            if (walkableCells.Count == 0)
+                return desiredWorldPoint;
+
+            desiredWorldPoint.z = 0f;
+            previousWorldPoint.z = 0f;
+            playerRadius = Mathf.Max(0f, playerRadius);
+
+            bool previousInside = ContainsWorldPoint(previousWorldPoint, playerRadius, walkableCells);
+            bool desiredInside = ContainsWorldPoint(desiredWorldPoint, playerRadius, walkableCells);
+
+            if (previousInside && desiredInside)
+                return ClampSegmentToWalkableArea(previousWorldPoint, desiredWorldPoint, playerRadius, walkableCells);
+
+            if (previousInside != desiredInside)
+            {
+                if (AllowsDoorwayBoundaryPassage(previousWorldPoint, desiredWorldPoint, playerRadius))
+                    return desiredWorldPoint;
+
+                TryBlockDoorMovement(previousWorldPoint, desiredWorldPoint, playerRadius);
+                return previousInside
+                    ? ClampSegmentToWalkableArea(previousWorldPoint, desiredWorldPoint, playerRadius, walkableCells)
+                    : ClampSegmentToOutdoorArea(previousWorldPoint, desiredWorldPoint, playerRadius, walkableCells);
+            }
+
+            if (!previousInside && !desiredInside &&
+                SegmentTouchesWalkableArea(previousWorldPoint, desiredWorldPoint, playerRadius, walkableCells, out Vector3 lastOutdoorPoint))
+            {
+                if (AllowsDoorwayBoundaryPassage(previousWorldPoint, desiredWorldPoint, playerRadius))
+                    return desiredWorldPoint;
+
+                TryBlockDoorMovement(previousWorldPoint, desiredWorldPoint, playerRadius);
+                return lastOutdoorPoint;
+            }
+
+            return TryBlockDoorMovement(previousWorldPoint, desiredWorldPoint, playerRadius)
+                ? previousWorldPoint
+                : desiredWorldPoint;
         }
 
         public bool TryGetRandomBlockCenter(out Vector3 worldPosition)
@@ -1165,6 +1216,47 @@ namespace DuoCurtain.RuntimeTileMesh
                 RuntimeTileMeshFusionDoor door = doors[i];
                 if (door != null)
                     door.transform.SetParent(seed.transform, true);
+            }
+        }
+
+        private List<FusionWallAttachment> DetachGroupWallAttachments(HashSet<RuntimeTileMeshDraggableBlock> group)
+        {
+            List<FusionWallAttachment> attachments = new List<FusionWallAttachment>();
+            if (group == null)
+                return attachments;
+
+            foreach (RuntimeTileMeshDraggableBlock block in group)
+            {
+                if (block == null)
+                    continue;
+
+                FusionWallAttachment[] blockAttachments = block.GetComponentsInChildren<FusionWallAttachment>(true);
+                for (int i = 0; i < blockAttachments.Length; i++)
+                {
+                    FusionWallAttachment attachment = blockAttachments[i];
+                    if (attachment == null || attachments.Contains(attachment))
+                        continue;
+
+                    attachment.transform.SetParent(transform, true);
+                    attachments.Add(attachment);
+                }
+            }
+
+            return attachments;
+        }
+
+        private static void AttachWallAttachmentsToSeed(
+            List<FusionWallAttachment> attachments,
+            RuntimeTileMeshDraggableBlock seed)
+        {
+            if (attachments == null || seed == null)
+                return;
+
+            for (int i = 0; i < attachments.Count; i++)
+            {
+                FusionWallAttachment attachment = attachments[i];
+                if (attachment != null)
+                    attachment.transform.SetParent(seed.transform, true);
             }
         }
 
@@ -1508,6 +1600,55 @@ namespace DuoCurtain.RuntimeTileMesh
         private bool TryToggleDoorFromMovement(Vector3 from, Vector3 to, float playerRadius)
         {
             return TryBlockDoorMovement(from, to, playerRadius);
+        }
+
+        private Vector3 ClampSegmentToOutdoorArea(
+            Vector3 from,
+            Vector3 to,
+            float clearanceRadius,
+            HashSet<Vector2Int> walkableCells)
+        {
+            if (!SegmentTouchesWalkableArea(from, to, clearanceRadius, walkableCells, out Vector3 lastOutdoorPoint))
+                return to;
+
+            return lastOutdoorPoint;
+        }
+
+        private bool SegmentTouchesWalkableArea(
+            Vector3 from,
+            Vector3 to,
+            float clearanceRadius,
+            HashSet<Vector2Int> walkableCells,
+            out Vector3 lastOutdoorPoint)
+        {
+            lastOutdoorPoint = from;
+            int steps = GetSegmentSampleCount(from, to);
+            for (int i = 1; i <= steps; i++)
+            {
+                Vector3 sample = Vector3.Lerp(from, to, i / (float)steps);
+                if (ContainsWorldPoint(sample, clearanceRadius, walkableCells))
+                    return true;
+
+                lastOutdoorPoint = sample;
+            }
+
+            return false;
+        }
+
+        private bool AllowsDoorwayBoundaryPassage(Vector3 from, Vector3 to, float playerRadius)
+        {
+            List<RuntimeTileMeshFusionDoor> doors = CollectActiveDoors();
+            for (int i = 0; i < doors.Count; i++)
+            {
+                RuntimeTileMeshFusionDoor door = doors[i];
+                if (door != null && door.isActiveAndEnabled &&
+                    door.AllowsMovementThroughDoorway(from, to, playerRadius))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         public bool TryBlockDoorMovement(Vector3 from, Vector3 to, float playerRadius)

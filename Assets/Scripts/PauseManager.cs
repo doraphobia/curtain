@@ -38,10 +38,20 @@ public class PauseManager : MonoBehaviour
     [Header("Pause Title")]
     public bool showPauseTitle = true;
     public string pauseTitle = "GAME PAUSED";
+    public string pauseTitleChinese = "游戏暂停";
+    public string pauseTitleEnglish = "GAME PAUSED";
     [Min(1f)]
     public float pauseTitleFontSize = 72f;
     public Color pauseTitleColor = Color.white;
     public Vector2 pauseTitleAnchoredPosition = Vector2.zero;
+
+    [Header("Language")]
+    public bool showLanguageToggle = true;
+    public Vector2 languageToggleAnchoredPosition = new Vector2(0f, -150f);
+    public Vector2 languageToggleSize = new Vector2(360f, 72f);
+    public float languageToggleFontSize = 28f;
+    public Color languageToggleBackgroundColor = new Color(1f, 1f, 1f, 0.16f);
+    public Color languageToggleTextColor = Color.white;
 
     public static bool IsGamePaused { get; private set; }
     public static event Action<bool> PauseChanged;
@@ -56,6 +66,8 @@ public class PauseManager : MonoBehaviour
     private RawImage blurImage;
     private Image blurTintImage;
     private TextMeshProUGUI pauseTitleText;
+    private Button languageToggleButton;
+    private TextMeshProUGUI languageToggleText;
     private Texture2D blurTexture;
     private Coroutine blurFadeRoutine;
     private Coroutine resumeRoutine;
@@ -63,8 +75,16 @@ public class PauseManager : MonoBehaviour
 
     void Update()
     {
+        if (DuoCurtain.RuntimeTileMesh.FusionSanityController.IsDeathActive)
+            return;
+
         if (Input.GetKeyDown(toggleKey))
             TogglePause();
+    }
+
+    void OnEnable()
+    {
+        DuoCurtainLocalization.LanguageChanged += RefreshLocalizedPauseText;
     }
 
     public void TogglePause()
@@ -302,9 +322,75 @@ public class PauseManager : MonoBehaviour
         pauseTitleText.alignment = TextAlignmentOptions.Center;
         pauseTitleText.fontSize = pauseTitleFontSize;
         pauseTitleText.color = pauseTitleColor;
-        pauseTitleText.text = pauseTitle;
+
+        CreateLanguageToggle(canvasObject.transform);
+        RefreshLocalizedPauseText();
 
         canvasObject.SetActive(false);
+    }
+
+    private void CreateLanguageToggle(Transform parent)
+    {
+        GameObject buttonObject = new GameObject(
+            "Language Toggle",
+            typeof(RectTransform),
+            typeof(CanvasRenderer),
+            typeof(Image),
+            typeof(Button));
+        buttonObject.transform.SetParent(parent, false);
+
+        RectTransform rect = buttonObject.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = languageToggleAnchoredPosition;
+        rect.sizeDelta = languageToggleSize;
+
+        Image image = buttonObject.GetComponent<Image>();
+        image.color = languageToggleBackgroundColor;
+
+        languageToggleButton = buttonObject.GetComponent<Button>();
+        languageToggleButton.onClick.AddListener(DuoCurtainLocalization.ToggleLanguage);
+
+        GameObject textObject = new GameObject(
+            "Language Toggle Text",
+            typeof(RectTransform),
+            typeof(CanvasRenderer),
+            typeof(TextMeshProUGUI));
+        textObject.transform.SetParent(buttonObject.transform, false);
+        RectTransform textRect = textObject.GetComponent<RectTransform>();
+        StretchToParent(textRect);
+
+        languageToggleText = textObject.GetComponent<TextMeshProUGUI>();
+        languageToggleText.raycastTarget = false;
+        languageToggleText.alignment = TextAlignmentOptions.Center;
+    }
+
+    private void RefreshLocalizedPauseText()
+    {
+        if (pauseTitleText != null)
+        {
+            string title = DuoCurtainLocalization.Text("pause.title", pauseTitleChinese, pauseTitleEnglish);
+            pauseTitleText.text = title;
+            pauseTitleText.fontSize = pauseTitleFontSize;
+            pauseTitleText.color = pauseTitleColor;
+            DuoCurtainLocalization.ApplyFont(pauseTitleText, title);
+        }
+
+        if (languageToggleButton != null)
+            languageToggleButton.gameObject.SetActive(showLanguageToggle);
+
+        if (languageToggleText != null)
+        {
+            string text = DuoCurtainLocalization.Text(
+                "pause.languageToggle",
+                "语言：中文",
+                "Language: English");
+            languageToggleText.text = text;
+            languageToggleText.fontSize = languageToggleFontSize;
+            languageToggleText.color = languageToggleTextColor;
+            DuoCurtainLocalization.ApplyFont(languageToggleText, text);
+        }
     }
 
     private void SetBlurTexture(Texture2D texture)
@@ -322,11 +408,11 @@ public class PauseManager : MonoBehaviour
         if (pauseTitleText != null)
         {
             pauseTitleText.gameObject.SetActive(showPauseTitle);
-            pauseTitleText.text = pauseTitle;
             pauseTitleText.fontSize = pauseTitleFontSize;
             pauseTitleText.color = pauseTitleColor;
             pauseTitleText.rectTransform.anchoredPosition = pauseTitleAnchoredPosition;
         }
+        RefreshLocalizedPauseText();
 
         blurCanvas.sortingOrder = blurCanvasSortingOrder;
         if (blurCanvasGroup != null)
@@ -564,6 +650,8 @@ public class PauseManager : MonoBehaviour
 
     void OnDisable()
     {
+        DuoCurtainLocalization.LanguageChanged -= RefreshLocalizedPauseText;
+
         if (!paused)
             return;
 

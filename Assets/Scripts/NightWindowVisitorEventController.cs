@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using DuoCurtain.RuntimeTileMesh;
 
 [DisallowMultipleComponent]
 public class NightWindowVisitorEventController : MonoBehaviour
@@ -29,6 +30,7 @@ public class NightWindowVisitorEventController : MonoBehaviour
     public Button ignoreButton;
     public TimeCounterUI currencySource;
     public SanitySystem sanitySystem;
+    public FusionSanityController fusionSanitySystem;
     public AudioSource eventAudioSource;
 
     [Header("Gameplay")]
@@ -83,6 +85,10 @@ public class NightWindowVisitorEventController : MonoBehaviour
 
         if (sanitySystem == null)
             sanitySystem = FindFirstObjectByType<SanitySystem>();
+        if (fusionSanitySystem == null)
+            fusionSanitySystem = FusionSanityController.Active != null
+                ? FusionSanityController.Active
+                : FindFirstObjectByType<FusionSanityController>();
 
         if (letInButton != null)
         {
@@ -142,12 +148,29 @@ public class NightWindowVisitorEventController : MonoBehaviour
             if (currencySource != null)
                 currencySource.AddValue(goodVisitorReward);
         }
-        else if (sanitySystem != null)
+        else
         {
-            sanitySystem.ApplyHalfSanityPenalty();
+            ApplySanityPenalty();
         }
 
         EndEvent();
+    }
+
+    private void ApplySanityPenalty()
+    {
+        if (fusionSanitySystem == null)
+            fusionSanitySystem = FusionSanityController.Active != null
+                ? FusionSanityController.Active
+                : FindFirstObjectByType<FusionSanityController>();
+
+        if (fusionSanitySystem != null)
+        {
+            fusionSanitySystem.ApplyHalfSanityPenalty();
+            return;
+        }
+
+        if (sanitySystem != null)
+            sanitySystem.ApplyHalfSanityPenalty();
     }
 
     public void HandleIgnoreClicked()
