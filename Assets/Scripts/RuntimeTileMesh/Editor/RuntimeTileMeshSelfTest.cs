@@ -25,6 +25,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             failures += ExpectFusionConnectionRules();
             failures += ExpectFusionBlockMergeRules();
             failures += ExpectFusionDoorRules();
+            failures += ExpectSelectedBlockCarriesPlayer();
 
             if (failures == 0)
             {
@@ -257,6 +258,61 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             }
 
             return failures;
+        }
+
+        private static int ExpectSelectedBlockCarriesPlayer()
+        {
+            GameObject controllerObject = new GameObject("RuntimeTileMeshSelfTest Player Carry Controller");
+            GameObject playerObject = new GameObject("RuntimeTileMeshSelfTest Player");
+            List<GameObject> cleanup = new List<GameObject> { controllerObject, playerObject };
+
+            try
+            {
+                RuntimeTileMeshFusionSandbox sandbox = controllerObject.AddComponent<RuntimeTileMeshFusionSandbox>();
+                sandbox.gridSize = 1f;
+                sandbox.gridOrigin = Vector2.zero;
+                sandbox.managementInputEnabled = true;
+                sandbox.mergeAfterPlacement = false;
+                sandbox.carryPlayerWithSelectedBlock = true;
+
+                PlayerControl player = playerObject.AddComponent<PlayerControl>();
+                player.SetWorldPositionImmediate(new Vector3(0.25f, 0.75f, 0f));
+                sandbox.playerControl = player;
+
+                RuntimeTileMeshDraggableBlock block = CreateSelfTestBlock(
+                    "Player Carry Block",
+                    new[] { CreateBlockSpec(Vector2Int.zero) },
+                    cleanup);
+
+                sandbox.BeginDraggingBlock(block, new Vector3(4f, 3f, 0f), false);
+                Vector3 expectedPlayerPosition = new Vector3(4.25f, 3.75f, 0f);
+                if (!sandbox.IsCarryingPlayer ||
+                    Vector3.Distance(player.PlayerWorldPosition, expectedPlayerPosition) > 0.0001f)
+                {
+                    Debug.LogError(
+                        "[RuntimeTileMeshSelfTest] Selected block should carry the player while preserving the player's local offset. Expected " +
+                        expectedPlayerPosition + ", got " + player.PlayerWorldPosition + ".");
+                    return 1;
+                }
+
+                sandbox.SetManagementInputEnabled(false, true);
+                if (sandbox.IsCarryingPlayer ||
+                    Vector3.Distance(player.PlayerWorldPosition, expectedPlayerPosition) > 0.0001f)
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] Player carry should release on placement without changing the final player position.");
+                    return 1;
+                }
+
+                return 0;
+            }
+            finally
+            {
+                for (int i = cleanup.Count - 1; i >= 0; i--)
+                {
+                    if (cleanup[i] != null)
+                        UnityEngine.Object.DestroyImmediate(cleanup[i]);
+                }
+            }
         }
 
         private static int ExpectFusionDoorRules()

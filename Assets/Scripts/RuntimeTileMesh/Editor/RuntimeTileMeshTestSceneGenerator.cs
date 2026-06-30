@@ -547,6 +547,8 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
 
             FoleyStepClock stepClock = controllerObject.AddComponent<FoleyStepClock>();
             control.stepClock = stepClock;
+            sandbox.playerControl = control;
+            sandbox.carryPlayerWithSelectedBlock = true;
             return control;
         }
 

@@ -361,6 +361,14 @@ public class PlayerControl : MonoBehaviour
         return TryGetPlayerScreenPosition(out screenPosition);
     }
 
+    public void SetWorldPositionImmediate(Vector3 worldPosition)
+    {
+        worldPosition.z = 0f;
+        currentWorldPosition = worldPosition;
+        hasWorldPosition = true;
+        currentCursorSpeed = 0f;
+    }
+
     private void ResolveReferences()
     {
         if (targetCamera == null)

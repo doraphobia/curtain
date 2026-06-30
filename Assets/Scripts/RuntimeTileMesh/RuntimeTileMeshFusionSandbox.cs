@@ -47,6 +47,10 @@ namespace DuoCurtain.RuntimeTileMesh
         [Range(0.05f, 1f)]
         public float pathSampleCellStep = 0.25f;
 
+        [Header("Player Carry")]
+        public PlayerControl playerControl;
+        public bool carryPlayerWithSelectedBlock = true;
+
         [Header("Visual")]
         public int normalSortingOrder = 0;
         public int selectedSortingOrder = 10;
@@ -61,14 +65,19 @@ namespace DuoCurtain.RuntimeTileMesh
         private RuntimeTileMeshDraggableBlock selectedBlock;
         private Vector3 grabOffset;
         private bool selectedThisFrame;
+        private RuntimeTileMeshDraggableBlock playerCarrierBlock;
+        private Vector3 playerCarrierLocalOffset;
 
         public bool HasWalkableCells => CollectWalkableCells().Count > 0;
         public bool ManagementInputEnabled => managementInputEnabled;
+        public bool IsCarryingPlayer => playerCarrierBlock != null;
 
         void Awake()
         {
             if (worldCamera == null)
                 worldCamera = Camera.main;
+
+            ResolvePlayerControl();
 
             RefreshBlocks();
             if (snapExistingBlocksOnAwake)
@@ -86,8 +95,12 @@ namespace DuoCurtain.RuntimeTileMesh
             if (!managementInputEnabled)
             {
                 ClearHover();
+                ReleaseCarriedPlayer();
                 return;
             }
+
+            if (selectedBlock == null && playerCarrierBlock != null)
+                ReleaseCarriedPlayer();
 
             selectedThisFrame = false;
             Vector3 mouseWorld = ScreenToWorld(Input.mousePosition);
@@ -150,6 +163,7 @@ namespace DuoCurtain.RuntimeTileMesh
             selectedBlock.SetSelected(false);
             selectedBlock.SetSortingOrder(normalSortingOrder);
             selectedBlock = null;
+            ReleaseCarriedPlayer();
         }
 
         public RuntimeTileMeshDraggableBlock SpawnBlock(
@@ -172,12 +186,21 @@ namespace DuoCurtain.RuntimeTileMesh
                 blocks.Add(block);
 
             if (beginDragging && managementInputEnabled)
-                BeginDraggingBlock(block, worldPosition, false);
+                BeginDraggingBlockInternal(block, worldPosition, false, false);
 
             return block;
         }
 
         public void BeginDraggingBlock(RuntimeTileMeshDraggableBlock block, Vector3 pointerWorld, bool useGrabOffset)
+        {
+            BeginDraggingBlockInternal(block, pointerWorld, useGrabOffset, true);
+        }
+
+        private void BeginDraggingBlockInternal(
+            RuntimeTileMeshDraggableBlock block,
+            Vector3 pointerWorld,
+            bool useGrabOffset,
+            bool allowPlayerCarry)
         {
             if (!managementInputEnabled || block == null)
                 return;
@@ -191,6 +214,7 @@ namespace DuoCurtain.RuntimeTileMesh
             selectedBlock.SetSortingOrder(selectedSortingOrder);
             grabOffset = useGrabOffset ? selectedBlock.transform.position - pointerWorld : Vector3.zero;
             selectedThisFrame = true;
+            BindPlayerToSelectedBlock(allowPlayerCarry);
             MoveSelectedBlock(pointerWorld);
         }
 
@@ -273,6 +297,7 @@ namespace DuoCurtain.RuntimeTileMesh
             selectedBlock.SetSortingOrder(selectedSortingOrder);
             grabOffset = preserveGrabOffset ? selectedBlock.transform.position - mouseWorld : Vector3.zero;
             selectedThisFrame = true;
+            BindPlayerToSelectedBlock(true);
             MoveSelectedBlock(mouseWorld);
         }
 
@@ -284,12 +309,14 @@ namespace DuoCurtain.RuntimeTileMesh
             Vector3 desired = preserveGrabOffset ? mouseWorld + grabOffset : mouseWorld;
             Vector3 snapped = SnapWorldPosition(desired, selectedBlock.transform.position.z);
             selectedBlock.transform.position = snapped;
+            MoveCarriedPlayerWithSelectedBlock();
         }
 
         private void PlaceSelectedBlock()
         {
             RuntimeTileMeshDraggableBlock placed = selectedBlock;
             selectedBlock = null;
+            ReleaseCarriedPlayer();
 
             placed.SetSelected(false);
             placed.SetSortingOrder(normalSortingOrder);
@@ -297,6 +324,54 @@ namespace DuoCurtain.RuntimeTileMesh
 
             if (mergeAfterPlacement)
                 MergeConnectedBlocks(placed);
+        }
+
+        private void BindPlayerToSelectedBlock(bool allowPlayerCarry)
+        {
+            ReleaseCarriedPlayer();
+            if (!allowPlayerCarry || !carryPlayerWithSelectedBlock || selectedBlock == null)
+                return;
+
+            ResolvePlayerControl();
+            if (playerControl == null || !playerControl.HasPlayerWorldPosition)
+                return;
+
+            Vector3 playerWorldPosition = playerControl.PlayerWorldPosition;
+            HashSet<Vector2Int> selectedCells = selectedBlock.GetWorldCells(gridSize, gridOrigin);
+            if (!selectedCells.Contains(WorldPointToOccupiedCell(playerWorldPosition)))
+                return;
+
+            playerCarrierBlock = selectedBlock;
+            playerCarrierLocalOffset = playerWorldPosition - selectedBlock.transform.position;
+        }
+
+        private void MoveCarriedPlayerWithSelectedBlock()
+        {
+            if (playerCarrierBlock == null || playerCarrierBlock != selectedBlock)
+                return;
+
+            ResolvePlayerControl();
+            if (playerControl == null)
+            {
+                ReleaseCarriedPlayer();
+                return;
+            }
+
+            Vector3 carriedWorldPosition = playerCarrierBlock.transform.position + playerCarrierLocalOffset;
+            carriedWorldPosition.z = 0f;
+            playerControl.SetWorldPositionImmediate(carriedWorldPosition);
+        }
+
+        private void ReleaseCarriedPlayer()
+        {
+            playerCarrierBlock = null;
+            playerCarrierLocalOffset = Vector3.zero;
+        }
+
+        private void ResolvePlayerControl()
+        {
+            if (playerControl == null)
+                playerControl = PlayerControl.Active != null ? PlayerControl.Active : FindFirstObjectByType<PlayerControl>();
         }
 
         [ContextMenu("Merge All Connected Blocks")]

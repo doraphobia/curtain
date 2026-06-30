@@ -2140,6 +2140,8 @@ MonoBehaviour:
   excludeSelectedBlockFromWalkableArea: 1
   requireContinuousWalkablePath: 1
   pathSampleCellStep: 0.25
+  playerControl: {fileID: 73730041}
+  carryPlayerWithSelectedBlock: 1
   normalSortingOrder: 0
   selectedSortingOrder: 10
   drawSceneGrid: 1

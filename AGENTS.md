@@ -9,3 +9,4 @@
 - `TilePieceDefinition.cells` is the source of truth for a tile footprint. Keep cells explicit for production prefabs; do not let decorative children auto-generate gameplay cells.
 - `Player` is the physical cursor/body and owns blocking, footsteps, and current-block checks.
 - `Heading Point` is the interaction pointer. Hover-to-interact systems such as curtains, drawing zones, placement previews, and UI-like world boxes must query Heading Point, not Player.
+- In Management Mode, selecting a block that currently contains `Player` carries `Player` with that block by preserving the player's local offset until the block is placed or the selection is cancelled.
