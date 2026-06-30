@@ -50,7 +50,7 @@ namespace DuoCurtain.RuntimeTileMesh
         public GameObject wallVisualPrefab;
         public Color wallDebugColor = new Color(0.38f, 0.38f, 0.38f, 0.95f);
         [Min(0.005f)]
-        public float wallDebugLineWidth = 0.035f;
+        public float wallDebugLineWidth = 0.02f;
 
         [Header("Player Walkable Area")]
         public bool excludeSelectedBlockFromWalkableArea = true;
@@ -80,6 +80,10 @@ namespace DuoCurtain.RuntimeTileMesh
         private RuntimeTileMeshDraggableBlock playerCarrierBlock;
         private Vector3 playerCarrierLocalOffset;
         private readonly List<RuntimeTileMeshFusionDoor> doorBuffer = new List<RuntimeTileMeshFusionDoor>();
+        private readonly HashSet<RuntimeTileMeshFusionDoor> playerContactingDoors =
+            new HashSet<RuntimeTileMeshFusionDoor>();
+        private readonly List<RuntimeTileMeshFusionDoor> playerDoorContactRemovalBuffer =
+            new List<RuntimeTileMeshFusionDoor>();
         private int suppressPointerInputFrame = -1;
 
         public bool HasWalkableCells => CollectWalkableCells().Count > 0;
@@ -122,6 +126,7 @@ namespace DuoCurtain.RuntimeTileMesh
 
             if (!managementInputEnabled)
             {
+                HandlePlayerDoorContact();
                 HandleDoorInteractionInput();
                 ClearHover();
                 ReleaseCarriedPlayer();
@@ -188,6 +193,56 @@ namespace DuoCurtain.RuntimeTileMesh
                 {
                     break;
                 }
+            }
+        }
+
+        private void HandlePlayerDoorContact()
+        {
+            if (!doorBlocksPlayer)
+            {
+                playerContactingDoors.Clear();
+                return;
+            }
+
+            if (!PlayerControl.TryGetPlayerWorldPosition(out Vector3 playerWorldPoint))
+            {
+                playerContactingDoors.Clear();
+                return;
+            }
+
+            float playerRadius = playerControl != null
+                ? playerControl.PlayerCollisionRadius
+                : (PlayerControl.Active != null ? PlayerControl.Active.PlayerCollisionRadius : 0f);
+
+            playerDoorContactRemovalBuffer.Clear();
+            foreach (RuntimeTileMeshFusionDoor trackedDoor in playerContactingDoors)
+            {
+                if (trackedDoor == null ||
+                    !trackedDoor.isActiveAndEnabled ||
+                    !trackedDoor.IsPointTouchingCurrentPanel(playerWorldPoint, playerRadius))
+                {
+                    playerDoorContactRemovalBuffer.Add(trackedDoor);
+                }
+            }
+
+            for (int i = 0; i < playerDoorContactRemovalBuffer.Count; i++)
+                playerContactingDoors.Remove(playerDoorContactRemovalBuffer[i]);
+
+            List<RuntimeTileMeshFusionDoor> doors = CollectActiveDoors();
+            for (int i = 0; i < doors.Count; i++)
+            {
+                RuntimeTileMeshFusionDoor door = doors[i];
+                if (door == null || !door.isActiveAndEnabled)
+                    continue;
+
+                if (!door.IsPointTouchingCurrentPanel(playerWorldPoint, playerRadius))
+                    continue;
+
+                if (playerContactingDoors.Contains(door))
+                    continue;
+
+                door.TryToggleFromPlayerContact(playerWorldPoint, playerRadius);
+                playerContactingDoors.Add(door);
             }
         }
 

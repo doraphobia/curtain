@@ -351,7 +351,7 @@ MonoBehaviour:
   doorInteractionRadius: 0.12
   wallVisualPrefab: {fileID: 0}
   wallDebugColor: {r: 0.38, g: 0.38, b: 0.38, a: 0.95}
-  wallDebugLineWidth: 0.035
+  wallDebugLineWidth: 0.02
   excludeSelectedBlockFromWalkableArea: 1
   requireContinuousWalkablePath: 1
   pathSampleCellStep: 0.25
@@ -4526,7 +4526,8 @@ MonoBehaviour:
   rebuildOnEnable: 1
   renderMode: 0
   localZoomDistance: 5
-  defaultMapSize: {x: 220, y: 180}
+  defaultMapSize: {x: 220, y: 220}
+  forceSquareMap: 1
   defaultAnchoredPosition: {x: -32, y: -32}
   padding: 18
   cellSpacing: 1.5

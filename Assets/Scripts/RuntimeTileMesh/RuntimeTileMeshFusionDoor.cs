@@ -74,6 +74,7 @@ namespace DuoCurtain.RuntimeTileMesh
         private MeshRenderer meshRenderer;
         private BoxCollider2D boxCollider;
         private Material runtimeMaterial;
+        private Material wallRuntimeMaterial;
         private MaterialPropertyBlock propertyBlock;
         private Mesh runtimeMesh;
         private Transform wallVisualRoot;
@@ -128,6 +129,14 @@ namespace DuoCurtain.RuntimeTileMesh
                     Destroy(runtimeMaterial);
                 else
                     DestroyImmediate(runtimeMaterial);
+            }
+
+            if (wallRuntimeMaterial != null)
+            {
+                if (Application.isPlaying)
+                    Destroy(wallRuntimeMaterial);
+                else
+                    DestroyImmediate(wallRuntimeMaterial);
             }
 
             if (runtimeMesh != null)
@@ -253,6 +262,31 @@ namespace DuoCurtain.RuntimeTileMesh
                 movement = openDirection.sqrMagnitude > 0.0001f ? openDirection : Vector2.right;
 
             OpenToward(movement, point);
+            return true;
+        }
+
+        public bool IsPointTouchingCurrentPanel(Vector3 worldPoint, float radius)
+        {
+            DoorPanelPose panelPose = isOpen ? GetOpenPanelPose() : GetClosedPanelPose();
+            return PointTouchesPanel(worldPoint, panelPose, radius);
+        }
+
+        public bool TryToggleFromPlayerContact(Vector3 playerWorldPoint, float playerRadius)
+        {
+            if (!CanToggleNow() || !IsPointTouchingCurrentPanel(playerWorldPoint, playerRadius))
+                return false;
+
+            if (isOpen)
+            {
+                Close();
+                return true;
+            }
+
+            Vector2 movement = (Vector2)seamCenter - (Vector2)playerWorldPoint;
+            if (movement.sqrMagnitude <= 0.0001f)
+                movement = openDirection.sqrMagnitude > 0.0001f ? openDirection : Vector2.right;
+
+            OpenToward(movement, playerWorldPoint);
             return true;
         }
 
@@ -643,6 +677,35 @@ namespace DuoCurtain.RuntimeTileMesh
             return runtimeMaterial;
         }
 
+        private Material GetWallMaterial()
+        {
+            if (wallRuntimeMaterial != null)
+                return wallRuntimeMaterial;
+
+            Shader shader = Shader.Find("Sprites/Default");
+            if (shader == null)
+                shader = Shader.Find("Universal Render Pipeline/Particles/Unlit");
+            if (shader == null)
+                shader = Shader.Find("Universal Render Pipeline/Unlit");
+            if (shader == null)
+                shader = Shader.Find("Unlit/Color");
+
+            if (shader == null)
+                return GetDoorMaterial();
+
+            wallRuntimeMaterial = new Material(shader);
+            wallRuntimeMaterial.name = "Runtime Tile Fusion Wall";
+            if (wallRuntimeMaterial.HasProperty("_Surface"))
+                wallRuntimeMaterial.SetFloat("_Surface", 0f);
+            if (wallRuntimeMaterial.HasProperty("_Cull"))
+                wallRuntimeMaterial.SetFloat("_Cull", 0f);
+            if (wallRuntimeMaterial.HasProperty("_BaseColor"))
+                wallRuntimeMaterial.SetColor("_BaseColor", Color.white);
+            if (wallRuntimeMaterial.HasProperty("_Color"))
+                wallRuntimeMaterial.SetColor("_Color", Color.white);
+            return wallRuntimeMaterial;
+        }
+
         private void ApplyVisualState()
         {
             EnsureVisual();
@@ -752,7 +815,7 @@ namespace DuoCurtain.RuntimeTileMesh
             dashObject.transform.SetParent(wallVisualRoot, false);
 
             LineRenderer line = dashObject.AddComponent<LineRenderer>();
-            line.sharedMaterial = GetDoorMaterial();
+            line.sharedMaterial = GetWallMaterial();
             line.positionCount = 2;
             line.useWorldSpace = false;
             line.widthMultiplier = foreground

@@ -605,7 +605,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             sandbox.doorColor = Color.black;
             sandbox.doorBlocksPlayer = true;
             sandbox.wallDebugColor = new Color(0.38f, 0.38f, 0.38f, 0.95f);
-            sandbox.wallDebugLineWidth = 0.035f;
+            sandbox.wallDebugLineWidth = 0.02f;
 
             RuntimeTileMeshFusionIntegrityMonitor integrityMonitor =
                 controllerObject.AddComponent<RuntimeTileMeshFusionIntegrityMonitor>();
@@ -728,7 +728,8 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             renderer.visible = true;
             renderer.rebuildOnEnable = true;
             renderer.renderMode = TopologyMapRenderMode.EntireBuilding;
-            renderer.defaultMapSize = new Vector2(220f, 180f);
+            renderer.defaultMapSize = new Vector2(220f, 220f);
+            renderer.forceSquareMap = true;
             renderer.defaultAnchoredPosition = new Vector2(-32f, -32f);
             renderer.padding = 18f;
             renderer.cellSpacing = 1.5f;

@@ -42,7 +42,8 @@ public class TopologyMapRenderer : MonoBehaviour
     public float localZoomDistance = 5f;
 
     [Header("Layout")]
-    public Vector2 defaultMapSize = new Vector2(220f, 180f);
+    public Vector2 defaultMapSize = new Vector2(220f, 220f);
+    public bool forceSquareMap = true;
     public Vector2 defaultAnchoredPosition = new Vector2(-32f, -32f);
     [Min(0f)]
     public float padding = 18f;
@@ -174,6 +175,8 @@ public class TopologyMapRenderer : MonoBehaviour
     {
         padding = Mathf.Max(0f, padding);
         cellSpacing = Mathf.Max(0f, cellSpacing);
+        if (forceSquareMap)
+            defaultMapSize = MakeSquareSize(defaultMapSize);
         localZoomDistance = Mathf.Max(0.5f, localZoomDistance);
         roomAppearDuration = Mathf.Max(0f, roomAppearDuration);
         highlightFadeDuration = Mathf.Max(0.0001f, highlightFadeDuration);
@@ -313,6 +316,7 @@ public class TopologyMapRenderer : MonoBehaviour
         EnsureFrameRoot();
         EnsureDebugText();
         ApplyHierarchyOrder();
+        ApplySquareMapSize();
     }
 
     private void EnsureMapRoot()
@@ -340,6 +344,29 @@ public class TopologyMapRenderer : MonoBehaviour
         mapRoot.pivot = new Vector2(1f, 1f);
         mapRoot.sizeDelta = defaultMapSize;
         mapRoot.anchoredPosition = defaultAnchoredPosition;
+        ApplySquareMapSize();
+    }
+
+    private void ApplySquareMapSize()
+    {
+        if (!forceSquareMap || mapRoot == null)
+            return;
+
+        if (mapRoot.anchorMin != mapRoot.anchorMax)
+            return;
+
+        Vector2 squareSize = MakeSquareSize(mapRoot.sizeDelta);
+        if (mapRoot.sizeDelta == squareSize)
+            return;
+
+        mapRoot.sizeDelta = squareSize;
+        frameDirty = true;
+    }
+
+    private static Vector2 MakeSquareSize(Vector2 size)
+    {
+        float side = Mathf.Max(1f, Mathf.Abs(size.x), Mathf.Abs(size.y));
+        return new Vector2(side, side);
     }
 
     private Canvas ResolveCanvasForGeneratedMap()
