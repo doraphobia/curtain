@@ -52,6 +52,7 @@ public class PlayerControl : MonoBehaviour
 
     [Header("Startup Safety")]
     public bool waitForRuntimeTileSpawnBeforeMouseFallback = true;
+    public bool requireRuntimeTileSpawnForRandomStart = true;
     [Min(0f)]
     public float runtimeTileSpawnWaitSeconds = 3f;
     [Min(0f)]
@@ -194,6 +195,7 @@ public class PlayerControl : MonoBehaviour
     private bool runtimeSpawnWaitStarted;
     private float runtimeSpawnWaitDeadline;
     private float startupInputUnlockTime;
+    private bool warnedAboutRuntimeSpawnFallbackBlocked;
 
     public Vector3 PlayerWorldPosition => currentWorldPosition;
     public Vector3 CurrentWorldPosition => PlayerWorldPosition;
@@ -409,6 +411,7 @@ public class PlayerControl : MonoBehaviour
         currentWorldPosition = worldPosition;
         hasWorldPosition = true;
         currentCursorSpeed = 0f;
+        playerIsOutsideRuntimeRoom = IsOutsideRuntimeRoomAt(currentWorldPosition);
     }
 
     private void ResolveReferences()
@@ -459,6 +462,21 @@ public class PlayerControl : MonoBehaviour
             return false;
         }
 
+        if (ShouldRequireRuntimeSpawnBeforeInitialization())
+        {
+            currentCursorSpeed = 0f;
+            if (!warnedAboutRuntimeSpawnFallbackBlocked && runtimeSpawnWaitStarted)
+            {
+                Debug.LogWarning(
+                    "[PlayerControl] Waiting for RuntimeTileMesh room cells before spawning Player. " +
+                    "Mouse fallback is disabled so startup pointer position cannot move the player outside a floor block.",
+                    this);
+                warnedAboutRuntimeSpawnFallbackBlocked = true;
+            }
+
+            return false;
+        }
+
         startWorld = ScreenToWorld(Input.mousePosition);
         if (clampCursorToRoom && ShouldUseRuntimeTileWalkableAreaFirst())
         {
@@ -505,6 +523,13 @@ public class PlayerControl : MonoBehaviour
         return Time.unscaledTime <= runtimeSpawnWaitDeadline;
     }
 
+    private bool ShouldRequireRuntimeSpawnBeforeInitialization()
+    {
+        return requireRuntimeTileSpawnForRandomStart &&
+               spawnAtRandomRuntimeTileBlockCenter &&
+               runtimeTileWalkableArea != null;
+    }
+
     private void CompleteWorldPositionInitialization(Vector3 worldPosition, bool lockStartupInput)
     {
         worldPosition.z = 0f;
@@ -512,6 +537,7 @@ public class PlayerControl : MonoBehaviour
         hasWorldPosition = true;
         playerIsOutsideRuntimeRoom = IsOutsideRuntimeRoomAt(currentWorldPosition);
         runtimeSpawnWaitStarted = false;
+        warnedAboutRuntimeSpawnFallbackBlocked = false;
 
         if (lockStartupInput && startupInputLockSeconds > 0f)
             startupInputUnlockTime = Mathf.Max(startupInputUnlockTime, Time.unscaledTime + startupInputLockSeconds);

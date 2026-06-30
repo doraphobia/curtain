@@ -10,6 +10,9 @@ namespace DuoCurtain.Vision
 
         [Header("Rebuild")]
         public bool autoFindSourcesOnRebuild = true;
+        public bool autoFindSourcesOnlyWhenNeeded = true;
+        [Min(0f)]
+        public float autoFindSourcesMinInterval = 0.5f;
         public bool rebuildWhenDirty = true;
 
         [Header("Debug")]
@@ -23,6 +26,8 @@ namespace DuoCurtain.Vision
         private readonly List<VisibilitySegment> sourceBuffer =
             new List<VisibilitySegment>(64);
         private bool dirty = true;
+        private bool hasRefreshedSceneSources;
+        private float lastSceneSourceRefreshTime = -999f;
 
         public static VisibilityWorld Instance => instance;
         public IReadOnlyList<VisibilitySegment> Segments => segments;
@@ -157,7 +162,7 @@ namespace DuoCurtain.Vision
 
         public void Rebuild()
         {
-            if (autoFindSourcesOnRebuild)
+            if (ShouldRefreshSceneSources())
                 RefreshSceneSources();
 
             segments.Clear();
@@ -221,12 +226,33 @@ namespace DuoCurtain.Vision
 
         private void RefreshSceneSources()
         {
+            hasRefreshedSceneSources = true;
+            lastSceneSourceRefreshTime = Application.isPlaying ? Time.unscaledTime : Time.realtimeSinceStartup;
+
             MonoBehaviour[] behaviours = FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None);
             for (int i = 0; i < behaviours.Length; i++)
             {
                 if (behaviours[i] is IVisibilitySegmentSource source && !sources.Contains(source))
                     sources.Add(source);
             }
+        }
+
+        private bool ShouldRefreshSceneSources()
+        {
+            if (!autoFindSourcesOnRebuild)
+                return false;
+
+            if (!autoFindSourcesOnlyWhenNeeded)
+                return true;
+
+            if (!hasRefreshedSceneSources || sources.Count == 0)
+                return true;
+
+            if (autoFindSourcesMinInterval <= 0f)
+                return true;
+
+            float now = Application.isPlaying ? Time.unscaledTime : Time.realtimeSinceStartup;
+            return now >= lastSceneSourceRefreshTime + autoFindSourcesMinInterval;
         }
 
         private static bool IsUsableSource(IVisibilitySegmentSource source)

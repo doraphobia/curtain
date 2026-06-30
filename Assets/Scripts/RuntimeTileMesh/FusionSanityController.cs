@@ -53,6 +53,11 @@ namespace DuoCurtain.RuntimeTileMesh
         [Min(0f)]
         public float shopUiClearance = 18f;
         public bool forceRestoreButtonAboveShopInManagement = true;
+        public bool keepRestoreButtonClearOfSanityHud = true;
+        [Min(0f)]
+        public float restoreButtonManagementExtraLift = 72f;
+        [Min(0f)]
+        public float restoreButtonSanityHudGap = 14f;
 
         [Header("HUD")]
         public bool createHudIfMissing = true;
@@ -413,6 +418,24 @@ namespace DuoCurtain.RuntimeTileMesh
                 }
             }
 
+            Vector2 sanityPosition = sanityHudAnchoredPosition + Vector2.up * shopLift;
+            Vector2 restorePosition = restoreButtonAnchoredPosition + Vector2.up * shopLift;
+            if (forceRestoreButtonAboveShopInManagement &&
+                gameModeController != null &&
+                gameModeController.IsManagementMode)
+            {
+                float expectedShopTop = gameModeController.ShopBannerHeight + gameModeController.ShopBottomInset;
+                restorePosition.y = Mathf.Max(
+                    restorePosition.y,
+                    expectedShopTop + shopUiClearance + restoreButtonManagementExtraLift);
+            }
+
+            if (keepRestoreButtonClearOfSanityHud)
+            {
+                float sanityTop = sanityPosition.y + Mathf.Max(0f, sanityHudSize.y);
+                restorePosition.y = Mathf.Max(restorePosition.y, sanityTop + restoreButtonSanityHudGap);
+            }
+
             if (sanityText != null)
             {
                 if (sanityTextRectTransform == null)
@@ -422,8 +445,7 @@ namespace DuoCurtain.RuntimeTileMesh
                 sanityTextRectTransform.anchorMax = Vector2.zero;
                 sanityTextRectTransform.pivot = Vector2.zero;
                 sanityTextRectTransform.sizeDelta = sanityHudSize;
-                sanityTextRectTransform.anchoredPosition =
-                    sanityHudAnchoredPosition + Vector2.up * shopLift;
+                sanityTextRectTransform.anchoredPosition = sanityPosition;
             }
 
             if (restoreButton != null)
@@ -435,8 +457,7 @@ namespace DuoCurtain.RuntimeTileMesh
                 restoreButtonRectTransform.anchorMax = Vector2.zero;
                 restoreButtonRectTransform.pivot = Vector2.zero;
                 restoreButtonRectTransform.sizeDelta = restoreButtonSize;
-                restoreButtonRectTransform.anchoredPosition =
-                    restoreButtonAnchoredPosition + Vector2.up * shopLift;
+                restoreButtonRectTransform.anchoredPosition = restorePosition;
             }
         }
 

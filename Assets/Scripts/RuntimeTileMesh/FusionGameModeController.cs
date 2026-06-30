@@ -8,7 +8,7 @@ using UnityEngine.UI;
 
 namespace DuoCurtain.RuntimeTileMesh
 {
-    [DefaultExecutionOrder(-40)]
+    [DefaultExecutionOrder(-70)]
     [DisallowMultipleComponent]
     public sealed class FusionGameModeController : MonoBehaviour
     {
@@ -1779,6 +1779,10 @@ namespace DuoCurtain.RuntimeTileMesh
                     hash = hash * 31 + Mathf.RoundToInt(shopThumbnailSettings.fixedOrthographicSize * 1000f);
                     hash = hash * 31 + shopThumbnailSettings.tint.GetHashCode();
                     hash = hash * 31 + Mathf.RoundToInt(shopThumbnailSettings.opacity * 1000f);
+                    hash = hash * 31 + (shopThumbnailSettings.useProceduralFallbackForWallAttachments ? 1 : 0);
+                    hash = hash * 31 + shopThumbnailSettings.fallbackWindowColor.GetHashCode();
+                    hash = hash * 31 + shopThumbnailSettings.fallbackDoorColor.GetHashCode();
+                    hash = hash * 31 + shopThumbnailSettings.fallbackDoorBackingColor.GetHashCode();
                     hash = hash * 31 + shopThumbnailSettings.previewRotationEuler.GetHashCode();
                     hash = hash * 31 + shopThumbnailSettings.previewOffset.GetHashCode();
                     hash = hash * 31 + Mathf.RoundToInt(shopThumbnailSettings.previewScale * 1000f);

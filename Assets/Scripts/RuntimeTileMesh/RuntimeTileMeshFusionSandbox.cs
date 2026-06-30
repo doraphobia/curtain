@@ -203,12 +203,12 @@ namespace DuoCurtain.RuntimeTileMesh
                 ReleaseCarriedPlayer();
 
             selectedThisFrame = false;
-            Vector3 mouseWorld = ScreenToWorld(Input.mousePosition);
+            Vector3 pointerWorld = GetPointerWorldPosition();
             bool pointerOverUI = ignorePointerOverUI && EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
 
             if (selectedBlock != null)
             {
-                MoveSelectedBlock(mouseWorld);
+                MoveSelectedBlock(pointerWorld);
                 if (Input.GetMouseButtonDown(Mathf.Max(0, cancelSelectionMouseButton)))
                 {
                     CancelSelectedBlock(false);
@@ -226,9 +226,9 @@ namespace DuoCurtain.RuntimeTileMesh
                 return;
             }
 
-            UpdateHover(mouseWorld);
+            UpdateHover(pointerWorld);
             if (Input.GetMouseButtonDown(0) && hoveredBlock != null)
-                PickUpBlock(hoveredBlock, mouseWorld);
+                PickUpBlock(hoveredBlock, pointerWorld);
         }
 
         void LateUpdate()
@@ -460,6 +460,12 @@ namespace DuoCurtain.RuntimeTileMesh
 
         public Vector3 GetPointerWorldPosition()
         {
+            if (PlayerControl.TryGetInteractionWorldPosition(out Vector3 interactionWorld))
+            {
+                interactionWorld.z = 0f;
+                return interactionWorld;
+            }
+
             if (worldCamera == null)
                 worldCamera = Camera.main;
 
@@ -939,6 +945,14 @@ namespace DuoCurtain.RuntimeTileMesh
 
             bool previousInside = ContainsWorldPoint(previousWorldPoint, playerRadius, walkableCells);
             bool desiredInside = ContainsWorldPoint(desiredWorldPoint, playerRadius, walkableCells);
+            bool previousCenterInside = ContainsWorldPoint(previousWorldPoint, 0f, walkableCells);
+            bool desiredCenterInside = ContainsWorldPoint(desiredWorldPoint, 0f, walkableCells);
+
+            if (previousCenterInside != desiredCenterInside &&
+                AllowsDoorwayBoundaryPassage(previousWorldPoint, desiredWorldPoint, playerRadius))
+            {
+                return desiredWorldPoint;
+            }
 
             if (previousInside && desiredInside)
                 return ClampSegmentToWalkableArea(previousWorldPoint, desiredWorldPoint, playerRadius, walkableCells);

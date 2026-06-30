@@ -48,6 +48,12 @@ namespace DuoCurtain.RuntimeTileMesh
             [Tooltip("Final UI thumbnail opacity.")]
             [Range(0f, 1f)]
             public float opacity = 1f;
+            [Header("Fallback")]
+            [Tooltip("Use a deterministic Texture2D thumbnail for built-in wall attachments that do not have prefab assets. This avoids platform-specific RenderTexture blanks after Windows/Mac sync.")]
+            public bool useProceduralFallbackForWallAttachments = true;
+            public Color fallbackWindowColor = new Color(1f, 0.92f, 0.08f, 1f);
+            public Color fallbackDoorColor = Color.black;
+            public Color fallbackDoorBackingColor = new Color(1f, 1f, 1f, 0.2f);
             [Header("Transform")]
             [Tooltip("Preview object rotation before rendering.")]
             public Vector3 previewRotationEuler = Vector3.zero;
@@ -64,7 +70,7 @@ namespace DuoCurtain.RuntimeTileMesh
         private sealed class PreviewEntry
         {
             public GameObject stage;
-            public RenderTexture texture;
+            public Texture texture;
             public Camera camera;
             public RawImage target;
         }
@@ -123,6 +129,9 @@ namespace DuoCurtain.RuntimeTileMesh
             ThumbnailSettings settings)
         {
             int resolution = Mathf.Clamp(settings.resolution, 64, 1024);
+            if (TryAssignProceduralAttachmentThumbnail(item, target, resolution, settings))
+                return;
+
             Vector3 stagePosition = new Vector3(10000f + index * 64f, 10000f, 0f);
 
             GameObject stage = new GameObject("Shop Preview Stage - " + item.displayName);
@@ -202,6 +211,90 @@ namespace DuoCurtain.RuntimeTileMesh
                 camera = previewCamera,
                 target = target
             });
+        }
+
+        private bool TryAssignProceduralAttachmentThumbnail(
+            FusionGameModeController.BlockShopItem item,
+            RawImage target,
+            int resolution,
+            ThumbnailSettings settings)
+        {
+            if (item == null ||
+                target == null ||
+                settings == null ||
+                !settings.useProceduralFallbackForWallAttachments ||
+                item.itemKind != FusionGameModeController.ShopItemKind.WallAttachment ||
+                item.wallAttachmentPrefab != null)
+            {
+                return false;
+            }
+
+            Texture2D texture = CreateProceduralAttachmentTexture(item, resolution, settings);
+            target.texture = texture;
+            target.color = new Color(settings.tint.r, settings.tint.g, settings.tint.b, Mathf.Clamp01(settings.opacity));
+            target.uvRect = new Rect(0f, 0f, 1f, 1f);
+            target.raycastTarget = false;
+
+            previews.Add(new PreviewEntry
+            {
+                stage = null,
+                texture = texture,
+                camera = null,
+                target = target
+            });
+            return true;
+        }
+
+        private static Texture2D CreateProceduralAttachmentTexture(
+            FusionGameModeController.BlockShopItem item,
+            int resolution,
+            ThumbnailSettings settings)
+        {
+            int size = Mathf.Clamp(resolution, 64, 1024);
+            Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            {
+                name = "Shop Thumbnail Fallback - " + item.displayName,
+                hideFlags = HideFlags.HideAndDontSave,
+                filterMode = FilterMode.Point,
+                wrapMode = TextureWrapMode.Clamp
+            };
+
+            Color background = settings.clearMode == ThumbnailClearMode.Transparent
+                ? new Color(settings.backgroundColor.r, settings.backgroundColor.g, settings.backgroundColor.b, 0f)
+                : settings.backgroundColor;
+            Color[] pixels = new Color[size * size];
+            for (int i = 0; i < pixels.Length; i++)
+                pixels[i] = background;
+
+            if (item.wallAttachmentCategory == FusionGameModeController.WallAttachmentCategory.Door)
+            {
+                FillRect(pixels, size, new Rect(0.28f, 0.18f, 0.44f, 0.64f), settings.fallbackDoorBackingColor);
+                FillRect(pixels, size, new Rect(0.45f, 0.16f, 0.1f, 0.68f), settings.fallbackDoorColor);
+            }
+            else
+            {
+                FillRect(pixels, size, new Rect(0.22f, 0.24f, 0.56f, 0.52f), new Color(1f, 1f, 1f, 0.18f));
+                FillRect(pixels, size, new Rect(0.28f, 0.3f, 0.44f, 0.4f), settings.fallbackWindowColor);
+            }
+
+            texture.SetPixels(pixels);
+            texture.Apply(false, true);
+            return texture;
+        }
+
+        private static void FillRect(Color[] pixels, int textureSize, Rect normalizedRect, Color color)
+        {
+            int minX = Mathf.Clamp(Mathf.FloorToInt(normalizedRect.xMin * textureSize), 0, textureSize - 1);
+            int maxX = Mathf.Clamp(Mathf.CeilToInt(normalizedRect.xMax * textureSize), minX + 1, textureSize);
+            int minY = Mathf.Clamp(Mathf.FloorToInt(normalizedRect.yMin * textureSize), 0, textureSize - 1);
+            int maxY = Mathf.Clamp(Mathf.CeilToInt(normalizedRect.yMax * textureSize), minY + 1, textureSize);
+
+            for (int y = minY; y < maxY; y++)
+            {
+                int row = y * textureSize;
+                for (int x = minX; x < maxX; x++)
+                    pixels[row + x] = color;
+            }
         }
 
         private static GameObject CreateItemPreviewObject(
@@ -386,7 +479,8 @@ namespace DuoCurtain.RuntimeTileMesh
 
                 if (entry.texture != null)
                 {
-                    entry.texture.Release();
+                    if (entry.texture is RenderTexture renderTexture)
+                        renderTexture.Release();
                     Destroy(entry.texture);
                 }
 

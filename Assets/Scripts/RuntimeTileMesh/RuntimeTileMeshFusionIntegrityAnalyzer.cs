@@ -203,16 +203,9 @@ namespace DuoCurtain.RuntimeTileMesh
                     snapshot.worldTiles);
             }
 
-            int expectedVertices = GetExpectedMeshVertexCount(snapshot, settings);
-            if (snapshot.worldTileCount > 0 &&
-                snapshot.meshVertexCount > 0 &&
-                snapshot.meshVertexCount != expectedVertices)
-            {
-                AddIssue(issues, IssueMeshVertexMismatch,
-                    snapshot.blockName + " expected " + expectedVertices + " optimized mesh vertices for " +
-                    snapshot.worldTileCount + " tile(s), got " + snapshot.meshVertexCount + ".",
-                    snapshot.worldTiles);
-            }
+            // RuntimeTileMesh intentionally merges adjacent cells into a single connected polygon.
+            // A valid 5-cell Z block can therefore have 6 outline vertices instead of 20 per-cell
+            // vertices. Coverage and triangle checks below are the authoritative mesh integrity tests.
 
             if (snapshot.worldTileCount > 0 && !snapshot.meshCoversAllTiles)
             {

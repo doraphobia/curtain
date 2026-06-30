@@ -147,6 +147,8 @@ namespace DuoCurtain.RuntimeTileMesh
         private Vector2 lastMoveDirection = Vector2.up;
         private float visionAlertProgress;
         private VisionDetectionSource lastDetectionSource;
+        private int visionSampleFrame = -1;
+        private VisionSnapshot cachedVisionSnapshot;
 
         public TraceEnemyState CurrentState => currentState;
 
@@ -397,13 +399,10 @@ namespace DuoCurtain.RuntimeTileMesh
             Vector2 playerPosition = playerControl.PlayerWorldPosition;
             lastKnownPlayerPosition = playerPosition;
 
-            EnsureVisionSystem();
-            if (visionSensor == null)
+            if (!TrySampleVisionThisFrame(out VisionSnapshot snapshot))
                 return false;
 
-            visionSensor.SetForward(lastMoveDirection);
-            visionSensor.ForceSample();
-            if (!visionSensor.LatestSnapshot.TryGetDetectionInfo(
+            if (!snapshot.TryGetDetectionInfo(
                     playerPosition,
                     out VisionDetectionSource detectionSource,
                     out PortalVisionPolygon portalPolygon))
@@ -630,8 +629,8 @@ namespace DuoCurtain.RuntimeTileMesh
                 return;
             }
 
-            visionSensor.SetForward(lastMoveDirection);
-            visionSensor.ForceSample();
+            if (!TrySampleVisionThisFrame(out VisionSnapshot snapshot))
+                return;
 
             bool seesPlayer = CanSeePlayerWithRuntimeVision();
             UpdateVisionAlertProgress(seesPlayer);
@@ -658,7 +657,7 @@ namespace DuoCurtain.RuntimeTileMesh
                 primary.g,
                 primary.b,
                 Mathf.Clamp01(primary.a * 0.72f));
-            visionRenderController.Render(visionSensor.LatestSnapshot);
+            visionRenderController.Render(snapshot);
         }
 
         private bool CanSeePlayerWithRuntimeVision()
@@ -666,7 +665,27 @@ namespace DuoCurtain.RuntimeTileMesh
             if (visionSensor == null || playerControl == null || !playerControl.HasPlayerWorldPosition)
                 return false;
 
-            return visionSensor.CanSeeWorldPoint(playerControl.PlayerWorldPosition);
+            VisionSnapshot snapshot = cachedVisionSnapshot != null ? cachedVisionSnapshot : visionSensor.LatestSnapshot;
+            return snapshot != null && snapshot.ContainsWorldPoint(playerControl.PlayerWorldPosition);
+        }
+
+        private bool TrySampleVisionThisFrame(out VisionSnapshot snapshot)
+        {
+            EnsureVisionSystem();
+            snapshot = null;
+            if (visionSensor == null)
+                return false;
+
+            visionSensor.SetForward(lastMoveDirection);
+            if (visionSampleFrame != Time.frameCount || cachedVisionSnapshot == null)
+            {
+                visionSensor.ForceSample();
+                cachedVisionSnapshot = visionSensor.LatestSnapshot;
+                visionSampleFrame = Time.frameCount;
+            }
+
+            snapshot = cachedVisionSnapshot;
+            return snapshot != null;
         }
 
         private void UpdateVisionAlertProgress(bool seesPlayer)
