@@ -47,7 +47,9 @@ namespace DuoCurtain.RuntimeTileMesh
         [Min(0.01f)]
         public float doorTargetStopDistance = 0.25f;
         [Min(0f)]
-        public float doorBreakDuration = 1.2f;
+        public float doorBreakDuration = 5f;
+        [Min(0f)]
+        public float minimumDoorBreakDuration = 5f;
         [Min(0f)]
         public float enterRoomDelay = 0.25f;
         public bool openFusionDoorAfterBreak = true;
@@ -333,7 +335,7 @@ namespace DuoCurtain.RuntimeTileMesh
                 case TraceEnemyState.BreakingDoor:
                     doorBreakTimer += Time.deltaTime;
                     UpdateDoorBreakProgress();
-                    if (doorBreakTimer >= doorBreakDuration)
+                    if (doorBreakTimer >= GetEffectiveDoorBreakDuration())
                     {
                         if (openFusionDoorAfterBreak && targetDoor != null)
                             targetDoor.OpenToward((Vector2)(targetDoor.transform.position - transform.position));
@@ -553,10 +555,16 @@ namespace DuoCurtain.RuntimeTileMesh
             if (doorBreakProgressBar == null)
                 return;
 
-            float normalized = doorBreakDuration > 0.0001f
-                ? Mathf.Clamp01(doorBreakTimer / doorBreakDuration)
+            float effectiveDuration = GetEffectiveDoorBreakDuration();
+            float normalized = effectiveDuration > 0.0001f
+                ? Mathf.Clamp01(doorBreakTimer / effectiveDuration)
                 : 1f;
             doorBreakProgressBar.SetProgress(normalized, true);
+        }
+
+        private float GetEffectiveDoorBreakDuration()
+        {
+            return Mathf.Max(0.0001f, doorBreakDuration, minimumDoorBreakDuration);
         }
 
         private void HideDoorBreakProgress()

@@ -34,6 +34,12 @@ public class WindowPortal : MonoBehaviour, IVisionPortal
     [Range(1f, 179f)]
     public float portalSpreadAngle = 45f;
 
+    private bool hasRuntimePortalOverride;
+    private Vector2 runtimePortalCenter;
+    private Vector2 runtimePortalTangent;
+    private Vector2 runtimeOutwardNormal;
+    private float runtimePortalLength;
+
     public bool IsOpen
     {
         get
@@ -45,8 +51,8 @@ public class WindowPortal : MonoBehaviour, IVisionPortal
     }
 
     public bool IsPortalOpen => IsOpen;
-    public Vector2 PortalA => GetPortalCenter() - GetPortalTangent() * (Mathf.Max(0.01f, portalLength) * 0.5f);
-    public Vector2 PortalB => GetPortalCenter() + GetPortalTangent() * (Mathf.Max(0.01f, portalLength) * 0.5f);
+    public Vector2 PortalA => GetPortalCenter() - GetPortalTangent() * (GetPortalLength() * 0.5f);
+    public Vector2 PortalB => GetPortalCenter() + GetPortalTangent() * (GetPortalLength() * 0.5f);
     public Vector2 ForwardNormal => GetPortalNormal();
     public Vector2 BackwardNormal => -GetPortalNormal();
     public int FrontRoomId => ownerRoom != null ? ownerRoom.GetInstanceID() : 0;
@@ -73,10 +79,26 @@ public class WindowPortal : MonoBehaviour, IVisionPortal
 
     public void ConfigurePortal(Vector2 center, Vector2 tangent, Vector2 normal, float length)
     {
+        ClearRuntimePortalOverride();
         portalCenter = center;
         portalTangent = tangent.sqrMagnitude > 0.000001f ? tangent.normalized : Vector2.up;
         outwardNormal = normal.sqrMagnitude > 0.000001f ? normal.normalized : Vector2.right;
         portalLength = Mathf.Max(0.01f, length);
+    }
+
+    public void SetRuntimePortalOverride(Vector2 center, Vector2 tangent, Vector2 normal, float length)
+    {
+        hasRuntimePortalOverride = true;
+        runtimePortalCenter = center;
+        runtimePortalTangent = tangent.sqrMagnitude > 0.000001f ? tangent.normalized : Vector2.up;
+        runtimeOutwardNormal = normal.sqrMagnitude > 0.000001f ? normal.normalized : Vector2.right;
+        runtimePortalLength = Mathf.Max(0.01f, length);
+    }
+
+    public void ClearRuntimePortalOverride()
+    {
+        hasRuntimePortalOverride = false;
+        runtimePortalLength = 0f;
     }
 
     public bool CanPassVision(Vector2 incomingOrigin, Vector2 incomingDirection)
@@ -99,7 +121,7 @@ public class WindowPortal : MonoBehaviour, IVisionPortal
         Vector2 exitOrigin = hitPoint + normal * Mathf.Max(0.001f, portalExitOffset);
         return new VisionPortalExit(
             exitOrigin,
-            safeDirection,
+            normal,
             portalContinuationDistance,
             GetTargetRoomId(incomingOrigin));
     }
@@ -145,6 +167,8 @@ public class WindowPortal : MonoBehaviour, IVisionPortal
 
     private Vector2 GetPortalCenter()
     {
+        if (hasRuntimePortalOverride)
+            return runtimePortalCenter;
         if (portalCenter.sqrMagnitude > 0.000001f)
             return portalCenter;
         if (windowCollider != null)
@@ -154,6 +178,8 @@ public class WindowPortal : MonoBehaviour, IVisionPortal
 
     private Vector2 GetPortalTangent()
     {
+        if (hasRuntimePortalOverride && runtimePortalTangent.sqrMagnitude > 0.000001f)
+            return runtimePortalTangent.normalized;
         if (portalTangent.sqrMagnitude > 0.000001f)
             return portalTangent.normalized;
         return transform.up;
@@ -161,9 +187,18 @@ public class WindowPortal : MonoBehaviour, IVisionPortal
 
     private Vector2 GetPortalNormal()
     {
+        if (hasRuntimePortalOverride && runtimeOutwardNormal.sqrMagnitude > 0.000001f)
+            return runtimeOutwardNormal.normalized;
         if (outwardNormal.sqrMagnitude > 0.000001f)
             return outwardNormal.normalized;
         return transform.right;
+    }
+
+    private float GetPortalLength()
+    {
+        return hasRuntimePortalOverride
+            ? Mathf.Max(0.01f, runtimePortalLength)
+            : Mathf.Max(0.01f, portalLength);
     }
 
     private Vector2 GetExitNormal(Vector2 incomingOrigin)

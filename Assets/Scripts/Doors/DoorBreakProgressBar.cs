@@ -78,7 +78,7 @@ public class DoorBreakProgressBar : MonoBehaviour
         GameObject fillObject = new GameObject("Fill");
         fillObject.transform.SetParent(transform, false);
         fillImage = fillObject.AddComponent<Image>();
-        fillImage.color = new Color(1f, 0.35f, 0.15f, 0.95f);
+        fillImage.color = new Color(1f, 1f, 1f, 0.96f);
         fillImage.type = Image.Type.Filled;
         fillImage.fillMethod = Image.FillMethod.Horizontal;
         fillImage.fillOrigin = (int)Image.OriginHorizontal.Left;

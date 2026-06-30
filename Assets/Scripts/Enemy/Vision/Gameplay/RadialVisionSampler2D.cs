@@ -441,23 +441,23 @@ namespace DuoCurtain.Vision
                     continue;
 
                 VisionPortalExit portalExit = portal.GetExit(snapshot.origin, sample.direction);
-                Vector2 exitNormal = portalExit.origin - sample.point;
-                if (exitNormal.sqrMagnitude <= 0.000001f)
-                    exitNormal = portalExit.forward;
-                exitNormal = exitNormal.sqrMagnitude > 0.000001f
-                    ? exitNormal.normalized
-                    : sample.direction.normalized;
-                float effectiveExitOffset = Mathf.Max(
-                    Mathf.Max(0.001f, portalExitOffset),
-                    Vector2.Distance(sample.point, portalExit.origin));
-                Vector2 exitOrigin = sample.point + exitNormal * effectiveExitOffset;
                 Vector2 exitForward = portalExit.forward.sqrMagnitude > 0.000001f
                     ? portalExit.forward.normalized
                     : sample.direction.normalized;
+                float effectiveExitOffset = Mathf.Max(0.001f, portalExitOffset);
+                Vector2 apertureA = portal.PortalA + exitForward * effectiveExitOffset;
+                Vector2 apertureB = portal.PortalB + exitForward * effectiveExitOffset;
+                Vector2 exitOrigin = (apertureA + apertureB) * 0.5f;
                 float distance = Mathf.Min(
                     Mathf.Max(0.01f, portalExit.maxDistance),
                     Mathf.Max(0.01f, portalContinuationDistance));
                 float angle = Mathf.Clamp(portalSpreadAngle, 1f, 179f);
+                OrderPortalApertureEndpoints(
+                    ref apertureA,
+                    ref apertureB,
+                    exitOrigin,
+                    exitForward,
+                    angle);
 
                 CollectRelevantBlockingSegments(
                     worldSegments,
@@ -490,7 +490,10 @@ namespace DuoCurtain.Vision
                         portalExit.targetRoomId,
                         sample.visibilitySegmentType == VisibilitySegmentType.OpenWindow
                             ? VisionDetectionSource.OpenWindowPortal
-                            : VisionDetectionSource.OpenDoorPortal);
+                            : VisionDetectionSource.OpenDoorPortal,
+                        true,
+                        apertureA,
+                        apertureB);
                     addedPortal = true;
                 }
 
@@ -509,6 +512,27 @@ namespace DuoCurtain.Vision
             if (sample.visibilitySourceObject == null)
                 return null;
             return sample.visibilitySourceObject.GetComponent<IVisionPortal>();
+        }
+
+        private static void OrderPortalApertureEndpoints(
+            ref Vector2 apertureA,
+            ref Vector2 apertureB,
+            Vector2 origin,
+            Vector2 forward,
+            float coneAngle)
+        {
+            Vector2 safeForward = forward.sqrMagnitude > 0.000001f ? forward.normalized : Vector2.up;
+            float centerAngle = Mathf.Atan2(safeForward.y, safeForward.x) * Mathf.Rad2Deg;
+            float angleA = Mathf.Atan2(apertureA.y - origin.y, apertureA.x - origin.x) * Mathf.Rad2Deg;
+            float angleB = Mathf.Atan2(apertureB.y - origin.y, apertureB.x - origin.x) * Mathf.Rad2Deg;
+            float normalizedA = GetNormalizedAngleInCone(angleA, centerAngle, Mathf.Clamp(coneAngle, 1f, 179f));
+            float normalizedB = GetNormalizedAngleInCone(angleB, centerAngle, Mathf.Clamp(coneAngle, 1f, 179f));
+            if (normalizedA <= normalizedB)
+                return;
+
+            Vector2 temp = apertureA;
+            apertureA = apertureB;
+            apertureB = temp;
         }
 
         private static bool ShouldPreferSegment(VisibilitySegment candidate, VisibilitySegment current)

@@ -189,9 +189,15 @@ namespace DuoCurtain.Vision
             if (portalPolygon == null || !portalPolygon.IsValid)
                 return;
 
-            int baseIndex = vertices.Count;
             Color portalColor = WithOpacity(parameters.portalColor, parameters.opacity * parameters.portalOpacity);
             Vector2 origin = portalPolygon.portalExitOrigin;
+            if (portalPolygon.hasPortalAperture)
+            {
+                AddPortalAperturePolygon(snapshot, portalPolygon, parameters, portalColor, origin);
+                return;
+            }
+
+            int baseIndex = vertices.Count;
             Vector3 localOrigin = outputTransform.InverseTransformPoint(
                 new Vector3(origin.x, origin.y, rendererContext.zOffset));
             vertices.Add(localOrigin);
@@ -217,12 +223,78 @@ namespace DuoCurtain.Vision
             AddFanTriangles(baseIndex, points.Count);
         }
 
+        private void AddPortalAperturePolygon(
+            VisionSnapshot snapshot,
+            PortalVisionPolygon portalPolygon,
+            VisionRenderParameters parameters,
+            Color portalColor,
+            Vector2 origin)
+        {
+            int baseIndex = vertices.Count;
+            AddPortalPolygonVertex(
+                portalPolygon.portalApertureA,
+                snapshot,
+                parameters,
+                portalColor,
+                origin,
+                0f);
+
+            IReadOnlyList<Vector2> points = portalPolygon.Polygon;
+            int totalCount = points.Count + 2;
+            for (int i = 0; i < points.Count; i++)
+            {
+                float normalizedIndex = totalCount > 1 ? (i + 1) / (float)(totalCount - 1) : 0.5f;
+                AddPortalPolygonVertex(points[i], snapshot, parameters, portalColor, origin, normalizedIndex);
+            }
+
+            AddPortalPolygonVertex(
+                portalPolygon.portalApertureB,
+                snapshot,
+                parameters,
+                portalColor,
+                origin,
+                1f);
+
+            AddPolygonTriangles(baseIndex, totalCount);
+        }
+
+        private void AddPortalPolygonVertex(
+            Vector2 point,
+            VisionSnapshot snapshot,
+            VisionRenderParameters parameters,
+            Color portalColor,
+            Vector2 origin,
+            float normalizedIndex)
+        {
+            float maxDistance = Mathf.Max(0.0001f, snapshot.viewDistance);
+            float normalizedDistance = Mathf.Clamp01(Vector2.Distance(origin, point) / maxDistance);
+            Vector3 localPoint = outputTransform.InverseTransformPoint(
+                new Vector3(point.x, point.y, rendererContext.zOffset));
+            vertices.Add(localPoint);
+            uv0.Add(BuildUV(point, snapshot.bounds, parameters.uvMode, normalizedIndex, normalizedDistance));
+            uv1.Add(new Vector4(normalizedDistance, normalizedIndex, point.x, point.y));
+            colors.Add(portalColor);
+        }
+
         private void AddFanTriangles(int baseIndex, int outerPointCount)
         {
             if (outerPointCount < 2)
                 return;
 
             for (int i = 1; i < outerPointCount; i++)
+            {
+                triangles.Add(baseIndex);
+                triangles.Add(baseIndex + i + 1);
+                triangles.Add(baseIndex + i);
+            }
+        }
+
+        private void AddPolygonTriangles(int baseIndex, int vertexCount)
+        {
+            if (vertexCount < 3)
+                return;
+
+            for (int i = 1; i < vertexCount - 1; i++)
             {
                 triangles.Add(baseIndex);
                 triangles.Add(baseIndex + i + 1);

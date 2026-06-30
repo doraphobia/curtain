@@ -19,6 +19,9 @@ namespace DuoCurtain.Vision
         public IVisionPortal portal;
         public Vector2 portalHitPoint;
         public Vector2 portalExitOrigin;
+        public bool hasPortalAperture;
+        public Vector2 portalApertureA;
+        public Vector2 portalApertureB;
         public int targetRoomId;
         public VisionDetectionSource detectionSource;
         public IReadOnlyList<Vector2> Polygon => polygon;
@@ -95,13 +98,19 @@ namespace DuoCurtain.Vision
             Vector2 portalExitOrigin,
             IReadOnlyList<Vector2> points,
             int targetRoomId,
-            VisionDetectionSource detectionSource)
+            VisionDetectionSource detectionSource,
+            bool hasAperture = false,
+            Vector2 apertureA = default,
+            Vector2 apertureB = default)
         {
             PortalVisionPolygon polygon = new PortalVisionPolygon
             {
                 portal = portal,
                 portalHitPoint = portalHitPoint,
                 portalExitOrigin = portalExitOrigin,
+                hasPortalAperture = hasAperture,
+                portalApertureA = apertureA,
+                portalApertureB = apertureB,
                 targetRoomId = targetRoomId,
                 detectionSource = detectionSource
             };
@@ -130,6 +139,18 @@ namespace DuoCurtain.Vision
                     portalPolygon.portalExitOrigin.x,
                     portalPolygon.portalExitOrigin.y,
                     0f));
+                if (portalPolygon.hasPortalAperture)
+                {
+                    sampleBounds.Encapsulate(new Vector3(
+                        portalPolygon.portalApertureA.x,
+                        portalPolygon.portalApertureA.y,
+                        0f));
+                    sampleBounds.Encapsulate(new Vector3(
+                        portalPolygon.portalApertureB.x,
+                        portalPolygon.portalApertureB.y,
+                        0f));
+                }
+
                 for (int j = 0; j < portalPolygon.Polygon.Count; j++)
                 {
                     Vector2 point = portalPolygon.Polygon[j];
@@ -151,7 +172,7 @@ namespace DuoCurtain.Vision
             for (int i = 0; i < portalPolygons.Count; i++)
             {
                 PortalVisionPolygon portalPolygon = portalPolygons[i];
-                if (ContainsPolygonPoint(worldPoint, portalPolygon.portalExitOrigin, portalPolygon.Polygon, 179f))
+                if (ContainsPortalPolygonPoint(worldPoint, portalPolygon))
                     return true;
             }
 
@@ -182,7 +203,7 @@ namespace DuoCurtain.Vision
             for (int i = 0; i < portalPolygons.Count; i++)
             {
                 PortalVisionPolygon candidate = portalPolygons[i];
-                if (ContainsPolygonPoint(worldPoint, candidate.portalExitOrigin, candidate.Polygon, 179f))
+                if (ContainsPortalPolygonPoint(worldPoint, candidate))
                 {
                     source = candidate.detectionSource;
                     portalPolygon = candidate;
@@ -191,6 +212,34 @@ namespace DuoCurtain.Vision
             }
 
             return false;
+        }
+
+        private static bool ContainsPortalPolygonPoint(Vector2 worldPoint, PortalVisionPolygon portalPolygon)
+        {
+            if (portalPolygon == null)
+                return false;
+            if (!portalPolygon.hasPortalAperture)
+                return ContainsPolygonPoint(worldPoint, portalPolygon.portalExitOrigin, portalPolygon.Polygon, 179f);
+            if (portalPolygon.Polygon == null || portalPolygon.Polygon.Count < 2)
+                return false;
+
+            int polygonVertexCount = portalPolygon.Polygon.Count + 2;
+            bool inside = false;
+            int previous = polygonVertexCount - 1;
+            for (int current = 0; current < polygonVertexCount; current++)
+            {
+                Vector2 a = GetPortalPolygonVertex(current, portalPolygon);
+                Vector2 b = GetPortalPolygonVertex(previous, portalPolygon);
+                bool crosses = (a.y > worldPoint.y) != (b.y > worldPoint.y);
+                if (crosses &&
+                    worldPoint.x <
+                    (b.x - a.x) * (worldPoint.y - a.y) / (b.y - a.y) + a.x)
+                    inside = !inside;
+
+                previous = current;
+            }
+
+            return inside;
         }
 
         private static bool ContainsPolygonPoint(
@@ -232,6 +281,15 @@ namespace DuoCurtain.Vision
                 return polygon[index];
 
             return index == 0 ? polygonOrigin : polygon[index - 1];
+        }
+
+        private static Vector2 GetPortalPolygonVertex(int index, PortalVisionPolygon portalPolygon)
+        {
+            if (index == 0)
+                return portalPolygon.portalApertureA;
+            if (index == portalPolygon.Polygon.Count + 1)
+                return portalPolygon.portalApertureB;
+            return portalPolygon.Polygon[index - 1];
         }
     }
 }

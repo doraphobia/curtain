@@ -8,6 +8,8 @@ namespace DuoCurtain.RuntimeTileMesh
     public sealed class FusionWallAttachment : MonoBehaviour, IVisibilitySegmentSource
     {
         private const string DefaultSpriteName = "Fusion Runtime Window Sprite";
+        private static readonly List<FusionWallAttachment> activeWindowAttachments =
+            new List<FusionWallAttachment>();
 
         public enum AttachmentType
         {
@@ -47,12 +49,16 @@ namespace DuoCurtain.RuntimeTileMesh
 
         [Header("Visibility")]
         public bool registerForVisibility = true;
+        public bool mergeAdjacentWindowsForVisibility = true;
+        [Min(0f)]
+        public float mergeGapToleranceInCells = 0.25f;
 
         private static Sprite defaultSprite;
         private SpriteRenderer spriteRenderer;
         private BoxCollider2D windowCollider;
         private HoverScrollColorLerp2D hoverScroll;
         private WindowPortal windowPortal;
+        private readonly List<WindowMergeCandidate> mergeCandidates = new List<WindowMergeCandidate>(16);
 
         public WindowPortal WindowPortal => windowPortal;
         public HoverScrollColorLerp2D HoverScroll => hoverScroll;
@@ -66,6 +72,9 @@ namespace DuoCurtain.RuntimeTileMesh
 
         void OnEnable()
         {
+            if (!activeWindowAttachments.Contains(this))
+                activeWindowAttachments.Add(this);
+
             if (!registerForVisibility)
                 return;
 
@@ -75,6 +84,8 @@ namespace DuoCurtain.RuntimeTileMesh
 
         void OnDisable()
         {
+            activeWindowAttachments.Remove(this);
+
             if (VisibilityWorld.Instance != null)
                 VisibilityWorld.Instance.UnregisterSource(this);
         }
@@ -130,17 +141,223 @@ namespace DuoCurtain.RuntimeTileMesh
             if (!registerForVisibility)
                 return;
 
+            EnsureWindowComponents();
             Vector2 safeTangent = tangent.sqrMagnitude > 0.0001f ? tangent.normalized : Vector2.up;
             float halfLength = Mathf.Max(0.01f, lengthInCells) * Mathf.Max(0.01f, gridSize) * 0.5f;
             VisibilitySegmentType type = windowPortal != null && windowPortal.IsOpen
                 ? VisibilitySegmentType.OpenWindow
                 : VisibilitySegmentType.ClosedWindow;
+
+            if (mergeAdjacentWindowsForVisibility &&
+                TryGetMergedVisibilitySpan(type, out Vector2 mergedStart, out Vector2 mergedEnd, out FusionWallAttachment representative))
+            {
+                if (representative != this)
+                {
+                    if (windowPortal != null)
+                        windowPortal.ClearRuntimePortalOverride();
+                    return;
+                }
+
+                Vector2 mergedCenter = (mergedStart + mergedEnd) * 0.5f;
+                float mergedLength = Vector2.Distance(mergedStart, mergedEnd);
+                if (windowPortal != null)
+                    windowPortal.SetRuntimePortalOverride(mergedCenter, safeTangent, outwardNormal, mergedLength);
+
+                results.Add(new VisibilitySegment(
+                    mergedStart,
+                    mergedEnd,
+                    type,
+                    gameObject,
+                    windowPortal != null ? windowPortal : this));
+                return;
+            }
+
+            if (windowPortal != null)
+                windowPortal.ClearRuntimePortalOverride();
+
             results.Add(new VisibilitySegment(
                 edgeCenter - safeTangent * halfLength,
                 edgeCenter + safeTangent * halfLength,
                 type,
                 gameObject,
-                this));
+                windowPortal != null ? windowPortal : this));
+        }
+
+        private bool TryGetMergedVisibilitySpan(
+            VisibilitySegmentType type,
+            out Vector2 mergedStart,
+            out Vector2 mergedEnd,
+            out FusionWallAttachment representative)
+        {
+            mergedStart = edgeCenter;
+            mergedEnd = edgeCenter;
+            representative = this;
+
+            mergeCandidates.Clear();
+            float safeGridSize = Mathf.Max(0.01f, gridSize);
+            float lineTolerance = safeGridSize * 0.05f;
+            float gapTolerance = safeGridSize * Mathf.Max(0f, mergeGapToleranceInCells);
+            float lineCoordinate = GetLineCoordinate();
+            bool isOpen = type == VisibilitySegmentType.OpenWindow;
+            float selfStart = GetIntervalStart();
+            float selfEnd = GetIntervalEnd();
+
+            for (int i = activeWindowAttachments.Count - 1; i >= 0; i--)
+            {
+                FusionWallAttachment attachment = activeWindowAttachments[i];
+                if (attachment == null)
+                {
+                    activeWindowAttachments.RemoveAt(i);
+                    continue;
+                }
+
+                if (!CanMergeWith(attachment, isOpen, lineCoordinate, lineTolerance))
+                    continue;
+
+                mergeCandidates.Add(new WindowMergeCandidate(
+                    attachment,
+                    attachment.GetIntervalStart(),
+                    attachment.GetIntervalEnd()));
+            }
+
+            if (mergeCandidates.Count <= 1)
+                return false;
+
+            float mergedMin = selfStart;
+            float mergedMax = selfEnd;
+            bool changed;
+            do
+            {
+                changed = false;
+                for (int i = 0; i < mergeCandidates.Count; i++)
+                {
+                    WindowMergeCandidate candidate = mergeCandidates[i];
+                    if (candidate.end < mergedMin - gapTolerance ||
+                        candidate.start > mergedMax + gapTolerance)
+                    {
+                        continue;
+                    }
+
+                    float previousMin = mergedMin;
+                    float previousMax = mergedMax;
+                    mergedMin = Mathf.Min(mergedMin, candidate.start);
+                    mergedMax = Mathf.Max(mergedMax, candidate.end);
+                    if (!Mathf.Approximately(previousMin, mergedMin) ||
+                        !Mathf.Approximately(previousMax, mergedMax))
+                    {
+                        changed = true;
+                    }
+                }
+            } while (changed);
+
+            int connectedCount = 0;
+            representative = this;
+            float representativeStart = selfStart;
+            int representativeId = GetInstanceID();
+            for (int i = 0; i < mergeCandidates.Count; i++)
+            {
+                WindowMergeCandidate candidate = mergeCandidates[i];
+                if (candidate.end < mergedMin - gapTolerance ||
+                    candidate.start > mergedMax + gapTolerance)
+                {
+                    continue;
+                }
+
+                connectedCount++;
+                int candidateId = candidate.attachment.GetInstanceID();
+                if (candidate.start < representativeStart - 0.0001f ||
+                    (Mathf.Abs(candidate.start - representativeStart) <= 0.0001f && candidateId < representativeId))
+                {
+                    representative = candidate.attachment;
+                    representativeStart = candidate.start;
+                    representativeId = candidateId;
+                }
+            }
+
+            if (connectedCount <= 1)
+                return false;
+
+            Vector2 safeTangent = tangent.sqrMagnitude > 0.0001f ? tangent.normalized : Vector2.up;
+            float centerAlong = (mergedMin + mergedMax) * 0.5f;
+            Vector2 center = axis == RuntimeTileMeshFusionDoor.DoorAxis.Vertical
+                ? new Vector2(lineCoordinate, centerAlong)
+                : new Vector2(centerAlong, lineCoordinate);
+            float halfLength = Mathf.Max(0.01f, mergedMax - mergedMin) * 0.5f;
+            mergedStart = center - safeTangent * halfLength;
+            mergedEnd = center + safeTangent * halfLength;
+            return true;
+        }
+
+        private bool CanMergeWith(
+            FusionWallAttachment attachment,
+            bool isOpen,
+            float lineCoordinate,
+            float lineTolerance)
+        {
+            if (attachment == null ||
+                attachment.attachmentType != AttachmentType.Window ||
+                !attachment.isActiveAndEnabled ||
+                !attachment.registerForVisibility ||
+                attachment.axis != axis ||
+                attachment.mergeAdjacentWindowsForVisibility != mergeAdjacentWindowsForVisibility)
+            {
+                return false;
+            }
+
+            attachment.EnsureWindowComponents();
+            bool attachmentOpen = attachment.windowPortal != null && attachment.windowPortal.IsOpen;
+            if (attachmentOpen != isOpen)
+                return false;
+
+            if (Mathf.Abs(attachment.GetLineCoordinate() - lineCoordinate) > lineTolerance)
+                return false;
+
+            Vector2 safeNormal = outwardNormal.sqrMagnitude > 0.0001f ? outwardNormal.normalized : Vector2.right;
+            Vector2 otherNormal = attachment.outwardNormal.sqrMagnitude > 0.0001f
+                ? attachment.outwardNormal.normalized
+                : Vector2.right;
+            if (Vector2.Dot(safeNormal, otherNormal) < 0.95f)
+                return false;
+
+            Vector2 safeTangent = tangent.sqrMagnitude > 0.0001f ? tangent.normalized : Vector2.up;
+            Vector2 otherTangent = attachment.tangent.sqrMagnitude > 0.0001f
+                ? attachment.tangent.normalized
+                : Vector2.up;
+            return Mathf.Abs(Vector2.Dot(safeTangent, otherTangent)) >= 0.95f;
+        }
+
+        private float GetLineCoordinate()
+        {
+            return axis == RuntimeTileMeshFusionDoor.DoorAxis.Vertical ? edgeCenter.x : edgeCenter.y;
+        }
+
+        private float GetAlongCoordinate()
+        {
+            return axis == RuntimeTileMeshFusionDoor.DoorAxis.Vertical ? edgeCenter.y : edgeCenter.x;
+        }
+
+        private float GetIntervalStart()
+        {
+            return GetAlongCoordinate() - Mathf.Max(0.01f, lengthInCells) * Mathf.Max(0.01f, gridSize) * 0.5f;
+        }
+
+        private float GetIntervalEnd()
+        {
+            return GetAlongCoordinate() + Mathf.Max(0.01f, lengthInCells) * Mathf.Max(0.01f, gridSize) * 0.5f;
+        }
+
+        private readonly struct WindowMergeCandidate
+        {
+            public readonly FusionWallAttachment attachment;
+            public readonly float start;
+            public readonly float end;
+
+            public WindowMergeCandidate(FusionWallAttachment attachment, float start, float end)
+            {
+                this.attachment = attachment;
+                this.start = Mathf.Min(start, end);
+                this.end = Mathf.Max(start, end);
+            }
         }
 
         private void EnsureWindowComponents()
