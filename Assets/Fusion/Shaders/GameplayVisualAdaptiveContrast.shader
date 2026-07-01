@@ -18,6 +18,7 @@ Shader "Duo Curtain/Gameplay Visual Adaptive Contrast"
         _Priority ("Priority", Range(0,100)) = 60
         _AdaptiveBlend ("Adaptive Blend", Range(0,1)) = 1
         _DebugMode ("Debug Mode", Range(0,4)) = 0
+        [HideInInspector] _UseVertexColor ("Use Vertex Color", Float) = 0
         [HideInInspector] _StencilComp ("Stencil Comparison", Float) = 8
         [HideInInspector] _Stencil ("Stencil ID", Float) = 0
         [HideInInspector] _StencilOp ("Stencil Operation", Float) = 0
@@ -104,6 +105,7 @@ Shader "Duo Curtain/Gameplay Visual Adaptive Contrast"
                 float _Priority;
                 float _AdaptiveBlend;
                 float _DebugMode;
+                float _UseVertexColor;
             CBUFFER_END
 
             float _GameplayVisualGlobalDebugMode;
@@ -128,7 +130,8 @@ Shader "Duo Curtain/Gameplay Visual Adaptive Contrast"
                 float3 background = SampleSceneColor(screenUV);
 
                 half4 textureColor = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv);
-                half4 source = textureColor * input.color * _Color;
+                half4 vertexTint = lerp(half4(1.0, 1.0, 1.0, 1.0), input.color, saturate(_UseVertexColor));
+                half4 source = textureColor * vertexTint * _Color;
 
                 float2 sceneTexel = 1.0 / max(_ScaledScreenParams.xy, float2(1.0, 1.0));
                 float luminanceCenter = DuoCurtainLuminance(background);

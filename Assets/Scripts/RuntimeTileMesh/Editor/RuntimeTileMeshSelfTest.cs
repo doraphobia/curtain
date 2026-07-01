@@ -39,6 +39,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             failures += ExpectVisionConeAndProceduralRenderer();
             failures += ExpectGameplayVisualAccessibilityShader();
             failures += ExpectGameplayVisualRendererPreservesSpriteInputs();
+            failures += ExpectGameplayVisualRendererVertexColorModes();
             failures += ExpectCombatInteractionFlow();
             failures += ExpectCombatDebugOverlaySnapshot();
 
@@ -1379,6 +1380,83 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                 UnityEngine.Object.DestroyImmediate(root);
                 UnityEngine.Object.DestroyImmediate(sprite);
                 UnityEngine.Object.DestroyImmediate(texture);
+            }
+        }
+
+        private static int ExpectGameplayVisualRendererVertexColorModes()
+        {
+            Shader shader = GameplayVisualSystem.FindAdaptiveShader();
+            if (shader == null)
+            {
+                Debug.LogError("[RuntimeTileMeshSelfTest] Gameplay visual adaptive shader could not be found.");
+                return 1;
+            }
+
+            int useVertexColorId = Shader.PropertyToID("_UseVertexColor");
+            GameObject root = new GameObject("Gameplay Visual Mesh Vertex Color Test");
+            Mesh mesh = new Mesh
+            {
+                name = "Gameplay Visual Mesh Vertex Color Test Mesh"
+            };
+            Material originalMaterial = null;
+            try
+            {
+                mesh.vertices = new[]
+                {
+                    new Vector3(-0.5f, -0.5f, 0f),
+                    new Vector3(-0.5f, 0.5f, 0f),
+                    new Vector3(0.5f, 0.5f, 0f),
+                    new Vector3(0.5f, -0.5f, 0f)
+                };
+                mesh.triangles = new[] { 0, 1, 2, 0, 2, 3 };
+                mesh.uv = new[]
+                {
+                    new Vector2(0f, 0f),
+                    new Vector2(0f, 1f),
+                    new Vector2(1f, 1f),
+                    new Vector2(1f, 0f)
+                };
+                mesh.RecalculateBounds();
+
+                MeshFilter filter = root.AddComponent<MeshFilter>();
+                filter.sharedMesh = mesh;
+                MeshRenderer renderer = root.AddComponent<MeshRenderer>();
+                Shader originalShader = Shader.Find("Sprites/Default");
+                if (originalShader == null)
+                    originalShader = shader;
+                originalMaterial = new Material(originalShader);
+                renderer.sharedMaterial = originalMaterial;
+
+                GameplayVisualRenderer visual = GameplayVisualRenderer.Ensure(
+                    renderer,
+                    GameplayVisualPriority.Interaction);
+                Material adapted = renderer.sharedMaterial;
+                if (adapted == null ||
+                    adapted.shader != shader ||
+                    !adapted.HasProperty(useVertexColorId) ||
+                    adapted.GetFloat(useVertexColorId) != 0f)
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] MeshRenderer without vertex colors must not use vertex color tint.");
+                    return 1;
+                }
+
+                visual.vertexColorMode = GameplayVisualRenderer.VertexColorMode.ForceOn;
+                visual.Refresh();
+                adapted = renderer.sharedMaterial;
+                if (adapted == null || adapted.GetFloat(useVertexColorId) != 1f)
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] Forced vertex color mode did not reach the adaptive material.");
+                    return 1;
+                }
+
+                return 0;
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+                if (originalMaterial != null)
+                    UnityEngine.Object.DestroyImmediate(originalMaterial);
+                UnityEngine.Object.DestroyImmediate(mesh);
             }
         }
 

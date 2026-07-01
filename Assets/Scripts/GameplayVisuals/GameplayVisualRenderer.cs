@@ -7,10 +7,18 @@ namespace DuoCurtain.GameplayVisuals
     [DisallowMultipleComponent]
     public sealed class GameplayVisualRenderer : MonoBehaviour
     {
+        public enum VertexColorMode
+        {
+            Auto,
+            ForceOff,
+            ForceOn
+        }
+
         private static readonly int MainTexId = Shader.PropertyToID("_MainTex");
         private static readonly int BaseMapId = Shader.PropertyToID("_BaseMap");
         private static readonly int ColorId = Shader.PropertyToID("_Color");
         private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+        private static readonly int UseVertexColorId = Shader.PropertyToID("_UseVertexColor");
         private static readonly int PrimaryColorId = Shader.PropertyToID("_PrimaryColor");
         private static readonly int SecondaryColorId = Shader.PropertyToID("_SecondaryColor");
         private static readonly int ContrastStrengthId = Shader.PropertyToID("_ContrastStrength");
@@ -41,6 +49,7 @@ namespace DuoCurtain.GameplayVisuals
         [Range(0f, 1f)] public float adaptiveBlend = 1f;
         [Min(0f)] public float adaptiveBlendSpeed = 8f;
         public GameplayVisualPriority priority = GameplayVisualPriority.Interaction;
+        public VertexColorMode vertexColorMode = VertexColorMode.Auto;
 
         [Header("Edges")]
         [Range(0f, 2f)] public float edgeContrast = 0.35f;
@@ -399,7 +408,7 @@ namespace DuoCurtain.GameplayVisuals
             return true;
         }
 
-        private static void SyncRendererMaterialInputs(
+        private void SyncRendererMaterialInputs(
             Renderer target,
             Material[] source,
             Material[] adaptive)
@@ -409,12 +418,11 @@ namespace DuoCurtain.GameplayVisuals
 
             Texture spriteTexture = null;
             Color rendererColor = Color.white;
-            bool useRendererVertexColor = false;
+            bool useRendererVertexColor = ResolveRendererVertexColorUsage(target);
             if (target is SpriteRenderer spriteRenderer)
             {
                 spriteTexture = spriteRenderer.sprite != null ? spriteRenderer.sprite.texture : null;
                 rendererColor = spriteRenderer.color;
-                useRendererVertexColor = true;
             }
 
             for (int i = 0; i < adaptive.Length; i++)
@@ -433,6 +441,7 @@ namespace DuoCurtain.GameplayVisuals
                     CopyColor(original, material, ColorId, BaseColorId, rendererColor);
                 else
                     SetColorIfPresent(material, ColorId, Color.white);
+                SetFloatIfPresent(material, UseVertexColorId, useRendererVertexColor ? 1f : 0f);
             }
         }
 
@@ -449,6 +458,28 @@ namespace DuoCurtain.GameplayVisuals
 
             SetColorIfPresent(adaptive, ColorId, Color.white);
             SetColorIfPresent(adaptive, BaseColorId, Color.white);
+            SetFloatIfPresent(adaptive, UseVertexColorId, 1f);
+        }
+
+        private bool ResolveRendererVertexColorUsage(Renderer target)
+        {
+            if (vertexColorMode == VertexColorMode.ForceOn)
+                return true;
+            if (vertexColorMode == VertexColorMode.ForceOff)
+                return false;
+            if (target is SpriteRenderer)
+                return true;
+
+            MeshFilter meshFilter = target != null ? target.GetComponent<MeshFilter>() : null;
+            Mesh mesh = meshFilter != null ? meshFilter.sharedMesh : null;
+            if (mesh == null || mesh.vertexCount <= 0)
+                return false;
+
+            Color[] colors = mesh.colors;
+            if (colors != null && colors.Length == mesh.vertexCount)
+                return true;
+            Color32[] colors32 = mesh.colors32;
+            return colors32 != null && colors32.Length == mesh.vertexCount;
         }
 
         private static void CopyCommonMaterialInputs(Material source, Material destination)
@@ -509,6 +540,12 @@ namespace DuoCurtain.GameplayVisuals
         {
             if (material != null && material.HasProperty(id))
                 material.SetColor(id, color);
+        }
+
+        private static void SetFloatIfPresent(Material material, int id, float value)
+        {
+            if (material != null && material.HasProperty(id))
+                material.SetFloat(id, value);
         }
 
         private static void CopyFloat(Material source, Material destination, int id)

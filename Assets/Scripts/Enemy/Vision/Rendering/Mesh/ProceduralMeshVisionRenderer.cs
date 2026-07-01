@@ -141,6 +141,7 @@ namespace DuoCurtain.Vision
                     adaptiveVisualRenderer.adaptiveBlend = 0.88f;
                     adaptiveVisualRenderer.contrastStrength = 0.92f;
                     adaptiveVisualRenderer.edgeContrast = 0.45f;
+                    adaptiveVisualRenderer.vertexColorMode = GameplayVisualRenderer.VertexColorMode.ForceOn;
                 }
             }
             adaptiveVisualRenderer?.Refresh();
