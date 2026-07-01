@@ -1,6 +1,7 @@
 #if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
+using DuoCurtain.GameplayVisuals;
 using DuoCurtain.Vision;
 using UnityEditor;
 using UnityEngine;
@@ -35,6 +36,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             failures += ExpectFusionIntegrityTileAccounting();
             failures += ExpectFusionIntegrityUsesLatestBuild();
             failures += ExpectVisionConeAndProceduralRenderer();
+            failures += ExpectGameplayVisualAccessibilityShader();
 
             if (failures == 0)
             {
@@ -1147,6 +1149,47 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                     return 1;
                 }
 
+                FixedVisibilityOpeningSource openingSource = new FixedVisibilityOpeningSource();
+                openingSource.openings.Add(new VisibilityOpening(
+                    OpeningGeometry.Segment(
+                        new Vector2(1f, -0.5f),
+                        new Vector2(1f, 0.5f),
+                        Vector2.right),
+                    true,
+                    OpeningProjectionRule.ContinueIncomingRay,
+                    visibilityWorldObject,
+                    null));
+                source.segments.Add(new VisibilitySegment(
+                    new Vector2(3f, -1f),
+                    new Vector2(3f, 1f),
+                    VisibilitySegmentType.Wall,
+                    visibilityWorldObject,
+                    null));
+                visibilityWorld.RegisterOpeningSource(openingSource);
+                sampler.Sample(
+                    snapshot,
+                    Vector2.zero,
+                    Vector2.right,
+                    90f,
+                    5f,
+                    32,
+                    96,
+                    2,
+                    0.35f,
+                    0,
+                    false,
+                    null,
+                    visibilityWorld,
+                    false);
+
+                if (!snapshot.ContainsWorldPoint(new Vector2(2f, 0f)) ||
+                    snapshot.ContainsWorldPoint(new Vector2(4f, 0f)))
+                {
+                    Debug.LogError(
+                        "[RuntimeTileMeshSelfTest] Generic openings should continue the incoming ray without creating a secondary cone, then stop at the next occluder.");
+                    return 1;
+                }
+
                 rendererObject = new GameObject("Vision Renderer Self Test");
                 ProceduralMeshVisionRenderer visionRenderer =
                     rendererObject.AddComponent<ProceduralMeshVisionRenderer>();
@@ -1192,6 +1235,62 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
 
                 results.AddRange(segments);
             }
+        }
+
+        private sealed class FixedVisibilityOpeningSource : IVisibilityOpeningSource
+        {
+            public readonly List<VisibilityOpening> openings = new List<VisibilityOpening>();
+
+            public void CollectVisibilityOpenings(List<VisibilityOpening> results)
+            {
+                if (results == null)
+                    return;
+                results.AddRange(openings);
+            }
+        }
+
+        private static int ExpectGameplayVisualAccessibilityShader()
+        {
+            Shader shader = GameplayVisualSystem.FindAdaptiveShader();
+            if (shader == null)
+            {
+                Debug.LogError("[RuntimeTileMeshSelfTest] Adaptive gameplay visual shader could not be found.");
+                return 1;
+            }
+
+            Material material = new Material(shader);
+            try
+            {
+                string[] requiredProperties =
+                {
+                    "_PrimaryColor",
+                    "_SecondaryColor",
+                    "_ContrastStrength",
+                    "_ContrastCurve",
+                    "_BrightnessBias",
+                    "_EdgeContrast",
+                    "_OutlineStrength",
+                    "_Priority",
+                    "_AdaptiveBlend",
+                    "_DebugMode"
+                };
+                for (int i = 0; i < requiredProperties.Length; i++)
+                {
+                    if (material.HasProperty(requiredProperties[i]))
+                        continue;
+
+                    Debug.LogError(
+                        "[RuntimeTileMeshSelfTest] Adaptive gameplay visual shader is missing property " +
+                        requiredProperties[i] + ".");
+                    return 1;
+                }
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(material);
+            }
+
+            return 0;
         }
 
         private static RuntimeTileMeshDraggableBlock CreateSelfTestBlock(

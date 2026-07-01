@@ -3,8 +3,7 @@ using DuoCurtain.Vision;
 using UnityEngine;
 
 /// <summary>
-/// Vision portal for enemies. Integrates with existing <see cref="HoverScrollColorLerp2D"/> curtains when assigned.
-/// Windows are visibility-only; enemies do not path through them.
+/// Legacy window aperture data. Enemy vision reads generic openings from VisibilityWorld instead of querying windows.
 /// </summary>
 [DisallowMultipleComponent]
 public class WindowPortal : MonoBehaviour, IVisionPortal
@@ -31,8 +30,6 @@ public class WindowPortal : MonoBehaviour, IVisionPortal
     public float portalExitOffset = 0.05f;
     [Min(0.01f)]
     public float portalContinuationDistance = 4f;
-    [Range(1f, 179f)]
-    public float portalSpreadAngle = 45f;
 
     private bool hasRuntimePortalOverride;
     private Vector2 runtimePortalCenter;
@@ -74,7 +71,6 @@ public class WindowPortal : MonoBehaviour, IVisionPortal
         portalLength = Mathf.Max(0.01f, portalLength);
         portalExitOffset = Mathf.Max(0.001f, portalExitOffset);
         portalContinuationDistance = Mathf.Max(0.01f, portalContinuationDistance);
-        portalSpreadAngle = Mathf.Clamp(portalSpreadAngle, 1f, 179f);
     }
 
     public void ConfigurePortal(Vector2 center, Vector2 tangent, Vector2 normal, float length)

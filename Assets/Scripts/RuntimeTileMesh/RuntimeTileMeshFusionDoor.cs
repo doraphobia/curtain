@@ -1,11 +1,12 @@
 using System.Collections.Generic;
+using DuoCurtain.GameplayVisuals;
 using DuoCurtain.Vision;
 using UnityEngine;
 
 namespace DuoCurtain.RuntimeTileMesh
 {
     [DisallowMultipleComponent]
-    public class RuntimeTileMeshFusionDoor : MonoBehaviour, IVisibilitySegmentSource
+    public class RuntimeTileMeshFusionDoor : MonoBehaviour, IVisibilitySegmentSource, IVisibilityOpeningSource
     {
         private const string DoorPanelName = "Door Panel";
         private const string WallVisualName = "Wall Visual";
@@ -98,6 +99,7 @@ namespace DuoCurtain.RuntimeTileMesh
         private Material runtimeMaterial;
         private Material wallRuntimeMaterial;
         private MaterialPropertyBlock propertyBlock;
+        private GameplayVisualRenderer adaptiveVisualRenderer;
         private Mesh runtimeMesh;
         private Transform wallVisualRoot;
         private float lastToggleTime = -999f;
@@ -142,14 +144,19 @@ namespace DuoCurtain.RuntimeTileMesh
             if (!registerForVisibility)
                 return;
 
-            VisibilityWorld.GetOrCreate().RegisterSource(this);
+            VisibilityWorld world = VisibilityWorld.GetOrCreate();
+            world.RegisterSource(this);
+            world.RegisterOpeningSource(this);
             MarkVisibilityDirty();
         }
 
         void OnDisable()
         {
             if (VisibilityWorld.Instance != null)
+            {
                 VisibilityWorld.Instance.UnregisterSource(this);
+                VisibilityWorld.Instance.UnregisterOpeningSource(this);
+            }
         }
 
         void OnValidate()
@@ -564,6 +571,43 @@ namespace DuoCurtain.RuntimeTileMesh
             }
         }
 
+        public void CollectVisibilityOpenings(List<VisibilityOpening> results)
+        {
+            if (results == null || wallCellLength <= 0)
+                return;
+            if (!registerForVisibility || !IsDoorwayPassable())
+                return;
+
+            int variable = wallVariableStart + doorVariableOffset;
+            if (supportedWallVariables.Count > 0 && !supportedWallVariables.Contains(variable))
+                return;
+
+            float safeGridSize = Mathf.Max(0.0001f, Mathf.Abs(gridSize));
+            float runStart = GetWallRunStartWorld();
+            Vector2 start;
+            Vector2 end;
+            Vector2 normal;
+            if (axis == DoorAxis.Vertical)
+            {
+                start = new Vector2(seamCenter.x, runStart + doorVariableOffset * safeGridSize);
+                end = new Vector2(seamCenter.x, runStart + (doorVariableOffset + 1) * safeGridSize);
+                normal = Vector2.right;
+            }
+            else
+            {
+                start = new Vector2(runStart + doorVariableOffset * safeGridSize, seamCenter.y);
+                end = new Vector2(runStart + (doorVariableOffset + 1) * safeGridSize, seamCenter.y);
+                normal = Vector2.up;
+            }
+
+            results.Add(new VisibilityOpening(
+                OpeningGeometry.Segment(start, end, normal),
+                true,
+                OpeningProjectionRule.ContinueIncomingRay,
+                gameObject,
+                this));
+        }
+
         private static void MarkVisibilityDirty()
         {
             VisibilityWorld.MarkActiveWorldDirty();
@@ -974,6 +1018,23 @@ namespace DuoCurtain.RuntimeTileMesh
 
             meshRenderer.sharedMaterial = GetDoorMaterial();
             meshRenderer.sortingOrder = 30;
+            if (adaptiveVisualRenderer == null)
+            {
+                adaptiveVisualRenderer = GameplayVisualRenderer.Ensure(
+                    meshRenderer,
+                    GameplayVisualPriority.Interaction);
+                if (adaptiveVisualRenderer != null)
+                {
+                    adaptiveVisualRenderer.collectTargetsAutomatically = false;
+                    adaptiveVisualRenderer.renderers = new Renderer[] { meshRenderer };
+                    adaptiveVisualRenderer.contrastStrength = 1.25f;
+                    adaptiveVisualRenderer.edgeContrast = 0.65f;
+                    adaptiveVisualRenderer.enableOutline = true;
+                    adaptiveVisualRenderer.outlineWidth = 1f;
+                    adaptiveVisualRenderer.outlineStrength = 0.55f;
+                }
+            }
+            adaptiveVisualRenderer?.Refresh();
             boxCollider.isTrigger = false;
             boxCollider.size = Vector2.one;
             boxCollider.offset = Vector2.zero;
@@ -1037,7 +1098,9 @@ namespace DuoCurtain.RuntimeTileMesh
             if (runtimeMaterial != null)
                 return runtimeMaterial;
 
-            Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
+            Shader shader = GameplayVisualSystem.FindAdaptiveShader();
+            if (shader == null)
+                shader = Shader.Find("Universal Render Pipeline/Unlit");
             if (shader == null)
                 shader = Shader.Find("Sprites/Default");
             if (shader == null)

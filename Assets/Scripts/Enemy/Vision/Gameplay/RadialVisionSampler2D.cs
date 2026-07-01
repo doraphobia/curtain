@@ -11,8 +11,7 @@ namespace DuoCurtain.Vision
         private readonly List<VisionRaySample> coarseSamples = new List<VisionRaySample>(128);
         private readonly List<float> candidateAngles = new List<float>(256);
         private readonly List<VisibilitySegment> relevantSegments = new List<VisibilitySegment>(256);
-        private readonly List<VisibilitySegment> portalRelevantSegments = new List<VisibilitySegment>(256);
-        private readonly List<int> portalSourceIds = new List<int>(16);
+        private readonly List<VisibilityOpening> relevantOpenings = new List<VisibilityOpening>(64);
         private readonly RaycastHit2D[] hitBuffer = new RaycastHit2D[32];
         private ContactFilter2D contactFilter;
 
@@ -30,13 +29,10 @@ namespace DuoCurtain.Vision
             bool hitTriggers,
             Transform ignoredRoot,
             VisibilityWorld visibilityWorld,
-            bool fallbackToPhysicsWhenNoSegments,
-            bool allowWindowPortals = true,
-            float portalExitOffset = 0.05f,
-            float portalContinuationDistance = 4f,
-            float portalSpreadAngle = 45f,
-            int maxPortalDepth = 1)
+            bool fallbackToPhysicsWhenNoSegments)
         {
+            relevantSegments.Clear();
+            relevantOpenings.Clear();
             if (visibilityWorld != null)
             {
                 visibilityWorld.RebuildIfDirty();
@@ -48,8 +44,16 @@ namespace DuoCurtain.Vision
                     viewDistance,
                     ignoredRoot,
                     relevantSegments);
+                CollectRelevantOpenings(
+                    visibilityWorld.Openings,
+                    origin,
+                    forward,
+                    viewAngleDegrees,
+                    viewDistance,
+                    ignoredRoot,
+                    relevantOpenings);
 
-                if (relevantSegments.Count > 0)
+                if (relevantSegments.Count > 0 || relevantOpenings.Count > 0)
                 {
                     SampleSegments(
                         snapshot,
@@ -59,18 +63,8 @@ namespace DuoCurtain.Vision
                         viewDistance,
                         rayCount,
                         maxRayCount,
-                        relevantSegments);
-                    BuildPortalContinuations(
-                        snapshot,
-                        visibilityWorld.Segments,
-                        ignoredRoot,
-                        rayCount,
-                        maxRayCount,
-                        allowWindowPortals,
-                        portalExitOffset,
-                        portalContinuationDistance,
-                        portalSpreadAngle,
-                        maxPortalDepth);
+                        relevantSegments,
+                        relevantOpenings);
                     return;
                 }
             }
@@ -101,7 +95,8 @@ namespace DuoCurtain.Vision
                 viewDistance,
                 rayCount,
                 maxRayCount,
-                relevantSegments);
+                relevantSegments,
+                relevantOpenings);
         }
 
         public void Sample(
@@ -175,7 +170,8 @@ namespace DuoCurtain.Vision
             float viewDistance,
             int rayCount,
             int maxRayCount,
-            List<VisibilitySegment> segments)
+            List<VisibilitySegment> segments,
+            List<VisibilityOpening> openings)
         {
             if (snapshot == null)
                 return;
@@ -185,7 +181,7 @@ namespace DuoCurtain.Vision
             float distance = Mathf.Max(0.0001f, viewDistance);
             Vector2 safeForward = forward.sqrMagnitude > 0.000001f ? forward.normalized : Vector2.up;
             float centerAngle = Mathf.Atan2(safeForward.y, safeForward.x) * Mathf.Rad2Deg;
-            BuildCandidateAngles(origin, centerAngle, angle, coarseRayCount, segments);
+            BuildCandidateAngles(origin, centerAngle, angle, coarseRayCount, segments, openings);
             int maximumSamples = Mathf.Max(Mathf.Max(coarseRayCount, maxRayCount), candidateAngles.Count);
 
             snapshot.Begin(origin, safeForward, angle, distance, Time.time, Time.frameCount);
@@ -194,7 +190,7 @@ namespace DuoCurtain.Vision
                 float sampleAngle = candidateAngles[i];
                 float normalizedAngle = GetNormalizedAngleInCone(sampleAngle, centerAngle, angle);
                 snapshot.AddSample(
-                    CastSegmentRay(origin, sampleAngle, normalizedAngle, distance, segments),
+                    CastSegmentRay(origin, sampleAngle, normalizedAngle, distance, segments, openings),
                     maximumSamples);
             }
 
@@ -206,7 +202,8 @@ namespace DuoCurtain.Vision
             float centerAngle,
             float angle,
             int coarseRayCount,
-            List<VisibilitySegment> segments)
+            List<VisibilitySegment> segments,
+            List<VisibilityOpening> openings)
         {
             candidateAngles.Clear();
             float startAngle = centerAngle - angle * 0.5f;
@@ -232,6 +229,19 @@ namespace DuoCurtain.Vision
                 VisibilitySegment segment = segments[i];
                 AddEndpointAngles(origin, segment.a, centerAngle, angle, endpointEpsilonDegrees);
                 AddEndpointAngles(origin, segment.b, centerAngle, angle, endpointEpsilonDegrees);
+            }
+
+            if (openings != null)
+            {
+                for (int i = 0; i < openings.Count; i++)
+                {
+                    VisibilityOpening opening = openings[i];
+                    if (!opening.allowsVision || opening.geometry.type != OpeningGeometryType.Segment)
+                        continue;
+
+                    AddEndpointAngles(origin, opening.geometry.segmentA, centerAngle, angle, endpointEpsilonDegrees);
+                    AddEndpointAngles(origin, opening.geometry.segmentB, centerAngle, angle, endpointEpsilonDegrees);
+                }
             }
 
             candidateAngles.Sort((left, right) =>
@@ -276,7 +286,8 @@ namespace DuoCurtain.Vision
             float angleDegrees,
             float normalizedAngle,
             float viewDistance,
-            List<VisibilitySegment> segments)
+            List<VisibilitySegment> segments,
+            List<VisibilityOpening> openings)
         {
             float radians = angleDegrees * Mathf.Deg2Rad;
             Vector2 direction = new Vector2(Mathf.Cos(radians), Mathf.Sin(radians));
@@ -284,44 +295,68 @@ namespace DuoCurtain.Vision
             float nearestDistance = viewDistance;
             VisibilitySegment nearestSegment = default;
             Vector2 nearestPoint = origin + direction * viewDistance;
+            float minimumDistance = 0f;
+            const int maxOpeningPasses = 8;
 
-            for (int i = 0; i < segments.Count; i++)
+            for (int pass = 0; pass < maxOpeningPasses; pass++)
             {
-                VisibilitySegment segment = segments[i];
-                if (!segment.BlocksVision)
-                    continue;
+                hasHit = false;
+                nearestDistance = viewDistance;
+                nearestSegment = default;
+                nearestPoint = origin + direction * viewDistance;
 
-                if (!TryRaySegmentIntersection(
+                for (int i = 0; i < segments.Count; i++)
+                {
+                    VisibilitySegment segment = segments[i];
+                    if (!segment.BlocksVision)
+                        continue;
+
+                    if (!TryRaySegmentIntersection(
+                            origin,
+                            direction,
+                            segment.a,
+                            segment.b,
+                            out float distanceAlongRay))
+                    {
+                        continue;
+                    }
+
+                    if (distanceAlongRay < minimumDistance || distanceAlongRay > viewDistance)
+                        continue;
+
+                    bool tiedWithCurrent = hasHit && Mathf.Abs(distanceAlongRay - nearestDistance) <= 0.0005f;
+                    if (hasHit && distanceAlongRay > nearestDistance && !tiedWithCurrent)
+                        continue;
+
+                    if (tiedWithCurrent)
+                    {
+                        if (!ShouldPreferSegment(segment, nearestSegment))
+                            continue;
+                    }
+                    else if (hasHit && distanceAlongRay >= nearestDistance)
+                    {
+                        continue;
+                    }
+
+                    nearestDistance = distanceAlongRay;
+                    nearestPoint = origin + direction * distanceAlongRay;
+                    nearestSegment = segment;
+                    hasHit = true;
+                }
+
+                if (!hasHit ||
+                    !CanRayContinueThroughOpening(
                         origin,
                         direction,
-                        segment.a,
-                        segment.b,
-                        out float distanceAlongRay))
+                        nearestDistance,
+                        nearestPoint,
+                        nearestSegment,
+                        openings))
                 {
-                    continue;
+                    break;
                 }
 
-                if (distanceAlongRay < 0f || distanceAlongRay > viewDistance)
-                    continue;
-
-                bool tiedWithCurrent = hasHit && Mathf.Abs(distanceAlongRay - nearestDistance) <= 0.0005f;
-                if (hasHit && distanceAlongRay > nearestDistance && !tiedWithCurrent)
-                    continue;
-
-                if (tiedWithCurrent)
-                {
-                    if (!ShouldPreferSegment(segment, nearestSegment))
-                        continue;
-                }
-                else if (hasHit && distanceAlongRay >= nearestDistance)
-                {
-                    continue;
-                }
-
-                nearestDistance = distanceAlongRay;
-                nearestPoint = origin + direction * distanceAlongRay;
-                nearestSegment = segment;
-                hasHit = true;
+                minimumDistance = nearestDistance + 0.001f;
             }
 
             Vector2 hitNormal = Vector2.zero;
@@ -398,154 +433,111 @@ namespace DuoCurtain.Vision
             }
         }
 
-        private void BuildPortalContinuations(
-            VisionSnapshot snapshot,
-            IReadOnlyList<VisibilitySegment> worldSegments,
-            Transform ignoredRoot,
-            int rayCount,
-            int maxRayCount,
-            bool allowWindowPortals,
-            float portalExitOffset,
-            float portalContinuationDistance,
-            float portalSpreadAngle,
-            int maxPortalDepth)
-        {
-            if (snapshot == null ||
-                worldSegments == null ||
-                maxPortalDepth <= 0 ||
-                !allowWindowPortals)
-            {
-                return;
-            }
-
-            portalSourceIds.Clear();
-            bool addedPortal = false;
-            for (int i = 0; i < snapshot.RaySamples.Count; i++)
-            {
-                VisionRaySample sample = snapshot.RaySamples[i];
-                if (!sample.hit || !VisibilityWorld.IsPortalType(sample.visibilitySegmentType))
-                    continue;
-                if (sample.visibilitySegmentType != VisibilitySegmentType.OpenWindow &&
-                    sample.visibilitySegmentType != VisibilitySegmentType.Portal)
-                    continue;
-                if (sample.visibilitySegmentSourceId != 0 &&
-                    portalSourceIds.Contains(sample.visibilitySegmentSourceId))
-                {
-                    continue;
-                }
-
-                IVisionPortal portal = ResolvePortal(sample);
-                if (portal == null || !portal.IsPortalOpen)
-                    continue;
-                if (!portal.CanPassVision(snapshot.origin, sample.direction))
-                    continue;
-
-                VisionPortalExit portalExit = portal.GetExit(snapshot.origin, sample.direction);
-                Vector2 exitForward = portalExit.forward.sqrMagnitude > 0.000001f
-                    ? portalExit.forward.normalized
-                    : sample.direction.normalized;
-                float effectiveExitOffset = Mathf.Max(0.001f, portalExitOffset);
-                Vector2 apertureA = portal.PortalA + exitForward * effectiveExitOffset;
-                Vector2 apertureB = portal.PortalB + exitForward * effectiveExitOffset;
-                Vector2 exitOrigin = (apertureA + apertureB) * 0.5f;
-                float distance = Mathf.Min(
-                    Mathf.Max(0.01f, portalExit.maxDistance),
-                    Mathf.Max(0.01f, portalContinuationDistance));
-                float angle = Mathf.Clamp(portalSpreadAngle, 1f, 179f);
-                OrderPortalApertureEndpoints(
-                    ref apertureA,
-                    ref apertureB,
-                    exitOrigin,
-                    exitForward,
-                    angle);
-
-                CollectRelevantBlockingSegments(
-                    worldSegments,
-                    exitOrigin,
-                    exitForward,
-                    angle,
-                    distance,
-                    ignoredRoot,
-                    portalRelevantSegments,
-                    sample.visibilitySegmentSourceId);
-
-                VisionSnapshot portalSnapshot = new VisionSnapshot();
-                SampleSegments(
-                    portalSnapshot,
-                    exitOrigin,
-                    exitForward,
-                    angle,
-                    distance,
-                    Mathf.Max(4, rayCount / 2),
-                    Mathf.Max(8, maxRayCount / 2),
-                    portalRelevantSegments);
-
-                if (portalSnapshot.IsValid)
-                {
-                    snapshot.AddPortalPolygon(
-                        portal,
-                        sample.point,
-                        exitOrigin,
-                        portalSnapshot.VisibilityPolygon,
-                        portalExit.targetRoomId,
-                        sample.visibilitySegmentType == VisibilitySegmentType.OpenWindow
-                            ? VisionDetectionSource.OpenWindowPortal
-                            : VisionDetectionSource.OpenDoorPortal,
-                        true,
-                        apertureA,
-                        apertureB);
-                    addedPortal = true;
-                }
-
-                if (sample.visibilitySegmentSourceId != 0)
-                    portalSourceIds.Add(sample.visibilitySegmentSourceId);
-            }
-
-            if (addedPortal)
-                snapshot.Complete();
-        }
-
-        private static IVisionPortal ResolvePortal(VisionRaySample sample)
-        {
-            if (sample.visibilitySourceComponent is IVisionPortal componentPortal)
-                return componentPortal;
-            if (sample.visibilitySourceObject == null)
-                return null;
-            return sample.visibilitySourceObject.GetComponent<IVisionPortal>();
-        }
-
-        private static void OrderPortalApertureEndpoints(
-            ref Vector2 apertureA,
-            ref Vector2 apertureB,
+        private void CollectRelevantOpenings(
+            IReadOnlyList<VisibilityOpening> worldOpenings,
             Vector2 origin,
             Vector2 forward,
-            float coneAngle)
+            float viewAngleDegrees,
+            float viewDistance,
+            Transform ignoredRoot,
+            List<VisibilityOpening> results)
         {
-            Vector2 safeForward = forward.sqrMagnitude > 0.000001f ? forward.normalized : Vector2.up;
-            float centerAngle = Mathf.Atan2(safeForward.y, safeForward.x) * Mathf.Rad2Deg;
-            float angleA = Mathf.Atan2(apertureA.y - origin.y, apertureA.x - origin.x) * Mathf.Rad2Deg;
-            float angleB = Mathf.Atan2(apertureB.y - origin.y, apertureB.x - origin.x) * Mathf.Rad2Deg;
-            float normalizedA = GetNormalizedAngleInCone(angleA, centerAngle, Mathf.Clamp(coneAngle, 1f, 179f));
-            float normalizedB = GetNormalizedAngleInCone(angleB, centerAngle, Mathf.Clamp(coneAngle, 1f, 179f));
-            if (normalizedA <= normalizedB)
+            results.Clear();
+            if (worldOpenings == null)
                 return;
 
-            Vector2 temp = apertureA;
-            apertureA = apertureB;
-            apertureB = temp;
+            Vector2 safeForward = forward.sqrMagnitude > 0.000001f ? forward.normalized : Vector2.up;
+            float centerAngle = Mathf.Atan2(safeForward.y, safeForward.x) * Mathf.Rad2Deg;
+            float angle = Mathf.Clamp(viewAngleDegrees, 0.01f, 360f);
+            float maxDistanceSqr = Mathf.Pow(Mathf.Max(0.0001f, viewDistance) + 0.05f, 2f);
+
+            for (int i = 0; i < worldOpenings.Count; i++)
+            {
+                VisibilityOpening opening = worldOpenings[i];
+                if (!opening.allowsVision ||
+                    opening.projectionRule != OpeningProjectionRule.ContinueIncomingRay ||
+                    opening.geometry.type != OpeningGeometryType.Segment)
+                {
+                    continue;
+                }
+
+                if (ignoredRoot != null &&
+                    opening.sourceObject != null &&
+                    opening.sourceObject.transform.IsChildOf(ignoredRoot))
+                {
+                    continue;
+                }
+
+                Vector2 a = opening.geometry.segmentA;
+                Vector2 b = opening.geometry.segmentB;
+                if (DistanceSqrPointSegment(origin, a, b) > maxDistanceSqr &&
+                    (a - origin).sqrMagnitude > maxDistanceSqr &&
+                    (b - origin).sqrMagnitude > maxDistanceSqr)
+                {
+                    continue;
+                }
+
+                if (!SegmentCouldIntersectCone(origin, centerAngle, angle, a, b))
+                    continue;
+
+                results.Add(opening);
+            }
+        }
+
+        private static bool CanRayContinueThroughOpening(
+            Vector2 origin,
+            Vector2 direction,
+            float wallDistance,
+            Vector2 wallHitPoint,
+            VisibilitySegment wallSegment,
+            List<VisibilityOpening> openings)
+        {
+            if (openings == null || openings.Count == 0)
+                return false;
+
+            const float distanceTolerance = 0.01f;
+            float wallLineLength = (wallSegment.b - wallSegment.a).magnitude;
+            float pointToleranceSqr = Mathf.Pow(Mathf.Max(0.015f, wallLineLength * 0.03f), 2f);
+
+            for (int i = 0; i < openings.Count; i++)
+            {
+                VisibilityOpening opening = openings[i];
+                if (!opening.allowsVision ||
+                    opening.projectionRule != OpeningProjectionRule.ContinueIncomingRay ||
+                    opening.geometry.type != OpeningGeometryType.Segment)
+                {
+                    continue;
+                }
+
+                if (!TryRaySegmentIntersection(
+                        origin,
+                        direction,
+                        opening.geometry.segmentA,
+                        opening.geometry.segmentB,
+                        out float openingDistance))
+                {
+                    continue;
+                }
+
+                if (Mathf.Abs(openingDistance - wallDistance) > distanceTolerance)
+                    continue;
+
+                Vector2 openingHitPoint = origin + direction * openingDistance;
+                if ((openingHitPoint - wallHitPoint).sqrMagnitude > pointToleranceSqr)
+                    continue;
+
+                return true;
+            }
+
+            return false;
         }
 
         private static bool ShouldPreferSegment(VisibilitySegment candidate, VisibilitySegment current)
         {
-            if (candidate.IsPortal != current.IsPortal)
-                return candidate.IsPortal;
-
             if (current.type == VisibilitySegmentType.Wall)
             {
-                return candidate.type == VisibilitySegmentType.OpenWindow ||
-                       candidate.type == VisibilitySegmentType.ClosedWindow ||
-                       candidate.type == VisibilitySegmentType.ClosedDoor ||
-                       candidate.type == VisibilitySegmentType.Portal;
+                return candidate.type == VisibilitySegmentType.ClosedWindow ||
+                       candidate.type == VisibilitySegmentType.ClosedDoor;
             }
 
             return false;
@@ -557,12 +549,22 @@ namespace DuoCurtain.Vision
             float coneAngle,
             VisibilitySegment segment)
         {
+            return SegmentCouldIntersectCone(origin, centerAngle, coneAngle, segment.a, segment.b);
+        }
+
+        private static bool SegmentCouldIntersectCone(
+            Vector2 origin,
+            float centerAngle,
+            float coneAngle,
+            Vector2 segmentA,
+            Vector2 segmentB)
+        {
             if (coneAngle >= 359.999f)
                 return true;
 
-            Vector2 midpoint = (segment.a + segment.b) * 0.5f;
-            return IsPointAngleInsideCone(origin, segment.a, centerAngle, coneAngle) ||
-                   IsPointAngleInsideCone(origin, segment.b, centerAngle, coneAngle) ||
+            Vector2 midpoint = (segmentA + segmentB) * 0.5f;
+            return IsPointAngleInsideCone(origin, segmentA, centerAngle, coneAngle) ||
+                   IsPointAngleInsideCone(origin, segmentB, centerAngle, coneAngle) ||
                    IsPointAngleInsideCone(origin, midpoint, centerAngle, coneAngle);
         }
 

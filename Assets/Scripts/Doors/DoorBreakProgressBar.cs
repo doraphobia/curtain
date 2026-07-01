@@ -1,3 +1,4 @@
+using DuoCurtain.GameplayVisuals;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -87,6 +88,26 @@ public class DoorBreakProgressBar : MonoBehaviour
         fillRect.anchorMax = Vector2.one;
         fillRect.offsetMin = new Vector2(2f, 2f);
         fillRect.offsetMax = new Vector2(-2f, -2f);
+
+        GameplayVisualRenderer backgroundVisual = GameplayVisualRenderer.Ensure(
+            backgroundImage,
+            GameplayVisualPriority.Progress);
+        if (backgroundVisual != null)
+        {
+            backgroundVisual.adaptiveBlend = 0.82f;
+            backgroundVisual.contrastStrength = 1.15f;
+            backgroundVisual.Refresh();
+        }
+
+        GameplayVisualRenderer fillVisual = GameplayVisualRenderer.Ensure(
+            fillImage,
+            GameplayVisualPriority.Progress);
+        if (fillVisual != null)
+        {
+            fillVisual.adaptiveBlend = 1f;
+            fillVisual.contrastStrength = 1.25f;
+            fillVisual.Refresh();
+        }
 
         SetVisible(false);
     }

@@ -3,6 +3,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.Serialization;
 using TMPro;
 using UnityEngine.UI;
+using DuoCurtain.GameplayVisuals;
 using DuoCurtain.RuntimeTileMesh;
 
 #if UNITY_EDITOR
@@ -167,8 +168,10 @@ public class PlayerControl : MonoBehaviour
     private RectTransform playerRectTransform;
     private Canvas playerCanvas;
     private Animator playerAnimator;
+    private GameplayVisualRenderer playerAdaptiveVisual;
     private RectTransform headingPointRectTransform;
     private Canvas headingPointCanvas;
+    private GameplayVisualRenderer headingPointAdaptiveVisual;
     private Texture2D runtimeCursorTexture;
     private Sprite runtimeCursorSprite;
     private Texture2D runtimeHeadingPointTexture;
@@ -433,6 +436,23 @@ public class PlayerControl : MonoBehaviour
             playerImage.raycastTarget = false;
             playerRectTransform = playerImage.rectTransform;
             playerCanvas = playerImage.GetComponentInParent<Canvas>();
+            if (playerAdaptiveVisual == null)
+            {
+                playerAdaptiveVisual = GameplayVisualRenderer.Ensure(
+                    playerImage,
+                    GameplayVisualPriority.Player);
+                if (playerAdaptiveVisual != null)
+                {
+                    playerAdaptiveVisual.collectTargetsAutomatically = false;
+                    playerAdaptiveVisual.graphics = new Graphic[] { playerImage };
+                    playerAdaptiveVisual.contrastStrength = 1.35f;
+                    playerAdaptiveVisual.edgeContrast = 0.75f;
+                    playerAdaptiveVisual.enableOutline = true;
+                    playerAdaptiveVisual.outlineWidth = 1.2f;
+                    playerAdaptiveVisual.outlineStrength = 0.72f;
+                    playerAdaptiveVisual.Refresh();
+                }
+            }
             ApplyCursorVisualSettings();
         }
 
@@ -869,6 +889,23 @@ public class PlayerControl : MonoBehaviour
         headingPointImage.enabled = true;
         headingPointRectTransform = headingPointImage.rectTransform;
         headingPointCanvas = headingPointImage.GetComponentInParent<Canvas>();
+        if (headingPointAdaptiveVisual == null)
+        {
+            headingPointAdaptiveVisual = GameplayVisualRenderer.Ensure(
+                headingPointImage,
+                GameplayVisualPriority.HeadingPoint);
+            if (headingPointAdaptiveVisual != null)
+            {
+                headingPointAdaptiveVisual.collectTargetsAutomatically = false;
+                headingPointAdaptiveVisual.graphics = new Graphic[] { headingPointImage };
+                headingPointAdaptiveVisual.contrastStrength = 1.25f;
+                headingPointAdaptiveVisual.edgeContrast = 0.7f;
+                headingPointAdaptiveVisual.enableOutline = true;
+                headingPointAdaptiveVisual.outlineWidth = 1.2f;
+                headingPointAdaptiveVisual.outlineStrength = 0.65f;
+                headingPointAdaptiveVisual.Refresh();
+            }
+        }
         ApplyHeadingPointVisualSettings();
     }
 

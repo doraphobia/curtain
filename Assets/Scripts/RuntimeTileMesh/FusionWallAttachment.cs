@@ -1,11 +1,12 @@
 using System.Collections.Generic;
+using DuoCurtain.GameplayVisuals;
 using DuoCurtain.Vision;
 using UnityEngine;
 
 namespace DuoCurtain.RuntimeTileMesh
 {
     [DisallowMultipleComponent]
-    public sealed class FusionWallAttachment : MonoBehaviour, IVisibilitySegmentSource
+    public sealed class FusionWallAttachment : MonoBehaviour, IVisibilitySegmentSource, IVisibilityOpeningSource
     {
         private const string DefaultSpriteName = "Fusion Runtime Window Sprite";
         private static readonly List<FusionWallAttachment> activeWindowAttachments =
@@ -61,6 +62,7 @@ namespace DuoCurtain.RuntimeTileMesh
         private BoxCollider2D windowCollider;
         private HoverScrollColorLerp2D hoverScroll;
         private WindowPortal windowPortal;
+        private GameplayVisualRenderer adaptiveVisualRenderer;
         private readonly List<WindowMergeCandidate> mergeCandidates = new List<WindowMergeCandidate>(16);
 
         public WindowPortal WindowPortal => windowPortal;
@@ -78,13 +80,13 @@ namespace DuoCurtain.RuntimeTileMesh
             if (!activeWindowAttachments.Contains(this))
                 activeWindowAttachments.Add(this);
 
-            if (!registerForVisibility)
+            VisibilityWorld world = VisibilityWorld.GetOrCreate();
+            if (registerForVisibility)
             {
-                RefreshAllWindowMergeVisuals();
-                return;
+                world.RegisterSource(this);
+                world.RegisterOpeningSource(this);
             }
 
-            VisibilityWorld.GetOrCreate().RegisterSource(this);
             MarkVisibilityDirty();
             RefreshAllWindowMergeVisuals();
         }
@@ -94,7 +96,10 @@ namespace DuoCurtain.RuntimeTileMesh
             activeWindowAttachments.Remove(this);
 
             if (VisibilityWorld.Instance != null)
+            {
                 VisibilityWorld.Instance.UnregisterSource(this);
+                VisibilityWorld.Instance.UnregisterOpeningSource(this);
+            }
 
             RefreshAllWindowMergeVisuals();
         }
@@ -159,6 +164,9 @@ namespace DuoCurtain.RuntimeTileMesh
                 ? VisibilitySegmentType.OpenWindow
                 : VisibilitySegmentType.ClosedWindow;
 
+            if (type == VisibilitySegmentType.OpenWindow)
+                return;
+
             if (mergeAdjacentWindowsForVisibility &&
                 TryGetMergedWindowSpan(
                     forVisualMerge: false,
@@ -203,6 +211,60 @@ namespace DuoCurtain.RuntimeTileMesh
                 edgeCenter - safeTangent * halfLength,
                 edgeCenter + safeTangent * halfLength,
                 type,
+                gameObject,
+                windowPortal != null ? windowPortal : this));
+        }
+
+        public void CollectVisibilityOpenings(List<VisibilityOpening> results)
+        {
+            if (results == null || !registerForVisibility)
+                return;
+
+            EnsureWindowComponents();
+            if (windowPortal == null || !windowPortal.IsOpen)
+                return;
+
+            Vector2 safeTangent = tangent.sqrMagnitude > 0.0001f ? tangent.normalized : Vector2.up;
+            Vector2 safeNormal = outwardNormal.sqrMagnitude > 0.0001f ? outwardNormal.normalized : Vector2.right;
+
+            if (mergeAdjacentWindowsForVisibility &&
+                TryGetMergedWindowSpan(
+                    forVisualMerge: false,
+                    matchOpenState: false,
+                    isOpen: true,
+                    out Vector2 mergedStart,
+                    out Vector2 mergedEnd,
+                    out FusionWallAttachment representative))
+            {
+                if (representative != this)
+                    return;
+
+                Vector2 mergedCenter = (mergedStart + mergedEnd) * 0.5f;
+                float mergedLength = Vector2.Distance(mergedStart, mergedEnd);
+                windowPortal.SetRuntimePortalOverride(mergedCenter, safeTangent, safeNormal, mergedLength);
+                AddOpening(results, mergedStart, mergedEnd, safeNormal);
+                return;
+            }
+
+            float halfLength = Mathf.Max(0.01f, lengthInCells) * Mathf.Max(0.01f, gridSize) * 0.5f;
+            windowPortal.ConfigurePortal(
+                edgeCenter,
+                safeTangent,
+                safeNormal,
+                halfLength * 2f);
+            AddOpening(
+                results,
+                edgeCenter - safeTangent * halfLength,
+                edgeCenter + safeTangent * halfLength,
+                safeNormal);
+        }
+
+        private void AddOpening(List<VisibilityOpening> results, Vector2 start, Vector2 end, Vector2 normal)
+        {
+            results.Add(new VisibilityOpening(
+                OpeningGeometry.Segment(start, end, normal),
+                true,
+                OpeningProjectionRule.ContinueIncomingRay,
                 gameObject,
                 windowPortal != null ? windowPortal : this));
         }
@@ -507,6 +569,22 @@ namespace DuoCurtain.RuntimeTileMesh
 
             if (spriteRenderer.sprite == null)
                 spriteRenderer.sprite = GetDefaultSprite();
+
+            if (adaptiveVisualRenderer == null)
+            {
+                adaptiveVisualRenderer = GameplayVisualRenderer.Ensure(
+                    spriteRenderer,
+                    GameplayVisualPriority.Interaction);
+                if (adaptiveVisualRenderer != null)
+                {
+                    adaptiveVisualRenderer.collectTargetsAutomatically = false;
+                    adaptiveVisualRenderer.renderers = new Renderer[] { spriteRenderer };
+                    adaptiveVisualRenderer.contrastStrength = 1.05f;
+                    adaptiveVisualRenderer.adaptiveBlend = 0.82f;
+                    adaptiveVisualRenderer.edgeContrast = 0.5f;
+                }
+            }
+            adaptiveVisualRenderer?.Refresh();
         }
 
         private void ApplyPlacement()

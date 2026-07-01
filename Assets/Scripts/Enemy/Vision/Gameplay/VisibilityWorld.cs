@@ -21,16 +21,23 @@ namespace DuoCurtain.Vision
 
         private readonly List<IVisibilitySegmentSource> sources =
             new List<IVisibilitySegmentSource>();
+        private readonly List<IVisibilityOpeningSource> openingSources =
+            new List<IVisibilityOpeningSource>();
         private readonly List<VisibilitySegment> segments =
             new List<VisibilitySegment>(256);
+        private readonly List<VisibilityOpening> openings =
+            new List<VisibilityOpening>(64);
         private readonly List<VisibilitySegment> sourceBuffer =
             new List<VisibilitySegment>(64);
+        private readonly List<VisibilityOpening> openingSourceBuffer =
+            new List<VisibilityOpening>(16);
         private bool dirty = true;
         private bool hasRefreshedSceneSources;
         private float lastSceneSourceRefreshTime = -999f;
 
         public static VisibilityWorld Instance => instance;
         public IReadOnlyList<VisibilitySegment> Segments => segments;
+        public IReadOnlyList<VisibilityOpening> Openings => openings;
         public bool IsDirty => dirty;
 
         void Awake()
@@ -88,12 +95,12 @@ namespace DuoCurtain.Vision
             switch (type)
             {
                 case VisibilitySegmentType.OpenDoor:
+                case VisibilitySegmentType.OpenWindow:
+                case VisibilitySegmentType.Portal:
                     return false;
                 case VisibilitySegmentType.Wall:
                 case VisibilitySegmentType.ClosedDoor:
                 case VisibilitySegmentType.ClosedWindow:
-                case VisibilitySegmentType.OpenWindow:
-                case VisibilitySegmentType.Portal:
                 case VisibilitySegmentType.Unknown:
                 default:
                     return true;
@@ -119,8 +126,7 @@ namespace DuoCurtain.Vision
 
         public static bool IsPortalType(VisibilitySegmentType type)
         {
-            return type == VisibilitySegmentType.OpenWindow ||
-                   type == VisibilitySegmentType.Portal;
+            return false;
         }
 
         public void RegisterSource(IVisibilitySegmentSource source)
@@ -141,6 +147,24 @@ namespace DuoCurtain.Vision
                 MarkDirty();
         }
 
+        public void RegisterOpeningSource(IVisibilityOpeningSource source)
+        {
+            if (source == null || openingSources.Contains(source))
+                return;
+
+            openingSources.Add(source);
+            MarkDirty();
+        }
+
+        public void UnregisterOpeningSource(IVisibilityOpeningSource source)
+        {
+            if (source == null)
+                return;
+
+            if (openingSources.Remove(source))
+                MarkDirty();
+        }
+
         public void MarkDirty()
         {
             dirty = true;
@@ -149,6 +173,7 @@ namespace DuoCurtain.Vision
         public void Clear()
         {
             segments.Clear();
+            openings.Clear();
             dirty = false;
         }
 
@@ -166,10 +191,12 @@ namespace DuoCurtain.Vision
                 RefreshSceneSources();
 
             segments.Clear();
+            openings.Clear();
             int wallCount = 0;
             int doorCount = 0;
             int windowCount = 0;
             int unknownCount = 0;
+            int openingCount = 0;
 
             for (int i = sources.Count - 1; i >= 0; i--)
             {
@@ -212,11 +239,42 @@ namespace DuoCurtain.Vision
                 }
             }
 
+            for (int i = openingSources.Count - 1; i >= 0; i--)
+            {
+                IVisibilityOpeningSource source = openingSources[i];
+                if (!IsUsableSource(source))
+                {
+                    openingSources.RemoveAt(i);
+                    continue;
+                }
+
+                openingSourceBuffer.Clear();
+                source.CollectVisibilityOpenings(openingSourceBuffer);
+                if (logSources)
+                    Debug.Log("[VisibilityWorld] Opening source " + GetSourceName(source) + " openings=" + openingSourceBuffer.Count);
+
+                for (int j = 0; j < openingSourceBuffer.Count; j++)
+                {
+                    VisibilityOpening opening = openingSourceBuffer[j];
+                    if (!opening.allowsVision)
+                        continue;
+                    if (opening.geometry.type == OpeningGeometryType.Segment &&
+                        (opening.geometry.segmentB - opening.geometry.segmentA).sqrMagnitude <= 0.0000001f)
+                    {
+                        continue;
+                    }
+
+                    openings.Add(opening);
+                    openingCount++;
+                }
+            }
+
             dirty = false;
             if (logRebuilds)
             {
                 Debug.Log(
                     "[VisibilityWorld] Rebuilt. Total segments=" + segments.Count +
+                    " openings=" + openingCount +
                     " walls=" + wallCount +
                     " doors=" + doorCount +
                     " windows=" + windowCount +
@@ -234,6 +292,8 @@ namespace DuoCurtain.Vision
             {
                 if (behaviours[i] is IVisibilitySegmentSource source && !sources.Contains(source))
                     sources.Add(source);
+                if (behaviours[i] is IVisibilityOpeningSource openingSource && !openingSources.Contains(openingSource))
+                    openingSources.Add(openingSource);
             }
         }
 
@@ -245,7 +305,7 @@ namespace DuoCurtain.Vision
             if (!autoFindSourcesOnlyWhenNeeded)
                 return true;
 
-            if (!hasRefreshedSceneSources || sources.Count == 0)
+            if (!hasRefreshedSceneSources || (sources.Count == 0 && openingSources.Count == 0))
                 return true;
 
             if (autoFindSourcesMinInterval <= 0f)
@@ -256,6 +316,16 @@ namespace DuoCurtain.Vision
         }
 
         private static bool IsUsableSource(IVisibilitySegmentSource source)
+        {
+            return IsUsableUnitySource(source);
+        }
+
+        private static bool IsUsableSource(IVisibilityOpeningSource source)
+        {
+            return IsUsableUnitySource(source);
+        }
+
+        private static bool IsUsableUnitySource(object source)
         {
             if (source == null)
                 return false;
@@ -281,7 +351,7 @@ namespace DuoCurtain.Vision
             return unityObject != null;
         }
 
-        private static string GetSourceName(IVisibilitySegmentSource source)
+        private static string GetSourceName(object source)
         {
             Object unityObject = source as Object;
             return unityObject != null ? unityObject.name : source.GetType().Name;

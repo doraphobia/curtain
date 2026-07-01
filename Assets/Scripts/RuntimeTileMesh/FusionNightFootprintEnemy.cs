@@ -33,12 +33,9 @@ namespace DuoCurtain.RuntimeTileMesh
         [Min(0.1f)]
         public float waypointRetargetInterval = 2f;
 
-        [Header("Window Detection")]
-        public bool requireOpenWindow = true;
+        [Header("Visibility Detection")]
         [Min(0.1f)]
         public float windowDetectionDistance = 12f;
-        [Min(0.1f)]
-        public float playerWindowDistance = 8f;
         [Min(0.01f)]
         public float windowCheckInterval = 0.2f;
         public bool targetFusionDoorAfterWindowDetection = true;
@@ -77,7 +74,6 @@ namespace DuoCurtain.RuntimeTileMesh
         [Header("Vision Debug")]
         public bool drawVisionConeInEditor = true;
         public bool drawLineOfSightInEditor = true;
-        public bool drawWindowSamplesInEditor = true;
 
         [Header("Runtime Vision Visual")]
         public bool showVisionInGame = true;
@@ -96,17 +92,6 @@ namespace DuoCurtain.RuntimeTileMesh
         public LayerMask runtimeVisionObstacleMask = ~0;
         public int runtimeVisionSortingOrder = 52;
         public float runtimeVisionZOffset = -0.2f;
-
-        [Header("Runtime Vision Portals")]
-        public bool allowWindowVisionPortals = true;
-        [Min(0.001f)]
-        public float visionPortalExitOffset = 0.05f;
-        [Min(0.01f)]
-        public float visionPortalContinuationDistance = 4f;
-        [Range(1f, 179f)]
-        public float visionPortalSpreadAngle = 45f;
-        [Min(0)]
-        public int visionMaxPortalDepth = 1;
 
         [Header("Vision Alert Feedback")]
         public bool useVisionAlertColorProgress = true;
@@ -136,7 +121,6 @@ namespace DuoCurtain.RuntimeTileMesh
         private bool confirmedPlayerByVision;
         private RuntimeTileMeshFusionDoor targetDoor;
         private Vector3 lastValidOutdoorPosition;
-        private WindowPortal lastUsedWindow;
         private Vector3 lastKnownPlayerPosition;
         private Material runtimeVisionMaterial;
         private Transform visionVisualRoot;
@@ -263,17 +247,15 @@ namespace DuoCurtain.RuntimeTileMesh
                 return;
 
             windowCheckTimer = Mathf.Max(0.01f, windowCheckInterval);
-            bool detected = CanDetectPlayerThroughOpenWindow(out WindowPortal usedWindow);
+            bool detected = CanDetectPlayerThroughVisibilityWorld();
             if (detected)
             {
                 confirmedPlayerByVision = true;
-                lastUsedWindow = usedWindow;
                 TryApplyWindowDetectionSanityDamage();
                 if (debugEnemyFlow)
                 {
                     Debug.Log(
-                        "[EnemyVision] CanSeePlayer=true Source=" + lastDetectionSource + " Window=" +
-                        (usedWindow != null ? usedWindow.name : "unknown"),
+                        "[EnemyVision] CanSeePlayer=true Source=" + lastDetectionSource,
                         this);
                 }
 
@@ -293,7 +275,6 @@ namespace DuoCurtain.RuntimeTileMesh
             if (currentState != TraceEnemyState.WanderOutside)
             {
                 confirmedPlayerByVision = false;
-                lastUsedWindow = null;
                 lastDetectionSource = VisionDetectionSource.None;
                 windowSanityDamageApplied = false;
                 SetState(TraceEnemyState.WanderOutside);
@@ -391,9 +372,8 @@ namespace DuoCurtain.RuntimeTileMesh
             lastContactDamageTime = Time.time;
         }
 
-        private bool CanDetectPlayerThroughOpenWindow(out WindowPortal usedWindow)
+        private bool CanDetectPlayerThroughVisibilityWorld()
         {
-            usedWindow = null;
             lastDetectionSource = VisionDetectionSource.None;
             if (playerControl == null || !playerControl.HasPlayerWorldPosition)
                 return false;
@@ -404,24 +384,12 @@ namespace DuoCurtain.RuntimeTileMesh
             if (!TrySampleVisionThisFrame(out VisionSnapshot snapshot))
                 return false;
 
-            if (!snapshot.TryGetDetectionInfo(
-                    playerPosition,
-                    out VisionDetectionSource detectionSource,
-                    out PortalVisionPolygon portalPolygon))
-            {
-                return false;
-            }
-
-            if (requireOpenWindow &&
-                detectionSource != VisionDetectionSource.OpenWindowPortal &&
-                detectionSource != VisionDetectionSource.Direct)
+            if (!snapshot.TryGetDetectionSource(playerPosition, out VisionDetectionSource detectionSource))
             {
                 return false;
             }
 
             lastDetectionSource = detectionSource;
-            if (portalPolygon != null)
-                usedWindow = portalPolygon.portal as WindowPortal;
             return true;
         }
 
@@ -739,11 +707,6 @@ namespace DuoCurtain.RuntimeTileMesh
             visionSensor.edgeDistanceThreshold = Mathf.Max(0f, runtimeVisionEdgeThreshold);
             visionSensor.obstacleMask = runtimeVisionObstacleMask;
             visionSensor.hitTriggers = false;
-            visionSensor.allowWindowPortals = allowWindowVisionPortals;
-            visionSensor.portalExitOffset = Mathf.Max(0.001f, visionPortalExitOffset);
-            visionSensor.portalContinuationDistance = Mathf.Max(0.01f, visionPortalContinuationDistance);
-            visionSensor.portalSpreadAngle = Mathf.Clamp(visionPortalSpreadAngle, 1f, 179f);
-            visionSensor.maxPortalDepth = Mathf.Max(0, visionMaxPortalDepth);
             visionSensor.SetForward(lastMoveDirection);
 
             if (visionRenderController == null)
@@ -850,14 +813,6 @@ namespace DuoCurtain.RuntimeTileMesh
             {
                 Gizmos.color = confirmedPlayerByVision ? Color.green : Color.red;
                 Gizmos.DrawLine(transform.position, lastKnownPlayerPosition);
-            }
-
-            if (drawWindowSamplesInEditor && lastUsedWindow != null)
-            {
-                Gizmos.color = Color.cyan;
-                Gizmos.DrawSphere(lastUsedWindow.transform.position, 0.08f);
-                Gizmos.DrawLine(transform.position, lastUsedWindow.transform.position);
-                Gizmos.DrawLine(lastUsedWindow.transform.position, lastKnownPlayerPosition);
             }
 
             if (targetDoor != null)

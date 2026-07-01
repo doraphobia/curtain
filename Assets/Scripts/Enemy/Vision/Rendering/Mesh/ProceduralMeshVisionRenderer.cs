@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using DuoCurtain.GameplayVisuals;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -24,6 +25,7 @@ namespace DuoCurtain.Vision
         private MeshRenderer meshRenderer;
         private Mesh mesh;
         private Material runtimeMaterial;
+        private GameplayVisualRenderer adaptiveVisualRenderer;
         private VisionRendererContext rendererContext;
         private bool initialized;
 
@@ -126,6 +128,22 @@ namespace DuoCurtain.Vision
             meshRenderer.sharedMaterial = material != null ? material : GetFallbackMaterial();
             meshRenderer.sortingLayerID = rendererContext.sortingLayerId;
             meshRenderer.sortingOrder = rendererContext.sortingOrder;
+
+            if (adaptiveVisualRenderer == null)
+            {
+                adaptiveVisualRenderer = GameplayVisualRenderer.Ensure(
+                    meshRenderer,
+                    GameplayVisualPriority.EnemyVision);
+                if (adaptiveVisualRenderer != null)
+                {
+                    adaptiveVisualRenderer.collectTargetsAutomatically = false;
+                    adaptiveVisualRenderer.renderers = new Renderer[] { meshRenderer };
+                    adaptiveVisualRenderer.adaptiveBlend = 0.88f;
+                    adaptiveVisualRenderer.contrastStrength = 0.92f;
+                    adaptiveVisualRenderer.edgeContrast = 0.45f;
+                }
+            }
+            adaptiveVisualRenderer?.Refresh();
         }
 
         private void BuildMesh(VisionSnapshot snapshot, VisionRenderParameters parameters)
@@ -354,7 +372,9 @@ namespace DuoCurtain.Vision
             if (runtimeMaterial != null)
                 return runtimeMaterial;
 
-            Shader shader = Shader.Find("Sprites/Default");
+            Shader shader = GameplayVisualSystem.FindAdaptiveShader();
+            if (shader == null)
+                shader = Shader.Find("Sprites/Default");
             if (shader == null)
                 shader = Shader.Find("Universal Render Pipeline/Unlit");
             if (shader == null)

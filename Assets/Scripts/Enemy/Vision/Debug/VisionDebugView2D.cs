@@ -13,6 +13,7 @@ namespace DuoCurtain.Vision
         public bool showVertices;
         public bool showBounds;
         public bool showVisibilityWorldSegments;
+        public bool showVisibilityWorldOpenings = true;
         public bool showHitPoints;
         public Color rayColor = new Color(1f, 0.65f, 0.1f, 0.35f);
         public Color portalRayColor = new Color(0f, 0.85f, 1f, 0.55f);
@@ -25,6 +26,7 @@ namespace DuoCurtain.Vision
         public Color openDoorSegmentColor = new Color(0.35f, 0.85f, 1f, 0.55f);
         public Color closedWindowSegmentColor = new Color(1f, 0.3f, 0.2f, 0.95f);
         public Color openWindowSegmentColor = new Color(0.2f, 1f, 0.45f, 0.65f);
+        public Color openingColor = new Color(0.15f, 1f, 0.55f, 1f);
         public Color unknownSegmentColor = Color.magenta;
         public Color hitPointColor = new Color(1f, 0.85f, 0.05f, 0.95f);
         [Min(0.001f)]
@@ -125,6 +127,8 @@ namespace DuoCurtain.Vision
 
             if (showVisibilityWorldSegments)
                 DrawVisibilityWorldSegments();
+            if (showVisibilityWorldOpenings)
+                DrawVisibilityWorldOpenings();
         }
 
         private void DrawVisibilityWorldSegments()
@@ -139,6 +143,26 @@ namespace DuoCurtain.Vision
                 VisibilitySegment segment = world.Segments[i];
                 Gizmos.color = GetSegmentColor(segment.type);
                 Gizmos.DrawLine(segment.a, segment.b);
+            }
+        }
+
+        private void DrawVisibilityWorldOpenings()
+        {
+            VisibilityWorld world = VisibilityWorld.Instance;
+            if (world == null)
+                return;
+
+            world.RebuildIfDirty();
+            Gizmos.color = openingColor;
+            for (int i = 0; i < world.Openings.Count; i++)
+            {
+                VisibilityOpening opening = world.Openings[i];
+                if (!opening.allowsVision || opening.geometry.type != OpeningGeometryType.Segment)
+                    continue;
+
+                Gizmos.DrawLine(opening.geometry.segmentA, opening.geometry.segmentB);
+                Gizmos.DrawSphere(opening.geometry.segmentA, vertexRadius);
+                Gizmos.DrawSphere(opening.geometry.segmentB, vertexRadius);
             }
         }
 

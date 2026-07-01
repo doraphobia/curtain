@@ -1,4 +1,5 @@
 using System.Collections;
+using DuoCurtain.GameplayVisuals;
 using UnityEngine;
 
 /// <summary>
@@ -15,6 +16,7 @@ public class FootprintInstance : MonoBehaviour
     private Color baseColor = Color.white;
     private float currentAlpha = 1f;
     private Coroutine animationRoutine;
+    private GameplayVisualRenderer adaptiveVisualRenderer;
 
     public FootprintSide Side { get; private set; }
     public int DecayIndex { get; private set; }
@@ -31,6 +33,20 @@ public class FootprintInstance : MonoBehaviour
             Renderer[] found = GetComponentsInChildren<Renderer>(true);
             if (found.Length > 0 && (spriteRenderer == null || found.Length > 1))
                 additionalRenderers = found;
+        }
+
+        adaptiveVisualRenderer = GameplayVisualRenderer.Ensure(
+            gameObject,
+            GameplayVisualPriority.EnemyFootprint);
+        if (adaptiveVisualRenderer != null)
+        {
+            adaptiveVisualRenderer.adaptiveBlend = 1f;
+            adaptiveVisualRenderer.contrastStrength = 1.15f;
+            adaptiveVisualRenderer.edgeContrast = 0.6f;
+            adaptiveVisualRenderer.enableOutline = true;
+            adaptiveVisualRenderer.outlineWidth = 1f;
+            adaptiveVisualRenderer.outlineStrength = 0.55f;
+            adaptiveVisualRenderer.Refresh();
         }
     }
 

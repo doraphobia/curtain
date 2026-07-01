@@ -195,8 +195,6 @@ namespace DuoCurtain.RuntimeTileMesh
             FusionNightFootprintEnemy enemy = enemyObject.AddComponent<FusionNightFootprintEnemy>();
             enemy.moveSpeed = enemyMoveSpeed;
             enemy.windowDetectionDistance = windowDetectionDistance;
-            enemy.playerWindowDistance = playerWindowDistance;
-            enemy.requireOpenWindow = requireOpenWindow;
             enemy.Configure(fusionSandbox, playerControl, leftFootprintPrefab, rightFootprintPrefab, footprintParent);
             if (enemy.footprintTrace != null)
                 enemy.footprintTrace.ConfigureFootprintColors(footprintColor, breakingFootprintColor);
