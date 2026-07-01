@@ -80,6 +80,25 @@ public class FoleyProfile : ScriptableObject
         return surfaceBanks.Count > 0 ? surfaceBanks[0] : null;
     }
 
+    public bool HasSurface(string surfaceId)
+    {
+        if (surfaceBanks == null || string.IsNullOrWhiteSpace(surfaceId))
+            return false;
+
+        string requestedSurfaceId = surfaceId.Trim();
+        for (int i = 0; i < surfaceBanks.Count; i++)
+        {
+            SurfaceBank bank = surfaceBanks[i];
+            if (bank == null)
+                continue;
+
+            if (MatchesSurface(bank.surfaceId, requestedSurfaceId))
+                return true;
+        }
+
+        return false;
+    }
+
     public bool HasAnyClips()
     {
         if (surfaceBanks == null)

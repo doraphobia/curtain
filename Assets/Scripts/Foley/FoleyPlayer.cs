@@ -28,6 +28,14 @@ public class FoleyPlayer : MonoBehaviour
     public bool createSourcesOnAwake = true;
     public bool useUnscaledTime = false;
 
+    [Header("3D Source Defaults")]
+    [Min(0.01f)]
+    public float minDistance = 1f;
+    [Min(0.01f)]
+    public float maxDistance = 500f;
+    public AudioRolloffMode rolloffMode = AudioRolloffMode.Logarithmic;
+    public bool spatialize = false;
+
     private readonly List<PooledSource> sourcePool = new List<PooledSource>();
     private readonly Dictionary<int, ProfileState> profileStates = new Dictionary<int, ProfileState>();
     private readonly Dictionary<string, int> lastClipIndices = new Dictionary<string, int>();
@@ -120,6 +128,7 @@ public class FoleyPlayer : MonoBehaviour
             source.volume = volume;
             source.pitch = pitch;
             source.spatialBlend = layer.overrideSpatialBlend ? layer.spatialBlend : profile.spatialBlend;
+            ApplySourceSpatialDefaults(source);
             source.outputAudioMixerGroup = layer.outputMixerGroup != null ? layer.outputMixerGroup : profile.outputMixerGroup;
 
             if (delay > 0f)
@@ -154,6 +163,25 @@ public class FoleyPlayer : MonoBehaviour
         GetState(profile).nuisanceVolume = 1f;
     }
 
+    public void ConfigureSpatialDefaults(
+        float sourceMinDistance,
+        float sourceMaxDistance,
+        AudioRolloffMode sourceRolloffMode,
+        bool sourceSpatialize)
+    {
+        minDistance = Mathf.Max(0.01f, sourceMinDistance);
+        maxDistance = Mathf.Max(minDistance + 0.01f, sourceMaxDistance);
+        rolloffMode = sourceRolloffMode;
+        spatialize = sourceSpatialize;
+
+        for (int i = 0; i < sourcePool.Count; i++)
+        {
+            PooledSource pooledSource = sourcePool[i];
+            if (pooledSource?.source != null)
+                ApplySourceSpatialDefaults(pooledSource.source);
+        }
+    }
+
     private void WarmPool(int count)
     {
         int targetCount = Mathf.Clamp(count, 1, Mathf.Max(1, maxPoolSize));
@@ -184,6 +212,7 @@ public class FoleyPlayer : MonoBehaviour
         AudioSource source = gameObject.AddComponent<AudioSource>();
         source.playOnAwake = false;
         source.loop = false;
+        ApplySourceSpatialDefaults(source);
 
         PooledSource pooledSource = new PooledSource
         {
@@ -192,6 +221,17 @@ public class FoleyPlayer : MonoBehaviour
         };
         sourcePool.Add(pooledSource);
         return pooledSource;
+    }
+
+    private void ApplySourceSpatialDefaults(AudioSource source)
+    {
+        if (source == null)
+            return;
+
+        source.minDistance = Mathf.Max(0.01f, minDistance);
+        source.maxDistance = Mathf.Max(source.minDistance + 0.01f, maxDistance);
+        source.rolloffMode = rolloffMode;
+        source.spatialize = spatialize;
     }
 
     private ProfileState GetState(FoleyProfile profile)

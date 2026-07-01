@@ -34,6 +34,10 @@ public class StageCycleController : MonoBehaviour
     [Min(0)]
     public int startStageIndex = 0;
 
+    [Header("Simulation Speed")]
+    [Min(0f)]
+    public float simulationSpeedMultiplier = 1f;
+
     [Header("Night Audio")]
     public AudioSource nightLoopAudioSource;
     public AudioClip nightLoopClip;
@@ -108,7 +112,7 @@ public class StageCycleController : MonoBehaviour
 
         if (!paused && !PauseManager.IsGamePaused)
         {
-            stageTimer += Time.deltaTime;
+            stageTimer += Time.deltaTime * Mathf.Max(0f, simulationSpeedMultiplier);
 
             float duration = CurrentStageDuration;
             while (stageTimer >= duration)
@@ -152,6 +156,31 @@ public class StageCycleController : MonoBehaviour
     public void SetPaused(bool shouldPause)
     {
         paused = shouldPause;
+    }
+
+    public void SetSimulationSpeedMultiplier(float multiplier)
+    {
+        simulationSpeedMultiplier = Mathf.Max(0f, multiplier);
+    }
+
+    public void ResetSimulationSpeedMultiplier()
+    {
+        simulationSpeedMultiplier = 1f;
+    }
+
+    public void SetStageTime(int stageIndex, float timer)
+    {
+        if (stages == null || stages.Count == 0)
+        {
+            currentStageIndex = 0;
+            stageTimer = 0f;
+            return;
+        }
+
+        currentStageIndex = Mathf.Clamp(stageIndex, 0, stages.Count - 1);
+        stageTimer = Mathf.Clamp(timer, 0f, GetStageDuration(currentStageIndex));
+        UpdateNightAudio(false);
+        UpdateDayNightImage();
     }
 
     private int GetNextStageIndex()

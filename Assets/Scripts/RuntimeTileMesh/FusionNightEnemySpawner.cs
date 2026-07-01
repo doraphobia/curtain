@@ -70,6 +70,34 @@ namespace DuoCurtain.RuntimeTileMesh
         [Range(1f, 64f)]
         public float footprintPixelsPerUnit = 64f;
 
+        [Header("Enemy Footstep Foley")]
+        public FoleyProfile enemyFootstepFoleyProfile;
+        public string enemyIndoorFootstepSurfaceId = "Concrete";
+        public string enemyOutdoorFootstepSurfaceId = "Outdoor";
+        public string enemyOutdoorFallbackSurfaceId = "Grass";
+        [Min(0f)]
+        public float enemyFootstepVolume = 0.72f;
+        [Min(0.01f)]
+        public float enemyFootstepMinDistance = 0.75f;
+        [Min(0.01f)]
+        public float enemyFootstepMaxDistance = 16f;
+        public AudioRolloffMode enemyFootstepRolloffMode = AudioRolloffMode.Logarithmic;
+        public bool enemyFootstepSpatialize = true;
+        [Range(0f, 1f)]
+        public float enemyFootstepSpatialBlend = 1f;
+        [Min(0f)]
+        public float enemyNormalFootstepVolumeMultiplier = 1f;
+        [Min(0f)]
+        public float enemyTargetingDoorFootstepVolumeMultiplier = 1.18f;
+        [Min(0f)]
+        public float enemyChasingFootstepVolumeMultiplier = 1.28f;
+        [Min(0f)]
+        public float enemyWatchingFootstepVolumeMultiplier = 0.75f;
+        [Min(0.01f)]
+        public float enemyNormalFootstepPitchMultiplier = 0.96f;
+        [Min(0.01f)]
+        public float enemyUrgentFootstepPitchMultiplier = 1.04f;
+
         [Header("Debug")]
         public bool logSpawns = true;
 
@@ -198,10 +226,45 @@ namespace DuoCurtain.RuntimeTileMesh
             enemy.Configure(fusionSandbox, playerControl, leftFootprintPrefab, rightFootprintPrefab, footprintParent);
             if (enemy.footprintTrace != null)
                 enemy.footprintTrace.ConfigureFootprintColors(footprintColor, breakingFootprintColor);
+            ConfigureEnemyFootstepAudio(enemyObject);
 
             activeEnemies.Add(enemy);
             if (logSpawns)
                 Debug.Log("[EnemySpawn] Enemy spawned at " + spawnPosition + " outside=" + !IsInsideAnyRoomOrFusionFloor(spawnPosition), enemy);
+        }
+
+        private void ConfigureEnemyFootstepAudio(GameObject enemyObject)
+        {
+            if (enemyObject == null)
+                return;
+
+            EnemyFootstepAudio footstepAudio = enemyObject.GetComponent<EnemyFootstepAudio>();
+            if (footstepAudio == null)
+                footstepAudio = enemyObject.AddComponent<EnemyFootstepAudio>();
+
+            FoleyProfile profile = enemyFootstepFoleyProfile;
+            if (profile == null && playerControl != null)
+                profile = playerControl.footstepFoleyProfile;
+
+            footstepAudio.ConfigureFoley(
+                profile,
+                enemyIndoorFootstepSurfaceId,
+                enemyOutdoorFootstepSurfaceId,
+                enemyOutdoorFallbackSurfaceId);
+            footstepAudio.Configure3DAudio(
+                enemyFootstepVolume,
+                enemyFootstepMinDistance,
+                enemyFootstepMaxDistance,
+                enemyFootstepRolloffMode,
+                enemyFootstepSpatialize,
+                enemyFootstepSpatialBlend);
+            footstepAudio.ConfigureStateMix(
+                enemyNormalFootstepVolumeMultiplier,
+                enemyTargetingDoorFootstepVolumeMultiplier,
+                enemyChasingFootstepVolumeMultiplier,
+                enemyWatchingFootstepVolumeMultiplier,
+                enemyNormalFootstepPitchMultiplier,
+                enemyUrgentFootstepPitchMultiplier);
         }
 
         private bool IsOutsidePlayerView(Vector3 worldPosition)

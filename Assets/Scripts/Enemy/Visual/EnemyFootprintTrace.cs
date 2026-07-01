@@ -339,7 +339,7 @@ public class EnemyFootprintTrace : MonoBehaviour
         instance.SetAsLatest(displayAlpha, displayColor);
         footprints.Add(instance);
         EnforceMaxFootprintCount();
-        footstepAudio?.PlayFootstep(spawnPosition, side);
+        footstepAudio?.PlayFootstep(spawnPosition, side, currentTraceState, IsIndoorPosition(spawnPosition));
     }
 
     private void DecayExistingFootprints()
@@ -370,6 +370,14 @@ public class EnemyFootprintTrace : MonoBehaviour
     }
 
     private bool IsLightSurface(Vector3 worldPosition)
+    {
+        if (RoomManager.IsInsideAnyRoom(worldPosition))
+            return true;
+
+        return fusionTraceEnemy != null && fusionTraceEnemy.IsInsideAnyFusionRoom(worldPosition);
+    }
+
+    private bool IsIndoorPosition(Vector3 worldPosition)
     {
         if (RoomManager.IsInsideAnyRoom(worldPosition))
             return true;
