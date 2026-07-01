@@ -1212,13 +1212,26 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                 int actualVertexCount = filter != null && filter.sharedMesh != null
                     ? filter.sharedMesh.vertexCount
                     : 0;
-                if (actualVertexCount == expectedVertexCount)
-                    return 0;
+                if (actualVertexCount != expectedVertexCount)
+                {
+                    Debug.LogError(
+                        "[RuntimeTileMeshSelfTest] Procedural vision mesh expected " +
+                        expectedVertexCount + " vertices, got " + actualVertexCount + ".");
+                    return 1;
+                }
 
-                Debug.LogError(
-                    "[RuntimeTileMeshSelfTest] Procedural vision mesh expected " +
-                    expectedVertexCount + " vertices, got " + actualVertexCount + ".");
-                return 1;
+                MeshRenderer meshRenderer = output != null ? output.GetComponent<MeshRenderer>() : null;
+                Shader visionShader = Shader.Find("Duo Curtain/Vision Cone Vertex Color");
+                if (visionShader != null &&
+                    (meshRenderer == null ||
+                     meshRenderer.sharedMaterial == null ||
+                     meshRenderer.sharedMaterial.shader != visionShader))
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] Procedural vision mesh must use the dedicated vision cone shader, not the adaptive gameplay visual replacement path.");
+                    return 1;
+                }
+
+                return 0;
             }
             finally
             {

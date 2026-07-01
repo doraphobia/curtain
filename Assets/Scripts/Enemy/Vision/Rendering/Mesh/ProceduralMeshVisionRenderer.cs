@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using DuoCurtain.GameplayVisuals;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -9,6 +8,7 @@ namespace DuoCurtain.Vision
     public sealed class ProceduralMeshVisionRenderer : MonoBehaviour, IVisionRenderer
     {
         private const string OutputName = "Procedural Vision Mesh";
+        private const string VisionShaderName = "Duo Curtain/Vision Cone Vertex Color";
 
         [Header("Output")]
         public Material material;
@@ -25,7 +25,6 @@ namespace DuoCurtain.Vision
         private MeshRenderer meshRenderer;
         private Mesh mesh;
         private Material runtimeMaterial;
-        private GameplayVisualRenderer adaptiveVisualRenderer;
         private VisionRendererContext rendererContext;
         private bool initialized;
 
@@ -128,23 +127,6 @@ namespace DuoCurtain.Vision
             meshRenderer.sharedMaterial = material != null ? material : GetFallbackMaterial();
             meshRenderer.sortingLayerID = rendererContext.sortingLayerId;
             meshRenderer.sortingOrder = rendererContext.sortingOrder;
-
-            if (adaptiveVisualRenderer == null)
-            {
-                adaptiveVisualRenderer = GameplayVisualRenderer.Ensure(
-                    meshRenderer,
-                    GameplayVisualPriority.EnemyVision);
-                if (adaptiveVisualRenderer != null)
-                {
-                    adaptiveVisualRenderer.collectTargetsAutomatically = false;
-                    adaptiveVisualRenderer.renderers = new Renderer[] { meshRenderer };
-                    adaptiveVisualRenderer.adaptiveBlend = 0.88f;
-                    adaptiveVisualRenderer.contrastStrength = 0.92f;
-                    adaptiveVisualRenderer.edgeContrast = 0.45f;
-                    adaptiveVisualRenderer.vertexColorMode = GameplayVisualRenderer.VertexColorMode.ForceOn;
-                }
-            }
-            adaptiveVisualRenderer?.Refresh();
         }
 
         private void BuildMesh(VisionSnapshot snapshot, VisionRenderParameters parameters)
@@ -373,9 +355,11 @@ namespace DuoCurtain.Vision
             if (runtimeMaterial != null)
                 return runtimeMaterial;
 
-            Shader shader = Shader.Find("Sprites/Default");
+            Shader shader = Shader.Find(VisionShaderName);
             if (shader == null)
                 shader = Shader.Find("Universal Render Pipeline/Unlit");
+            if (shader == null)
+                shader = Shader.Find("Sprites/Default");
             if (shader == null)
                 shader = Shader.Find("Unlit/Color");
             if (shader == null)
@@ -386,6 +370,12 @@ namespace DuoCurtain.Vision
                 name = "Vision Mesh Runtime Material",
                 hideFlags = HideFlags.HideAndDontSave
             };
+            if (runtimeMaterial.HasProperty("_Color"))
+                runtimeMaterial.SetColor("_Color", Color.white);
+            if (runtimeMaterial.HasProperty("_BaseColor"))
+                runtimeMaterial.SetColor("_BaseColor", Color.white);
+            if (runtimeMaterial.HasProperty("_Opacity"))
+                runtimeMaterial.SetFloat("_Opacity", 1f);
             return runtimeMaterial;
         }
 
