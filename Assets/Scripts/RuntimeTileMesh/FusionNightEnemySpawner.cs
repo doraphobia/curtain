@@ -32,6 +32,7 @@ namespace DuoCurtain.RuntimeTileMesh
 
         [Header("Spawn Warning")]
         public bool warnBeforeOffscreenSpawn = true;
+        public bool suppressSpawnWarningsInBootWorld = true;
         public bool warnOnlyWhenOffscreen = true;
         [Min(0f)]
         public float spawnWarningLeadTime = 1.25f;
@@ -167,6 +168,7 @@ namespace DuoCurtain.RuntimeTileMesh
                 }
 
                 bool shouldWarn = warnBeforeOffscreenSpawn &&
+                    !(suppressSpawnWarningsInBootWorld && BootWorldStateController.IsBootWorldActiveGlobally) &&
                     (!warnOnlyWhenOffscreen || IsOutsidePlayerView(spawnPosition));
                 GameObject gridWarning = null;
                 if (shouldWarn && spawnWarningLeadTime > 0.0001f)

@@ -1,6 +1,11 @@
 using System.Collections;
+using DuoCurtain.RuntimeTileMesh;
+using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.Events;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 public enum BootWorldState
 {
@@ -17,8 +22,11 @@ public sealed class BootWorldStateChangedEvent : UnityEvent<BootWorldState> { }
 public sealed class BootWorldStateController : MonoBehaviour
 {
     [Header("State")]
-    [SerializeField] private bool startInBootWorld;
+    [SerializeField] private bool startInBootWorld = true;
     [SerializeField] private bool listenForAnyInput = true;
+    [SerializeField] private bool includeMouseInput = true;
+    [SerializeField] private bool includeGamepadInput = true;
+    [SerializeField] private bool autoWireRedScene = true;
 
     [Header("Day Night")]
     [SerializeField] private StageCycleController stageController;
@@ -33,6 +41,12 @@ public sealed class BootWorldStateController : MonoBehaviour
     [Header("Title UI")]
     [SerializeField] private CanvasGroup titleCanvasGroup;
     [SerializeField] private GameObject[] titleUiObjects;
+    [SerializeField] private bool autoCreateTemporaryTitleUi = true;
+    [SerializeField] private string temporaryLogoText = "DUO CURTAIN";
+    [SerializeField] private string temporaryPressAnyKeyText = "PRESS ANY KEY";
+    [SerializeField] private string temporaryLanguageText = "LANGUAGE";
+    [SerializeField] private string temporarySettingsText = "SETTINGS";
+    [SerializeField] private string temporaryQuitText = "QUIT";
     [SerializeField] private float titleFadeOutDuration = 0.35f;
 
     [Header("Boot World Disabled During Title")]
@@ -51,16 +65,48 @@ public sealed class BootWorldStateController : MonoBehaviour
 
     private Coroutine transitionCoroutine;
     private float savedSimulationSpeed = 1f;
+    private bool hasAutoWiredScene;
 
+    public static BootWorldStateController Active { get; private set; }
     public BootWorldState CurrentState { get; private set; } = BootWorldState.ApplicationBoot;
     public bool IsBootWorldActive => CurrentState == BootWorldState.BootWorld;
     public bool IsTransitioningToGameplay => CurrentState == BootWorldState.GameplayTransition;
     public bool IsGameplayActive => CurrentState == BootWorldState.Gameplay;
+    public static bool IsBootWorldActiveGlobally => Active != null && Active.IsBootWorldActive;
+    public static bool IsGameplayActiveGlobally => Active == null || Active.IsGameplayActive;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    private static void EnsureRedSceneBootWorldController()
+    {
+        Scene activeScene = SceneManager.GetActiveScene();
+        if (!activeScene.IsValid() || activeScene.name != "RedScene")
+            return;
+
+        if (FindFirstObjectByType<BootWorldStateController>() != null)
+            return;
+
+        GameObject controllerObject = new GameObject("Boot World State Controller");
+        BootWorldStateController controller = controllerObject.AddComponent<BootWorldStateController>();
+        controller.startInBootWorld = true;
+        controller.autoWireRedScene = true;
+        controller.autoCreateTemporaryTitleUi = true;
+    }
+
+    private void OnEnable()
+    {
+        Active = this;
+    }
+
+    private void OnDisable()
+    {
+        if (Active == this)
+            Active = null;
+    }
 
     private void Start()
     {
-        if (stageController == null)
-            stageController = FindFirstObjectByType<StageCycleController>();
+        ResolveReferencesAndAutoWire();
+        EnsureTemporaryTitleUi();
 
         savedSimulationSpeed = stageController != null ? stageController.simulationSpeedMultiplier : 1f;
 
@@ -75,7 +121,7 @@ public sealed class BootWorldStateController : MonoBehaviour
         if (!listenForAnyInput || CurrentState != BootWorldState.BootWorld)
             return;
 
-        if (Input.anyKeyDown || Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2))
+        if (HasStartInput())
             BeginGameplayTransition();
     }
 
@@ -204,6 +250,203 @@ public sealed class BootWorldStateController : MonoBehaviour
         SetObjectsActive(bootWorldObjects, bootActive);
     }
 
+    private void ResolveReferencesAndAutoWire()
+    {
+        if (stageController == null)
+            stageController = FindFirstObjectByType<StageCycleController>();
+
+        if (!autoWireRedScene || hasAutoWiredScene)
+            return;
+
+        Scene activeScene = SceneManager.GetActiveScene();
+        if (!activeScene.IsValid() || activeScene.name != "RedScene")
+            return;
+
+        PlayerControl playerControl = FindFirstObjectByType<PlayerControl>();
+        FusionGameModeController gameModeController = FindFirstObjectByType<FusionGameModeController>();
+        FusionModeCameraRig cameraRig = FindFirstObjectByType<FusionModeCameraRig>();
+
+        if (playerBehaviours == null || playerBehaviours.Length == 0)
+            playerBehaviours = CompactBehaviours(playerControl);
+
+        if (gameplayUiBehaviours == null || gameplayUiBehaviours.Length == 0)
+            gameplayUiBehaviours = CompactBehaviours(gameModeController);
+
+        if (gameplayCameraBehaviours == null || gameplayCameraBehaviours.Length == 0)
+            gameplayCameraBehaviours = CompactBehaviours(cameraRig);
+
+        if (playerObjects == null || playerObjects.Length == 0)
+        {
+            playerObjects = CompactObjects(
+                GameObject.Find("Player Control"),
+                GameObject.Find("Player"),
+                GameObject.Find("Heading Point"));
+        }
+
+        if (gameplayUiObjects == null || gameplayUiObjects.Length == 0)
+        {
+            gameplayUiObjects = CompactObjects(
+                GameObject.Find("Player Control Canvas"),
+                GameObject.Find("Fusion UI Canvas"),
+                GameObject.Find("Fusion Sanity Canvas"),
+                GameObject.Find("Topology Map System"));
+        }
+
+        hasAutoWiredScene = true;
+    }
+
+    private bool HasStartInput()
+    {
+        bool mouseDown = Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2);
+        if (mouseDown)
+        {
+            return includeMouseInput && !IsPointerOverBootWorldUi();
+        }
+
+        if (Input.anyKeyDown)
+            return true;
+
+        if (!includeGamepadInput)
+            return false;
+
+        return Input.GetKeyDown(KeyCode.JoystickButton0) ||
+               Input.GetKeyDown(KeyCode.JoystickButton1) ||
+               Input.GetKeyDown(KeyCode.JoystickButton2) ||
+               Input.GetKeyDown(KeyCode.JoystickButton3) ||
+               Input.GetKeyDown(KeyCode.JoystickButton4) ||
+               Input.GetKeyDown(KeyCode.JoystickButton5) ||
+               Input.GetKeyDown(KeyCode.JoystickButton6) ||
+               Input.GetKeyDown(KeyCode.JoystickButton7) ||
+               Input.GetKeyDown(KeyCode.JoystickButton8) ||
+               Input.GetKeyDown(KeyCode.JoystickButton9) ||
+               Input.GetKeyDown(KeyCode.JoystickButton10) ||
+               Input.GetKeyDown(KeyCode.JoystickButton11) ||
+               Input.GetKeyDown(KeyCode.JoystickButton12) ||
+               Input.GetKeyDown(KeyCode.JoystickButton13) ||
+               Input.GetKeyDown(KeyCode.JoystickButton14) ||
+               Input.GetKeyDown(KeyCode.JoystickButton15) ||
+               Input.GetKeyDown(KeyCode.JoystickButton16) ||
+               Input.GetKeyDown(KeyCode.JoystickButton17) ||
+               Input.GetKeyDown(KeyCode.JoystickButton18) ||
+               Input.GetKeyDown(KeyCode.JoystickButton19);
+    }
+
+    private void EnsureTemporaryTitleUi()
+    {
+        if (!autoCreateTemporaryTitleUi || titleCanvasGroup != null)
+            return;
+
+        GameObject canvasObject = new GameObject(
+            "Boot World Temporary Title Canvas",
+            typeof(RectTransform),
+            typeof(Canvas),
+            typeof(CanvasScaler),
+            typeof(GraphicRaycaster),
+            typeof(CanvasGroup));
+        canvasObject.transform.SetParent(transform, false);
+
+        Canvas canvas = canvasObject.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 2400;
+
+        CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.matchWidthOrHeight = 0.5f;
+
+        titleCanvasGroup = canvasObject.GetComponent<CanvasGroup>();
+        titleCanvasGroup.interactable = true;
+        titleCanvasGroup.blocksRaycasts = true;
+
+        RectTransform canvasRect = canvasObject.GetComponent<RectTransform>();
+        canvasRect.anchorMin = Vector2.zero;
+        canvasRect.anchorMax = Vector2.one;
+        canvasRect.offsetMin = Vector2.zero;
+        canvasRect.offsetMax = Vector2.zero;
+
+        CreateTitleText(canvasRect, "Logo", temporaryLogoText, 86f, new Vector2(0f, 138f), TextAlignmentOptions.Center);
+        CreateTitleText(canvasRect, "Press Any Key", temporaryPressAnyKeyText, 32f, new Vector2(0f, 40f), TextAlignmentOptions.Center);
+        CreateTitleButton(canvasRect, "Language Button", temporaryLanguageText, new Vector2(-180f, -220f), HandleLanguagePressed);
+        CreateTitleButton(canvasRect, "Settings Button", temporarySettingsText, new Vector2(0f, -220f), HandleSettingsPressed);
+        CreateTitleButton(canvasRect, "Quit Button", temporaryQuitText, new Vector2(180f, -220f), HandleQuitPressed);
+    }
+
+    private TextMeshProUGUI CreateTitleText(
+        Transform parent,
+        string objectName,
+        string text,
+        float fontSize,
+        Vector2 anchoredPosition,
+        TextAlignmentOptions alignment)
+    {
+        GameObject textObject = new GameObject(objectName, typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+        textObject.transform.SetParent(parent, false);
+        RectTransform rect = textObject.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = anchoredPosition;
+        rect.sizeDelta = new Vector2(760f, 112f);
+
+        TextMeshProUGUI label = textObject.GetComponent<TextMeshProUGUI>();
+        label.text = text;
+        label.fontSize = fontSize;
+        label.alignment = alignment;
+        label.color = Color.white;
+        label.raycastTarget = false;
+        return label;
+    }
+
+    private void CreateTitleButton(
+        Transform parent,
+        string objectName,
+        string labelText,
+        Vector2 anchoredPosition,
+        UnityAction callback)
+    {
+        GameObject buttonObject = new GameObject(objectName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+        buttonObject.transform.SetParent(parent, false);
+        RectTransform rect = buttonObject.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = anchoredPosition;
+        rect.sizeDelta = new Vector2(156f, 48f);
+
+        Image image = buttonObject.GetComponent<Image>();
+        image.color = new Color(0f, 0f, 0f, 0.32f);
+
+        Button button = buttonObject.GetComponent<Button>();
+        button.onClick.AddListener(callback);
+
+        TextMeshProUGUI label = CreateTitleText(rect, "Label", labelText, 20f, Vector2.zero, TextAlignmentOptions.Center);
+        RectTransform labelRect = label.GetComponent<RectTransform>();
+        labelRect.anchorMin = Vector2.zero;
+        labelRect.anchorMax = Vector2.one;
+        labelRect.offsetMin = Vector2.zero;
+        labelRect.offsetMax = Vector2.zero;
+    }
+
+    private void HandleLanguagePressed()
+    {
+        Debug.Log("[BootWorld] Temporary Language button pressed.", this);
+    }
+
+    private void HandleSettingsPressed()
+    {
+        Debug.Log("[BootWorld] Temporary Settings button pressed.", this);
+    }
+
+    private void HandleQuitPressed()
+    {
+        Application.Quit();
+    }
+
+    private static bool IsPointerOverBootWorldUi()
+    {
+        return EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+    }
+
     private void SetTitleVisible(bool visible, bool immediate)
     {
         if (titleCanvasGroup != null && visible)
@@ -302,5 +545,51 @@ public sealed class BootWorldStateController : MonoBehaviour
             if (objects[i] != null)
                 objects[i].SetActive(active);
         }
+    }
+
+    private static Behaviour[] CompactBehaviours(params Behaviour[] source)
+    {
+        if (source == null || source.Length == 0)
+            return new Behaviour[0];
+
+        int count = 0;
+        for (int i = 0; i < source.Length; i++)
+        {
+            if (source[i] != null)
+                count++;
+        }
+
+        Behaviour[] result = new Behaviour[count];
+        int index = 0;
+        for (int i = 0; i < source.Length; i++)
+        {
+            if (source[i] != null)
+                result[index++] = source[i];
+        }
+
+        return result;
+    }
+
+    private static GameObject[] CompactObjects(params GameObject[] source)
+    {
+        if (source == null || source.Length == 0)
+            return new GameObject[0];
+
+        int count = 0;
+        for (int i = 0; i < source.Length; i++)
+        {
+            if (source[i] != null)
+                count++;
+        }
+
+        GameObject[] result = new GameObject[count];
+        int index = 0;
+        for (int i = 0; i < source.Length; i++)
+        {
+            if (source[i] != null)
+                result[index++] = source[i];
+        }
+
+        return result;
     }
 }

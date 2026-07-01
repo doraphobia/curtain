@@ -69,6 +69,10 @@ namespace DuoCurtain.RuntimeTileMesh
         public bool drawDebug;
         public bool debugEnemyFlow;
 
+        [Header("Boot World")]
+        public bool suppressTrackingDuringBootWorld = true;
+        public bool suppressVisionAlertDuringBootWorld = true;
+
         [Header("Vision Debug")]
         public bool drawVisionConeInEditor = true;
         public bool drawLineOfSightInEditor = true;
@@ -155,6 +159,12 @@ namespace DuoCurtain.RuntimeTileMesh
                 return;
 
             ResolveReferences();
+            if (IsBootWorldPassive())
+            {
+                TickBootWorldPassive();
+                return;
+            }
+
             TickWindowDetection();
             TickMovement();
             UpdateRuntimeVisionVisual();
@@ -215,6 +225,9 @@ namespace DuoCurtain.RuntimeTileMesh
 
         private void TickWindowDetection()
         {
+            if (IsBootWorldPassive())
+                return;
+
             if (currentState == TraceEnemyState.TargetingDoor ||
                 currentState == TraceEnemyState.BreakingDoor ||
                 currentState == TraceEnemyState.EnteredRoom ||
@@ -260,6 +273,25 @@ namespace DuoCurtain.RuntimeTileMesh
                 windowSanityDamageApplied = false;
                 SetState(TraceEnemyState.WanderOutside);
             }
+        }
+
+        private void TickBootWorldPassive()
+        {
+            if (currentState != TraceEnemyState.WanderOutside)
+            {
+                doorAttackSource?.CancelAttack();
+                targetDoor = null;
+                confirmedPlayerByVision = false;
+                lastDetectionSource = VisionDetectionSource.None;
+                windowSanityDamageApplied = false;
+                SetState(TraceEnemyState.WanderOutside);
+            }
+
+            TickMovement();
+            if (suppressVisionAlertDuringBootWorld)
+                visionAlertProgress = 0f;
+
+            UpdateRuntimeVisionVisual();
         }
 
         private void TryApplyWindowDetectionSanityDamage()
@@ -373,6 +405,9 @@ namespace DuoCurtain.RuntimeTileMesh
         private bool CanDetectPlayerThroughVisibilityWorld()
         {
             lastDetectionSource = VisionDetectionSource.None;
+            if (IsBootWorldPassive())
+                return false;
+
             if (playerControl == null || !playerControl.HasPlayerWorldPosition)
                 return false;
 
@@ -634,6 +669,9 @@ namespace DuoCurtain.RuntimeTileMesh
 
         private bool CanSeePlayerWithRuntimeVision()
         {
+            if (IsBootWorldPassive())
+                return false;
+
             if (visionSensor == null || playerControl == null || !playerControl.HasPlayerWorldPosition)
                 return false;
 
@@ -662,6 +700,12 @@ namespace DuoCurtain.RuntimeTileMesh
 
         private void UpdateVisionAlertProgress(bool seesPlayer)
         {
+            if (IsBootWorldPassive() && suppressVisionAlertDuringBootWorld)
+            {
+                visionAlertProgress = 0f;
+                return;
+            }
+
             bool lockedAlert =
                 confirmedPlayerByVision ||
                 currentState == TraceEnemyState.TargetingDoor ||
@@ -684,6 +728,11 @@ namespace DuoCurtain.RuntimeTileMesh
 
             float fadeDuration = Mathf.Max(0.01f, visionAlertFadeSeconds);
             visionAlertProgress = Mathf.Clamp01(visionAlertProgress - Time.deltaTime / fadeDuration);
+        }
+
+        private bool IsBootWorldPassive()
+        {
+            return suppressTrackingDuringBootWorld && BootWorldStateController.IsBootWorldActiveGlobally;
         }
 
         private void EnsureVisionSystem()

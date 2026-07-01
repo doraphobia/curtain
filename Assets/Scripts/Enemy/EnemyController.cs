@@ -91,6 +91,9 @@ public class EnemyController : MonoBehaviour
     public bool drawWindowVisionSamples = true;
     public bool logStateChanges = true;
 
+    [Header("Boot World")]
+    public bool suppressTrackingDuringBootWorld = true;
+
     [SerializeField] private EnemyState currentState = EnemyState.SpawnOutside;
 
     private Vector2 facingDirection = Vector2.up;
@@ -146,8 +149,24 @@ public class EnemyController : MonoBehaviour
 
         ResolvePlayerReferences();
         UpdateTimers();
+        if (suppressTrackingDuringBootWorld && BootWorldStateController.IsBootWorldActiveGlobally)
+        {
+            TickBootWorldPassive();
+            UpdateFacingFromVelocity();
+            return;
+        }
+
         TickCurrentState();
         UpdateFacingFromVelocity();
+    }
+
+    private void TickBootWorldPassive()
+    {
+        if (currentState == EnemyState.BreakingDoor)
+            doorAttackSource?.CancelAttack();
+
+        if (currentState != EnemyState.SpawnOutside && currentState != EnemyState.SearchOutside)
+            EnterState(EnemyState.SearchOutside);
     }
 
     private void TickCurrentState()
