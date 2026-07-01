@@ -373,9 +373,7 @@ namespace DuoCurtain.Vision
             if (runtimeMaterial != null)
                 return runtimeMaterial;
 
-            Shader shader = GameplayVisualSystem.FindAdaptiveShader();
-            if (shader == null)
-                shader = Shader.Find("Sprites/Default");
+            Shader shader = Shader.Find("Sprites/Default");
             if (shader == null)
                 shader = Shader.Find("Universal Render Pipeline/Unlit");
             if (shader == null)

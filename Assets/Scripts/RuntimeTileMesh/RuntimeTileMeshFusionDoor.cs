@@ -1274,11 +1274,9 @@ namespace DuoCurtain.RuntimeTileMesh
             if (runtimeMaterial != null)
                 return runtimeMaterial;
 
-            Shader shader = GameplayVisualSystem.FindAdaptiveShader();
+            Shader shader = Shader.Find("Sprites/Default");
             if (shader == null)
                 shader = Shader.Find("Universal Render Pipeline/Unlit");
-            if (shader == null)
-                shader = Shader.Find("Sprites/Default");
             if (shader == null)
                 shader = Shader.Find("Unlit/Color");
 

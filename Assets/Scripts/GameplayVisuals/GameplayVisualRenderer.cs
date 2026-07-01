@@ -38,6 +38,10 @@ namespace DuoCurtain.GameplayVisuals
         public Renderer[] renderers;
         public Graphic[] graphics;
 
+        [Header("Compatibility")]
+        [Tooltip("Off by default so the accessibility layer does not replace authored visual materials.")]
+        public bool replaceOriginalMaterials;
+
         [Header("Style")]
         public GameplayVisualProfile profile;
         public bool enableAdaptiveContrast = true;
@@ -127,6 +131,9 @@ namespace DuoCurtain.GameplayVisuals
 
         void Update()
         {
+            if (!replaceOriginalMaterials)
+                return;
+
             float targetBlend = profile != null ? profile.adaptiveBlend : adaptiveBlend;
             float blendSpeed = profile != null ? profile.adaptiveBlendSpeed : adaptiveBlendSpeed;
             if (runtimeAdaptiveBlend < 0f)
@@ -168,6 +175,12 @@ namespace DuoCurtain.GameplayVisuals
 
         public void Refresh()
         {
+            if (!replaceOriginalMaterials)
+            {
+                RestoreOriginalMaterials();
+                return;
+            }
+
             Shader shader = GameplayVisualSystem.FindAdaptiveShader();
             if (shader == null)
                 return;
@@ -190,6 +203,8 @@ namespace DuoCurtain.GameplayVisuals
         {
             primaryColor = brightBackgroundVariant;
             secondaryColor = darkBackgroundVariant;
+            if (!replaceOriginalMaterials)
+                return;
             ApplyProperties();
         }
 

@@ -1343,7 +1343,6 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                 GameplayVisualRenderer visual = GameplayVisualRenderer.Ensure(
                     targetRenderer,
                     GameplayVisualPriority.Interaction);
-                Material adapted = targetRenderer.sharedMaterial;
 
                 if (visual == null ||
                     visual.collectTargetsAutomatically ||
@@ -1355,9 +1354,20 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                     return 1;
                 }
 
+                if (visual.replaceOriginalMaterials ||
+                    targetRenderer.sharedMaterial == null ||
+                    targetRenderer.sharedMaterial.shader == shader)
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] GameplayVisualRenderer must preserve authored sprite materials by default.");
+                    return 1;
+                }
+
+                visual.replaceOriginalMaterials = true;
+                visual.Refresh();
+                Material adapted = targetRenderer.sharedMaterial;
                 if (adapted == null || adapted.shader != shader)
                 {
-                    Debug.LogError("[RuntimeTileMeshSelfTest] GameplayVisualRenderer did not apply the adaptive shader to the target sprite.");
+                    Debug.LogError("[RuntimeTileMeshSelfTest] GameplayVisualRenderer opt-in did not apply the adaptive shader to the target sprite.");
                     return 1;
                 }
 
@@ -1431,6 +1441,17 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                     renderer,
                     GameplayVisualPriority.Interaction);
                 Material adapted = renderer.sharedMaterial;
+                if (visual == null ||
+                    visual.replaceOriginalMaterials ||
+                    adapted != originalMaterial)
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] GameplayVisualRenderer must not replace mesh materials by default.");
+                    return 1;
+                }
+
+                visual.replaceOriginalMaterials = true;
+                visual.Refresh();
+                adapted = renderer.sharedMaterial;
                 if (adapted == null ||
                     adapted.shader != shader ||
                     !adapted.HasProperty(useVertexColorId) ||
