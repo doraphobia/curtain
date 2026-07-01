@@ -8,7 +8,6 @@ namespace DuoCurtain.Vision
     public sealed class ProceduralMeshVisionRenderer : MonoBehaviour, IVisionRenderer
     {
         private const string OutputName = "Procedural Vision Mesh";
-        private const string VisionShaderName = "Duo Curtain/Vision Cone Vertex Color";
 
         [Header("Output")]
         public Material material;
@@ -111,6 +110,8 @@ namespace DuoCurtain.Vision
                 meshRenderer = outputTransform.GetComponent<MeshRenderer>();
                 if (meshRenderer == null)
                     meshRenderer = outputTransform.gameObject.AddComponent<MeshRenderer>();
+                meshRenderer.shadowCastingMode = ShadowCastingMode.Off;
+                meshRenderer.receiveShadows = false;
             }
 
             if (mesh == null)
@@ -355,11 +356,9 @@ namespace DuoCurtain.Vision
             if (runtimeMaterial != null)
                 return runtimeMaterial;
 
-            Shader shader = Shader.Find(VisionShaderName);
+            Shader shader = Shader.Find("Sprites/Default");
             if (shader == null)
                 shader = Shader.Find("Universal Render Pipeline/Unlit");
-            if (shader == null)
-                shader = Shader.Find("Sprites/Default");
             if (shader == null)
                 shader = Shader.Find("Unlit/Color");
             if (shader == null)
@@ -370,12 +369,6 @@ namespace DuoCurtain.Vision
                 name = "Vision Mesh Runtime Material",
                 hideFlags = HideFlags.HideAndDontSave
             };
-            if (runtimeMaterial.HasProperty("_Color"))
-                runtimeMaterial.SetColor("_Color", Color.white);
-            if (runtimeMaterial.HasProperty("_BaseColor"))
-                runtimeMaterial.SetColor("_BaseColor", Color.white);
-            if (runtimeMaterial.HasProperty("_Opacity"))
-                runtimeMaterial.SetFloat("_Opacity", 1f);
             return runtimeMaterial;
         }
 

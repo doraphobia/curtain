@@ -1221,13 +1221,15 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                 }
 
                 MeshRenderer meshRenderer = output != null ? output.GetComponent<MeshRenderer>() : null;
-                Shader visionShader = Shader.Find("Duo Curtain/Vision Cone Vertex Color");
-                if (visionShader != null &&
-                    (meshRenderer == null ||
-                     meshRenderer.sharedMaterial == null ||
-                     meshRenderer.sharedMaterial.shader != visionShader))
+                if (meshRenderer == null || meshRenderer.sharedMaterial == null)
                 {
-                    Debug.LogError("[RuntimeTileMeshSelfTest] Procedural vision mesh must use the dedicated vision cone shader, not the adaptive gameplay visual replacement path.");
+                    Debug.LogError("[RuntimeTileMeshSelfTest] Procedural vision mesh must keep an independent runtime material.");
+                    return 1;
+                }
+
+                if (meshRenderer.sharedMaterial.shader == GameplayVisualSystem.FindAdaptiveShader())
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] Procedural vision mesh must not use the adaptive gameplay visual replacement path.");
                     return 1;
                 }
 
