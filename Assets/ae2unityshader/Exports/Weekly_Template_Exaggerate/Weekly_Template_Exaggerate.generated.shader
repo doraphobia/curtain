@@ -29,6 +29,7 @@
 // - Circle: 3D layers are not shader-converted in the MVP and should be baked.
 // - Circle: blend mode '5212' is not implemented yet.
 // - Princeples of Animation for Motion Design 1 Ease : blend mode '5212' is not implemented yet.
+// - Preview shader 'AE2Unity/Composite Unlit' was not found.
 Shader "AE2Unity/Generated/Weekly_Template_Exaggerate"
 {
     Properties

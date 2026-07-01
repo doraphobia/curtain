@@ -4,6 +4,9 @@
 //
 // Exported layers:
 // - 1: Curtain_Fade [shape], blend=NORMAL, opacity=100
+//
+// Import warnings:
+// - Preview shader 'AE2Unity/Composite Unlit' was not found.
 Shader "AE2Unity/Generated/BasicCurtain"
 {
     Properties

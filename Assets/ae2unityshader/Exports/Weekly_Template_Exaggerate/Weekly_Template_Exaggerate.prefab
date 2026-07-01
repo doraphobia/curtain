@@ -53,7 +53,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4273878755986126164}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1344c3c82d62a2a41a3576d8abb8e3ea, type: 3}
   m_Name: 
@@ -66,7 +66,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Texture: {fileID: 2800000, guid: 44cfd9fe911de4bf198c943801610d87, type: 3}
+  m_Texture: {fileID: 2800000, guid: 88e8df6ab25dd433090f1a71ea8b5ef3, type: 3}
   m_UVRect:
     serializedVersion: 2
     x: 0
@@ -212,4 +212,4 @@ MonoBehaviour:
   playOnAwake: 1
   loop: 1
   playbackSpeed: 1
-  timeSeconds: 4.3459244
+  timeSeconds: 0

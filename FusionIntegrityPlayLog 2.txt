@@ -1,0 +1,23 @@
+[FusionIntegrity] Play session started at t=0.000 scene=RedScene
+[FusionIntegrity] MergeGroup OK | tiles=10 | MergeGroup -> Fusion Block - 1x3 (2 blocks, 10 cells)
+Frame: t=10.487 f=4536
+Before blocks: 2 | After blocks: 1
+Tile Accounting:
+  trigger=Fusion Block - 1x3 (5)
+  existingGroupBlocks=1 existingGroupTileSumRaw=5
+  overlapWithinGroup=0
+  expectedUnion=10 actualMerged=10
+  extra=0 missing=0
+  sandboxBefore=20 sandboxAfter=20 outsideGroupBefore=10
+  triggerTiles=[(2,0), (3,0), (4,0), (2,1), (2,2)]
+  existingGroupTiles=[(3,1), (4,1), (5,1), (3,2), (3,3)]
+  expectedUnionTiles=[(2,0), (3,0), (4,0), (2,1), (3,1), (4,1), (5,1), (2,2), (3,2), (3,3)]
+
+[FusionIntegrity] ManualAudit OK | tiles=0 | Play Session End Audit
+Frame: t=0.000 f=0
+Before blocks: 0 | After blocks: 0
+
+[FusionIntegrity] Play session ended at t=0.000 | activeBlocks=0 | worldTiles=0
+[FusionIntegrity] ManualAudit OK | tiles=0 | Play Session End Audit
+Frame: t=0.000 f=0
+Before blocks: 0 | After blocks: 0
