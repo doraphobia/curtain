@@ -664,6 +664,7 @@ namespace DuoCurtain.RuntimeTileMesh
                 attachmentObject.transform.SetParent(fusionSandbox.transform, true);
             }
 
+            FusionWallAttachment.RefreshAllWindowMergeVisuals();
             return true;
         }
 

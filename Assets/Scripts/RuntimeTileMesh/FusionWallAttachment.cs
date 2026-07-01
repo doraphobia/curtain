@@ -50,10 +50,13 @@ namespace DuoCurtain.RuntimeTileMesh
         [Header("Visibility")]
         public bool registerForVisibility = true;
         public bool mergeAdjacentWindowsForVisibility = true;
+        public bool mergeAdjacentWindowsForVisuals = true;
+        public bool hideMergedWindowFollowers = true;
         [Min(0f)]
         public float mergeGapToleranceInCells = 0.25f;
 
         private static Sprite defaultSprite;
+        private static bool refreshingWindowMerges;
         private SpriteRenderer spriteRenderer;
         private BoxCollider2D windowCollider;
         private HoverScrollColorLerp2D hoverScroll;
@@ -76,10 +79,14 @@ namespace DuoCurtain.RuntimeTileMesh
                 activeWindowAttachments.Add(this);
 
             if (!registerForVisibility)
+            {
+                RefreshAllWindowMergeVisuals();
                 return;
+            }
 
             VisibilityWorld.GetOrCreate().RegisterSource(this);
             MarkVisibilityDirty();
+            RefreshAllWindowMergeVisuals();
         }
 
         void OnDisable()
@@ -88,6 +95,8 @@ namespace DuoCurtain.RuntimeTileMesh
 
             if (VisibilityWorld.Instance != null)
                 VisibilityWorld.Instance.UnregisterSource(this);
+
+            RefreshAllWindowMergeVisuals();
         }
 
         void OnValidate()
@@ -103,6 +112,7 @@ namespace DuoCurtain.RuntimeTileMesh
                 ApplyPlacement();
                 ApplyWindowSettings();
                 MarkVisibilityDirty();
+                RefreshAllWindowMergeVisuals();
             }
         }
 
@@ -132,6 +142,7 @@ namespace DuoCurtain.RuntimeTileMesh
             ApplyPlacement();
             ApplyWindowSettings();
             MarkVisibilityDirty();
+            RefreshAllWindowMergeVisuals();
         }
 
         public void CollectVisibilitySegments(List<VisibilitySegment> results)
@@ -149,7 +160,13 @@ namespace DuoCurtain.RuntimeTileMesh
                 : VisibilitySegmentType.ClosedWindow;
 
             if (mergeAdjacentWindowsForVisibility &&
-                TryGetMergedVisibilitySpan(type, out Vector2 mergedStart, out Vector2 mergedEnd, out FusionWallAttachment representative))
+                TryGetMergedWindowSpan(
+                    forVisualMerge: false,
+                    matchOpenState: !mergeAdjacentWindowsForVisuals,
+                    isOpen: type == VisibilitySegmentType.OpenWindow,
+                    out Vector2 mergedStart,
+                    out Vector2 mergedEnd,
+                    out FusionWallAttachment representative))
             {
                 if (representative != this)
                 {
@@ -173,7 +190,14 @@ namespace DuoCurtain.RuntimeTileMesh
             }
 
             if (windowPortal != null)
+            {
                 windowPortal.ClearRuntimePortalOverride();
+                windowPortal.ConfigurePortal(
+                    edgeCenter,
+                    safeTangent,
+                    outwardNormal,
+                    Mathf.Max(0.01f, lengthInCells) * Mathf.Max(0.01f, gridSize));
+            }
 
             results.Add(new VisibilitySegment(
                 edgeCenter - safeTangent * halfLength,
@@ -183,8 +207,39 @@ namespace DuoCurtain.RuntimeTileMesh
                 windowPortal != null ? windowPortal : this));
         }
 
-        private bool TryGetMergedVisibilitySpan(
-            VisibilitySegmentType type,
+        public static void RefreshAllWindowMergeVisuals()
+        {
+            if (refreshingWindowMerges)
+                return;
+
+            refreshingWindowMerges = true;
+            try
+            {
+                for (int i = activeWindowAttachments.Count - 1; i >= 0; i--)
+                {
+                    FusionWallAttachment attachment = activeWindowAttachments[i];
+                    if (attachment == null)
+                    {
+                        activeWindowAttachments.RemoveAt(i);
+                        continue;
+                    }
+
+                    if (attachment.isActiveAndEnabled)
+                        attachment.ApplyMergedVisualState();
+                }
+            }
+            finally
+            {
+                refreshingWindowMerges = false;
+            }
+
+            MarkVisibilityDirty();
+        }
+
+        private bool TryGetMergedWindowSpan(
+            bool forVisualMerge,
+            bool matchOpenState,
+            bool isOpen,
             out Vector2 mergedStart,
             out Vector2 mergedEnd,
             out FusionWallAttachment representative)
@@ -198,7 +253,6 @@ namespace DuoCurtain.RuntimeTileMesh
             float lineTolerance = safeGridSize * 0.05f;
             float gapTolerance = safeGridSize * Mathf.Max(0f, mergeGapToleranceInCells);
             float lineCoordinate = GetLineCoordinate();
-            bool isOpen = type == VisibilitySegmentType.OpenWindow;
             float selfStart = GetIntervalStart();
             float selfEnd = GetIntervalEnd();
 
@@ -211,7 +265,13 @@ namespace DuoCurtain.RuntimeTileMesh
                     continue;
                 }
 
-                if (!CanMergeWith(attachment, isOpen, lineCoordinate, lineTolerance))
+                if (!CanMergeWith(
+                        attachment,
+                        forVisualMerge,
+                        matchOpenState,
+                        isOpen,
+                        lineCoordinate,
+                        lineTolerance))
                     continue;
 
                 mergeCandidates.Add(new WindowMergeCandidate(
@@ -290,6 +350,8 @@ namespace DuoCurtain.RuntimeTileMesh
 
         private bool CanMergeWith(
             FusionWallAttachment attachment,
+            bool forVisualMerge,
+            bool matchOpenState,
             bool isOpen,
             float lineCoordinate,
             float lineTolerance)
@@ -297,16 +359,30 @@ namespace DuoCurtain.RuntimeTileMesh
             if (attachment == null ||
                 attachment.attachmentType != AttachmentType.Window ||
                 !attachment.isActiveAndEnabled ||
-                !attachment.registerForVisibility ||
-                attachment.axis != axis ||
-                attachment.mergeAdjacentWindowsForVisibility != mergeAdjacentWindowsForVisibility)
+                attachment.axis != axis)
             {
                 return false;
             }
 
+            if (forVisualMerge)
+            {
+                if (!mergeAdjacentWindowsForVisuals || !attachment.mergeAdjacentWindowsForVisuals)
+                    return false;
+            }
+            else
+            {
+                if (!registerForVisibility ||
+                    !attachment.registerForVisibility ||
+                    !mergeAdjacentWindowsForVisibility ||
+                    !attachment.mergeAdjacentWindowsForVisibility)
+                {
+                    return false;
+                }
+            }
+
             attachment.EnsureWindowComponents();
             bool attachmentOpen = attachment.windowPortal != null && attachment.windowPortal.IsOpen;
-            if (attachmentOpen != isOpen)
+            if (matchOpenState && attachmentOpen != isOpen)
                 return false;
 
             if (Mathf.Abs(attachment.GetLineCoordinate() - lineCoordinate) > lineTolerance)
@@ -324,6 +400,57 @@ namespace DuoCurtain.RuntimeTileMesh
                 ? attachment.tangent.normalized
                 : Vector2.up;
             return Mathf.Abs(Vector2.Dot(safeTangent, otherTangent)) >= 0.95f;
+        }
+
+        private void ApplyMergedVisualState()
+        {
+            EnsureWindowComponents();
+
+            if (!mergeAdjacentWindowsForVisuals ||
+                !TryGetMergedWindowSpan(
+                    forVisualMerge: true,
+                    matchOpenState: false,
+                    isOpen: windowPortal != null && windowPortal.IsOpen,
+                    out Vector2 mergedStart,
+                    out Vector2 mergedEnd,
+                    out FusionWallAttachment representative))
+            {
+                SetMergedFollowerState(false);
+                ApplyPlacement();
+                ApplyWindowSettingsWithoutDirty();
+                return;
+            }
+
+            if (representative != this)
+            {
+                SetMergedFollowerState(hideMergedWindowFollowers);
+                if (windowPortal != null)
+                    windowPortal.ClearRuntimePortalOverride();
+                return;
+            }
+
+            SetMergedFollowerState(false);
+            Vector2 mergedCenter = (mergedStart + mergedEnd) * 0.5f;
+            float mergedLength = Vector2.Distance(mergedStart, mergedEnd);
+            ApplyPlacementOverride(mergedCenter, mergedLength);
+            ApplyWindowSettingsWithoutDirty();
+
+            if (windowPortal != null)
+            {
+                windowPortal.SetRuntimePortalOverride(
+                    mergedCenter,
+                    tangent.sqrMagnitude > 0.0001f ? tangent.normalized : Vector2.up,
+                    outwardNormal.sqrMagnitude > 0.0001f ? outwardNormal.normalized : Vector2.right,
+                    Mathf.Max(0.01f, mergedLength));
+            }
+        }
+
+        private void SetMergedFollowerState(bool hiddenFollower)
+        {
+            if (spriteRenderer != null)
+                spriteRenderer.enabled = !hiddenFollower;
+            if (windowCollider != null)
+                windowCollider.enabled = !hiddenFollower;
         }
 
         private float GetLineCoordinate()
@@ -384,8 +511,15 @@ namespace DuoCurtain.RuntimeTileMesh
 
         private void ApplyPlacement()
         {
+            ApplyPlacementOverride(
+                edgeCenter,
+                Mathf.Max(0.01f, lengthInCells) * Mathf.Max(0.01f, gridSize));
+        }
+
+        private void ApplyPlacementOverride(Vector2 centerOnEdge, float worldLength)
+        {
             Vector2 normal = outwardNormal.sqrMagnitude > 0.0001f ? outwardNormal.normalized : Vector2.right;
-            Vector2 center = edgeCenter;
+            Vector2 center = centerOnEdge;
             if (insetIntoFloor)
                 center -= normal * (Mathf.Max(0f, insetDistanceInCells) * gridSize);
 
@@ -394,7 +528,7 @@ namespace DuoCurtain.RuntimeTileMesh
             float angle = axis == RuntimeTileMeshFusionDoor.DoorAxis.Vertical ? 90f : 0f;
             transform.rotation = Quaternion.Euler(0f, 0f, angle);
             transform.localScale = new Vector3(
-                Mathf.Max(0.01f, lengthInCells * gridSize),
+                Mathf.Max(0.01f, worldLength),
                 Mathf.Max(0.01f, thicknessInCells * gridSize),
                 1f);
 
@@ -407,6 +541,12 @@ namespace DuoCurtain.RuntimeTileMesh
         }
 
         private void ApplyWindowSettings()
+        {
+            ApplyWindowSettingsWithoutDirty();
+            MarkVisibilityDirty();
+        }
+
+        private void ApplyWindowSettingsWithoutDirty()
         {
             if (spriteRenderer != null)
             {
@@ -436,8 +576,6 @@ namespace DuoCurtain.RuntimeTileMesh
                     outwardNormal,
                     Mathf.Max(0.01f, lengthInCells) * Mathf.Max(0.01f, gridSize));
             }
-
-            MarkVisibilityDirty();
         }
 
         private static void MarkVisibilityDirty()
