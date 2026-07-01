@@ -84,10 +84,14 @@ namespace DuoCurtain.Combat
     {
         public static event Action<ImpactEvent> Impacted;
         public static int PublishedImpactCount { get; private set; }
+        public static ImpactEvent LastImpact { get; private set; }
+        public static bool HasLastImpact { get; private set; }
 
         public static void Publish(ImpactEvent impact)
         {
             PublishedImpactCount++;
+            LastImpact = impact;
+            HasLastImpact = true;
             Impacted?.Invoke(impact);
         }
     }

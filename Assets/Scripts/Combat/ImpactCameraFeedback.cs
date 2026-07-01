@@ -52,6 +52,10 @@ namespace DuoCurtain.Combat
         private static ImpactCameraFeedback instance;
 
         public int ActiveShakeCount => shakes.Count;
+        public string CurrentCameraName => currentCameraName;
+        public Vector2 LastShakeDirection => lastShakeDirection;
+        public float LastShakeStrength => lastShakeStrength;
+        public float DebugMaximumRadius => maximumRadius;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void EnsureRuntimeInstance()

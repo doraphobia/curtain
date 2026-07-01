@@ -34,6 +34,11 @@ namespace DuoCurtain.Combat
 
         public AttackPhase CurrentPhase => currentPhase;
         public float PhaseElapsed => phaseElapsed;
+        public GameObject TargetObject => target != null ? target.ReceiverObject : null;
+        public string TargetName => TargetObject != null ? TargetObject.name : "none";
+        public float TargetDistance => targetBehaviour != null
+            ? Vector2.Distance(transform.position, targetBehaviour.transform.position)
+            : -1f;
         public float PhaseProgress
         {
             get

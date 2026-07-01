@@ -10,5 +10,7 @@ Feedback is event-driven:
 - `ImpactObjectFeedback` provides one local hit reaction per impact.
 - `ImpactAudioFeedback` is an optional receiver-filtered spatial listener.
 - `DamageReceiverProgressPresenter` listens to health changes and owns the break progress UI.
+- `CombatDebugOverlay` is a runtime-only debug reader. Press F9 to show current camera,
+  published impacts, active camera shakes, attack phases, and receiver HP.
 
 Doors adapt `IDamageReceiver`; enemies never reference cameras, progress bars, audio, or visual feedback.

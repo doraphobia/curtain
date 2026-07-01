@@ -40,6 +40,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             failures += ExpectGameplayVisualAccessibilityShader();
             failures += ExpectGameplayVisualRendererPreservesSpriteInputs();
             failures += ExpectCombatInteractionFlow();
+            failures += ExpectCombatDebugOverlaySnapshot();
 
             if (failures == 0)
             {
@@ -1429,6 +1430,46 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                 ImpactEventBus.Impacted -= impactHandler;
                 UnityEngine.Object.DestroyImmediate(sourceObject);
                 UnityEngine.Object.DestroyImmediate(receiverObject);
+            }
+        }
+
+        private static int ExpectCombatDebugOverlaySnapshot()
+        {
+            GameObject sourceObject = new GameObject("Combat Debug Source");
+            GameObject receiverObject = new GameObject("Combat Debug Receiver");
+            GameObject overlayObject = new GameObject("Combat Debug Overlay Test");
+            try
+            {
+                CombatHealth health = receiverObject.AddComponent<CombatHealth>();
+                health.Configure(100f, false, 0f, null);
+                health.ResetHealth();
+
+                CombatAttackSource attack = sourceObject.AddComponent<CombatAttackSource>();
+                attack.attackDamage = 20f;
+                if (!attack.BeginAttack(health))
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] Combat debug attack source could not bind receiver.");
+                    return 1;
+                }
+
+                CombatDebugOverlay overlay = overlayObject.AddComponent<CombatDebugOverlay>();
+                string snapshot = overlay.BuildSnapshot();
+                if (!snapshot.Contains("Current Camera:") ||
+                    !snapshot.Contains("Published Impacts:") ||
+                    !snapshot.Contains("Attack Sources") ||
+                    !snapshot.Contains("Damage Receivers"))
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] Combat debug overlay snapshot is missing required sections.");
+                    return 1;
+                }
+
+                return 0;
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(sourceObject);
+                UnityEngine.Object.DestroyImmediate(receiverObject);
+                UnityEngine.Object.DestroyImmediate(overlayObject);
             }
         }
 
