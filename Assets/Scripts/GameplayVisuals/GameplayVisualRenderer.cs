@@ -7,6 +7,10 @@ namespace DuoCurtain.GameplayVisuals
     [DisallowMultipleComponent]
     public sealed class GameplayVisualRenderer : MonoBehaviour
     {
+        private static readonly int MainTexId = Shader.PropertyToID("_MainTex");
+        private static readonly int BaseMapId = Shader.PropertyToID("_BaseMap");
+        private static readonly int ColorId = Shader.PropertyToID("_Color");
+        private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
         private static readonly int PrimaryColorId = Shader.PropertyToID("_PrimaryColor");
         private static readonly int SecondaryColorId = Shader.PropertyToID("_SecondaryColor");
         private static readonly int ContrastStrengthId = Shader.PropertyToID("_ContrastStrength");
@@ -54,6 +58,8 @@ namespace DuoCurtain.GameplayVisuals
             new Dictionary<Renderer, Material[]>();
         private readonly Dictionary<Graphic, Material> originalGraphicMaterials =
             new Dictionary<Graphic, Material>();
+        private readonly Dictionary<Renderer, Material[]> adaptiveRendererMaterials =
+            new Dictionary<Renderer, Material[]>();
         private readonly List<Material> runtimeMaterials = new List<Material>();
         private Material sharedRuntimeMaterial;
         private MaterialPropertyBlock propertyBlock;
@@ -78,9 +84,13 @@ namespace DuoCurtain.GameplayVisuals
             if (target == null)
                 return null;
 
-            GameplayVisualRenderer visual = Ensure(target.gameObject, visualPriority);
+            GameplayVisualRenderer visual = target.gameObject.GetComponent<GameplayVisualRenderer>();
+            if (visual == null)
+                visual = target.gameObject.AddComponent<GameplayVisualRenderer>();
             visual.renderers = new[] { target };
             visual.graphics = null;
+            visual.collectTargetsAutomatically = false;
+            visual.priority = visualPriority;
             visual.Refresh();
             return visual;
         }
@@ -90,9 +100,13 @@ namespace DuoCurtain.GameplayVisuals
             if (target == null)
                 return null;
 
-            GameplayVisualRenderer visual = Ensure(target.gameObject, visualPriority);
+            GameplayVisualRenderer visual = target.gameObject.GetComponent<GameplayVisualRenderer>();
+            if (visual == null)
+                visual = target.gameObject.AddComponent<GameplayVisualRenderer>();
             visual.graphics = new[] { target };
             visual.renderers = null;
+            visual.collectTargetsAutomatically = false;
+            visual.priority = visualPriority;
             visual.Refresh();
             return visual;
         }
@@ -157,7 +171,7 @@ namespace DuoCurtain.GameplayVisuals
                 runtimeAdaptiveBlend = targetBlend;
 
             EnsureSharedMaterial(shader);
-            ApplyRendererMaterials();
+            ApplyRendererMaterials(shader);
             ApplyGraphicMaterials(shader);
             ApplyProperties();
             applied = true;
@@ -194,9 +208,9 @@ namespace DuoCurtain.GameplayVisuals
             runtimeMaterials.Add(sharedRuntimeMaterial);
         }
 
-        private void ApplyRendererMaterials()
+        private void ApplyRendererMaterials(Shader shader)
         {
-            if (renderers == null || sharedRuntimeMaterial == null)
+            if (renderers == null || shader == null)
                 return;
 
             for (int i = 0; i < renderers.Length; i++)
@@ -208,11 +222,10 @@ namespace DuoCurtain.GameplayVisuals
                 if (!originalRendererMaterials.ContainsKey(target))
                     originalRendererMaterials.Add(target, target.sharedMaterials);
 
-                Material[] source = target.sharedMaterials;
+                Material[] source = originalRendererMaterials[target];
                 int materialCount = Mathf.Max(1, source != null ? source.Length : 0);
-                Material[] adaptive = new Material[materialCount];
-                for (int m = 0; m < adaptive.Length; m++)
-                    adaptive[m] = sharedRuntimeMaterial;
+                Material[] adaptive = GetOrCreateAdaptiveRendererMaterials(target, source, materialCount, shader);
+                SyncRendererMaterialInputs(target, source, adaptive);
                 target.sharedMaterials = adaptive;
             }
         }
@@ -233,13 +246,18 @@ namespace DuoCurtain.GameplayVisuals
 
                 Material material = target.material;
                 if (material != null && material.shader == shader && runtimeMaterials.Contains(material))
+                {
+                    SyncGraphicMaterialInputs(target, material, originalGraphicMaterials[target]);
                     continue;
+                }
 
                 Material adaptive = new Material(shader)
                 {
                     name = target.name + " Adaptive Contrast (Runtime)",
                     hideFlags = HideFlags.HideAndDontSave
                 };
+                CopyCommonMaterialInputs(originalGraphicMaterials[target], adaptive);
+                SyncGraphicMaterialInputs(target, adaptive, originalGraphicMaterials[target]);
                 runtimeMaterials.Add(adaptive);
                 target.material = adaptive;
             }
@@ -330,6 +348,177 @@ namespace DuoCurtain.GameplayVisuals
             material.SetFloat(DebugModeId, (float)values.debugMode);
         }
 
+        private Material[] GetOrCreateAdaptiveRendererMaterials(
+            Renderer target,
+            Material[] source,
+            int materialCount,
+            Shader shader)
+        {
+            if (adaptiveRendererMaterials.TryGetValue(target, out Material[] existing) &&
+                existing != null &&
+                existing.Length == materialCount &&
+                AllUseShader(existing, shader))
+            {
+                return existing;
+            }
+
+            if (existing != null)
+            {
+                for (int i = 0; i < existing.Length; i++)
+                {
+                    runtimeMaterials.Remove(existing[i]);
+                    DestroyRuntimeMaterial(existing[i]);
+                }
+            }
+
+            Material[] adaptive = new Material[materialCount];
+            for (int i = 0; i < materialCount; i++)
+            {
+                Material original = source != null && i < source.Length ? source[i] : null;
+                adaptive[i] = new Material(shader)
+                {
+                    name = target.name + " Adaptive Contrast " + i + " (Runtime)",
+                    hideFlags = HideFlags.HideAndDontSave
+                };
+                CopyCommonMaterialInputs(original, adaptive[i]);
+                runtimeMaterials.Add(adaptive[i]);
+            }
+
+            adaptiveRendererMaterials[target] = adaptive;
+            return adaptive;
+        }
+
+        private static bool AllUseShader(Material[] materials, Shader shader)
+        {
+            for (int i = 0; i < materials.Length; i++)
+            {
+                if (materials[i] == null || materials[i].shader != shader)
+                    return false;
+            }
+
+            return true;
+        }
+
+        private static void SyncRendererMaterialInputs(
+            Renderer target,
+            Material[] source,
+            Material[] adaptive)
+        {
+            if (adaptive == null)
+                return;
+
+            Texture spriteTexture = null;
+            Color rendererColor = Color.white;
+            bool useRendererVertexColor = false;
+            if (target is SpriteRenderer spriteRenderer)
+            {
+                spriteTexture = spriteRenderer.sprite != null ? spriteRenderer.sprite.texture : null;
+                rendererColor = spriteRenderer.color;
+                useRendererVertexColor = true;
+            }
+
+            for (int i = 0; i < adaptive.Length; i++)
+            {
+                Material material = adaptive[i];
+                if (material == null)
+                    continue;
+
+                Material original = source != null && i < source.Length ? source[i] : null;
+                if (spriteTexture != null && material.HasProperty(MainTexId))
+                    material.SetTexture(MainTexId, spriteTexture);
+                else
+                    CopyTexture(original, material, MainTexId, BaseMapId);
+
+                if (!useRendererVertexColor)
+                    CopyColor(original, material, ColorId, BaseColorId, rendererColor);
+                else
+                    SetColorIfPresent(material, ColorId, Color.white);
+            }
+        }
+
+        private static void SyncGraphicMaterialInputs(Graphic target, Material adaptive, Material original)
+        {
+            if (target == null || adaptive == null)
+                return;
+
+            Texture texture = target.mainTexture;
+            if (texture != null && adaptive.HasProperty(MainTexId))
+                adaptive.SetTexture(MainTexId, texture);
+            else
+                CopyTexture(original, adaptive, MainTexId, BaseMapId);
+
+            SetColorIfPresent(adaptive, ColorId, Color.white);
+            SetColorIfPresent(adaptive, BaseColorId, Color.white);
+        }
+
+        private static void CopyCommonMaterialInputs(Material source, Material destination)
+        {
+            if (destination == null)
+                return;
+
+            CopyTexture(source, destination, MainTexId, BaseMapId);
+            CopyTexture(source, destination, BaseMapId, MainTexId);
+            CopyColor(source, destination, ColorId, BaseColorId, Color.white);
+            CopyColor(source, destination, BaseColorId, ColorId, Color.white);
+
+            CopyFloat(source, destination, Shader.PropertyToID("_StencilComp"));
+            CopyFloat(source, destination, Shader.PropertyToID("_Stencil"));
+            CopyFloat(source, destination, Shader.PropertyToID("_StencilOp"));
+            CopyFloat(source, destination, Shader.PropertyToID("_StencilWriteMask"));
+            CopyFloat(source, destination, Shader.PropertyToID("_StencilReadMask"));
+            CopyFloat(source, destination, Shader.PropertyToID("_ColorMask"));
+        }
+
+        private static void CopyTexture(Material source, Material destination, int preferredSourceId, int fallbackSourceId)
+        {
+            if (destination == null || !destination.HasProperty(MainTexId))
+                return;
+
+            Texture texture = null;
+            if (source != null)
+            {
+                if (source.HasProperty(preferredSourceId))
+                    texture = source.GetTexture(preferredSourceId);
+                if (texture == null && source.HasProperty(fallbackSourceId))
+                    texture = source.GetTexture(fallbackSourceId);
+            }
+
+            if (texture != null)
+                destination.SetTexture(MainTexId, texture);
+        }
+
+        private static void CopyColor(Material source, Material destination, int preferredSourceId, int fallbackSourceId, Color fallback)
+        {
+            if (destination == null)
+                return;
+
+            Color color = fallback;
+            if (source != null)
+            {
+                if (source.HasProperty(preferredSourceId))
+                    color = source.GetColor(preferredSourceId);
+                else if (source.HasProperty(fallbackSourceId))
+                    color = source.GetColor(fallbackSourceId);
+            }
+
+            SetColorIfPresent(destination, ColorId, color);
+            SetColorIfPresent(destination, BaseColorId, color);
+        }
+
+        private static void SetColorIfPresent(Material material, int id, Color color)
+        {
+            if (material != null && material.HasProperty(id))
+                material.SetColor(id, color);
+        }
+
+        private static void CopyFloat(Material source, Material destination, int id)
+        {
+            if (source == null || destination == null || !source.HasProperty(id) || !destination.HasProperty(id))
+                return;
+
+            destination.SetFloat(id, source.GetFloat(id));
+        }
+
         private void RestoreOriginalMaterials()
         {
             if (!applied)
@@ -348,6 +537,7 @@ namespace DuoCurtain.GameplayVisuals
 
             originalRendererMaterials.Clear();
             originalGraphicMaterials.Clear();
+            adaptiveRendererMaterials.Clear();
             applied = false;
         }
 

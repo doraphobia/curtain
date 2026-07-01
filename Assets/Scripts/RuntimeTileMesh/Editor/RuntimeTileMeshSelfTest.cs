@@ -1,6 +1,7 @@
 #if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
+using DuoCurtain.Combat;
 using DuoCurtain.GameplayVisuals;
 using DuoCurtain.Vision;
 using UnityEditor;
@@ -37,6 +38,8 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             failures += ExpectFusionIntegrityUsesLatestBuild();
             failures += ExpectVisionConeAndProceduralRenderer();
             failures += ExpectGameplayVisualAccessibilityShader();
+            failures += ExpectGameplayVisualRendererPreservesSpriteInputs();
+            failures += ExpectCombatInteractionFlow();
 
             if (failures == 0)
             {
@@ -1291,6 +1294,142 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             }
 
             return 0;
+        }
+
+        private static int ExpectGameplayVisualRendererPreservesSpriteInputs()
+        {
+            Shader shader = GameplayVisualSystem.FindAdaptiveShader();
+            if (shader == null)
+                return 1;
+
+            Texture2D texture = new Texture2D(2, 2, TextureFormat.RGBA32, false)
+            {
+                name = "RuntimeTileMeshSelfTest Sprite Texture",
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            texture.SetPixels(new[]
+            {
+                Color.clear,
+                Color.white,
+                Color.white,
+                Color.clear
+            });
+            texture.Apply(false, true);
+
+            Sprite sprite = Sprite.Create(
+                texture,
+                new Rect(0f, 0f, texture.width, texture.height),
+                new Vector2(0.5f, 0.5f),
+                1f);
+            sprite.name = "RuntimeTileMeshSelfTest Sprite";
+            sprite.hideFlags = HideFlags.HideAndDontSave;
+
+            GameObject root = new GameObject("Gameplay Visual Scope Root");
+            GameObject targetObject = new GameObject("Gameplay Visual Target");
+            GameObject siblingObject = new GameObject("Gameplay Visual Sibling");
+            targetObject.transform.SetParent(root.transform, false);
+            siblingObject.transform.SetParent(root.transform, false);
+
+            try
+            {
+                SpriteRenderer targetRenderer = targetObject.AddComponent<SpriteRenderer>();
+                targetRenderer.sprite = sprite;
+                SpriteRenderer siblingRenderer = siblingObject.AddComponent<SpriteRenderer>();
+                siblingRenderer.sprite = sprite;
+                Material siblingOriginal = siblingRenderer.sharedMaterial;
+
+                GameplayVisualRenderer visual = GameplayVisualRenderer.Ensure(
+                    targetRenderer,
+                    GameplayVisualPriority.Interaction);
+                Material adapted = targetRenderer.sharedMaterial;
+
+                if (visual == null ||
+                    visual.collectTargetsAutomatically ||
+                    visual.renderers == null ||
+                    visual.renderers.Length != 1 ||
+                    visual.renderers[0] != targetRenderer)
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] GameplayVisualRenderer.Ensure(Renderer) must bind only the requested renderer.");
+                    return 1;
+                }
+
+                if (adapted == null || adapted.shader != shader)
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] GameplayVisualRenderer did not apply the adaptive shader to the target sprite.");
+                    return 1;
+                }
+
+                if (!adapted.HasProperty("_MainTex") || adapted.GetTexture("_MainTex") != texture)
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] GameplayVisualRenderer did not preserve the target sprite texture.");
+                    return 1;
+                }
+
+                if (siblingRenderer.sharedMaterial != siblingOriginal)
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] GameplayVisualRenderer.Ensure(Renderer) modified a sibling renderer.");
+                    return 1;
+                }
+
+                return 0;
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+                UnityEngine.Object.DestroyImmediate(sprite);
+                UnityEngine.Object.DestroyImmediate(texture);
+            }
+        }
+
+        private static int ExpectCombatInteractionFlow()
+        {
+            GameObject sourceObject = new GameObject("Combat Self Test Source");
+            GameObject receiverObject = new GameObject("Combat Self Test Receiver");
+            int impactCount = 0;
+            int destroyedCount = 0;
+            Action<ImpactEvent> impactHandler = _ => impactCount++;
+            try
+            {
+                CombatHealth health = receiverObject.AddComponent<CombatHealth>();
+                health.Configure(100f, false, 0f, null);
+                health.ResetHealth();
+
+                CombatAttackSource attack = sourceObject.AddComponent<CombatAttackSource>();
+                attack.attackDamage = 20f;
+                attack.attackInterval = 1f;
+                attack.windupDuration = 0.25f;
+                attack.recoveryDuration = 0.75f;
+                attack.TargetDestroyed += (_, __) => destroyedCount++;
+                ImpactEventBus.Impacted += impactHandler;
+
+                if (!attack.BeginAttack(health))
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] Combat attack source could not acquire an IDamageReceiver.");
+                    return 1;
+                }
+
+                for (int i = 0; i < 18 && !health.IsDestroyed; i++)
+                    attack.TickAttack(0.25f);
+
+                if (!health.IsDestroyed ||
+                    Mathf.Abs(health.CurrentHealth) > 0.0001f ||
+                    impactCount != 5 ||
+                    destroyedCount != 1)
+                {
+                    Debug.LogError(
+                        "[RuntimeTileMeshSelfTest] Discrete combat expected 5 impacts, 0 HP, and one destroy event; got impacts=" +
+                        impactCount + " hp=" + health.CurrentHealth + " destroyedEvents=" + destroyedCount + ".");
+                    return 1;
+                }
+
+                return 0;
+            }
+            finally
+            {
+                ImpactEventBus.Impacted -= impactHandler;
+                UnityEngine.Object.DestroyImmediate(sourceObject);
+                UnityEngine.Object.DestroyImmediate(receiverObject);
+            }
         }
 
         private static RuntimeTileMeshDraggableBlock CreateSelfTestBlock(

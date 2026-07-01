@@ -1,4 +1,5 @@
 using UnityEngine;
+using DuoCurtain.Combat;
 using DuoCurtain.Vision;
 
 namespace DuoCurtain.RuntimeTileMesh
@@ -40,20 +41,17 @@ namespace DuoCurtain.RuntimeTileMesh
         public float windowCheckInterval = 0.2f;
         public bool targetFusionDoorAfterWindowDetection = true;
 
-        [Header("Door Flow")]
+        [Header("Door Attack")]
         [Min(0.01f)]
         public float doorTargetStopDistance = 0.25f;
-        [Min(0f)]
-        public float doorBreakDuration = 5f;
-        [Min(0f)]
-        public float minimumDoorBreakDuration = 5f;
+        [Min(0f)] public float doorAttackDamage = 20f;
+        [Min(0.01f)] public float doorAttackInterval = 1f;
+        [Min(0f)] public float doorAttackWindup = 0.25f;
+        [Min(0f)] public float doorAttackRecovery = 0.75f;
+        [Min(0f)] public float doorAttackRange = 0.6f;
+        public ImpactFeedbackPreset doorImpactPreset;
         [Min(0f)]
         public float enterRoomDelay = 0.25f;
-        public bool openFusionDoorAfterBreak = true;
-        public bool showDoorBreakProgress = true;
-        public Vector3 doorBreakProgressOffset = new Vector3(0f, 0.75f, 0f);
-        [Min(0.01f)]
-        public float doorBreakProgressSmoothSpeed = 8f;
 
         [Header("Sanity Pressure")]
         public bool damageSanityOnWindowDetection = true;
@@ -116,7 +114,6 @@ namespace DuoCurtain.RuntimeTileMesh
         private Vector3 waypoint;
         private float waypointTimer;
         private float windowCheckTimer;
-        private float doorBreakTimer;
         private float enterRoomTimer;
         private bool confirmedPlayerByVision;
         private RuntimeTileMeshFusionDoor targetDoor;
@@ -126,8 +123,7 @@ namespace DuoCurtain.RuntimeTileMesh
         private Transform visionVisualRoot;
         private LineRenderer visionPrimaryLine;
         private LineRenderer visionWindowProjectionLine;
-        private RuntimeTileMeshFusionDoor progressBarDoor;
-        private DoorBreakProgressBar doorBreakProgressBar;
+        private CombatAttackSource doorAttackSource;
         private bool windowSanityDamageApplied;
         private float lastContactDamageTime = -999f;
         private Vector2 lastMoveDirection = Vector2.up;
@@ -148,6 +144,7 @@ namespace DuoCurtain.RuntimeTileMesh
 
             footprintTrace.SetTraceState(EnemyTraceState.NormalMoving);
             lastValidOutdoorPosition = transform.position;
+            EnsureDoorAttackSource();
             EnsureVisionSystem();
             PickOutsideWaypoint();
         }
@@ -165,32 +162,15 @@ namespace DuoCurtain.RuntimeTileMesh
 
         void OnDestroy()
         {
+            UnbindDoorAttackSource();
             if (runtimeVisionMaterial == null)
-            {
-                DestroyDoorBreakProgressBar();
                 return;
-            }
 
             if (Application.isPlaying)
                 Destroy(runtimeVisionMaterial);
             else
                 DestroyImmediate(runtimeVisionMaterial);
 
-            DestroyDoorBreakProgressBar();
-        }
-
-        private void DestroyDoorBreakProgressBar()
-        {
-            if (doorBreakProgressBar == null)
-                return;
-
-            if (Application.isPlaying)
-                Destroy(doorBreakProgressBar.gameObject);
-            else
-                DestroyImmediate(doorBreakProgressBar.gameObject);
-
-            doorBreakProgressBar = null;
-            progressBarDoor = null;
         }
 
         public void Configure(
@@ -210,6 +190,7 @@ namespace DuoCurtain.RuntimeTileMesh
             footprintTrace.ConfigureFootprintPrefabs(leftFootprintPrefab, rightFootprintPrefab, footprintParent);
             footprintTrace.SetTraceState(EnemyTraceState.NormalMoving);
             lastValidOutdoorPosition = transform.position;
+            EnsureDoorAttackSource();
             EnsureVisionSystem();
         }
 
@@ -314,14 +295,31 @@ namespace DuoCurtain.RuntimeTileMesh
                     return;
 
                 case TraceEnemyState.BreakingDoor:
-                    doorBreakTimer += Time.deltaTime;
-                    UpdateDoorBreakProgress();
-                    if (doorBreakTimer >= GetEffectiveDoorBreakDuration())
+                    if (targetDoor == null)
                     {
-                        if (openFusionDoorAfterBreak && targetDoor != null)
-                            targetDoor.OpenToward((Vector2)(targetDoor.transform.position - transform.position));
-                        SetState(TraceEnemyState.EnteredRoom);
+                        doorAttackSource?.CancelAttack();
+                        SetState(TraceEnemyState.WanderOutside);
+                        return;
                     }
+
+                    if (targetDoor.IsDestroyed || targetDoor.IsOpen)
+                    {
+                        doorAttackSource?.CancelAttack();
+                        SetState(TraceEnemyState.EnteredRoom);
+                        return;
+                    }
+
+                    float distanceToDoor = Vector2.Distance(transform.position, targetDoor.transform.position);
+                    if (distanceToDoor > Mathf.Max(doorAttackRange, doorTargetStopDistance))
+                    {
+                        doorAttackSource?.CancelAttack();
+                        SetState(TraceEnemyState.TargetingDoor);
+                        return;
+                    }
+
+                    EnsureDoorAttackSource();
+                    if (doorAttackSource != null && !doorAttackSource.IsAttacking)
+                        doorAttackSource.BeginAttack(targetDoor);
                     return;
 
                 case TraceEnemyState.EnteredRoom:
@@ -457,6 +455,9 @@ namespace DuoCurtain.RuntimeTileMesh
             if (currentState == state)
                 return;
 
+            if (currentState == TraceEnemyState.BreakingDoor && state != TraceEnemyState.BreakingDoor)
+                doorAttackSource?.CancelAttack();
+
             if (debugEnemyFlow)
                 Debug.Log("[EnemyFlow] State=" + currentState + " -> " + state, this);
 
@@ -467,78 +468,28 @@ namespace DuoCurtain.RuntimeTileMesh
             switch (currentState)
             {
                 case TraceEnemyState.WatchingWindow:
-                    HideDoorBreakProgress();
                     footprintTrace.SetTraceState(EnemyTraceState.Watching);
                     break;
                 case TraceEnemyState.TargetingDoor:
-                    HideDoorBreakProgress();
                     footprintTrace.SetTraceState(EnemyTraceState.TargetingDoor);
                     break;
                 case TraceEnemyState.BreakingDoor:
-                    doorBreakTimer = 0f;
-                    EnsureDoorBreakProgress();
-                    if (doorBreakProgressBar != null)
-                        doorBreakProgressBar.SetProgress(0f, true);
+                    EnsureDoorAttackSource();
+                    if (targetDoor != null)
+                        doorAttackSource?.BeginAttack(targetDoor);
                     footprintTrace.SetTraceState(EnemyTraceState.BreakingDoor);
                     break;
                 case TraceEnemyState.EnteredRoom:
                     enterRoomTimer = 0f;
-                    if (doorBreakProgressBar != null)
-                        doorBreakProgressBar.SetProgress(1f, true);
                     footprintTrace.SetTraceState(EnemyTraceState.ChasingPlayer);
                     break;
                 case TraceEnemyState.ChasingPlayer:
-                    HideDoorBreakProgress();
                     footprintTrace.SetTraceState(EnemyTraceState.ChasingPlayer);
                     break;
                 default:
-                    HideDoorBreakProgress();
                     footprintTrace.SetTraceState(EnemyTraceState.NormalMoving);
                     break;
             }
-        }
-
-        private void EnsureDoorBreakProgress()
-        {
-            if (!showDoorBreakProgress || targetDoor == null)
-                return;
-
-            if (doorBreakProgressBar != null && progressBarDoor == targetDoor)
-                return;
-
-            if (doorBreakProgressBar != null)
-                Destroy(doorBreakProgressBar.gameObject);
-
-            progressBarDoor = targetDoor;
-            doorBreakProgressBar = DoorBreakProgressBar.CreateDefault(targetDoor.transform, doorBreakProgressOffset);
-            doorBreakProgressBar.smoothSpeed = Mathf.Max(0.01f, doorBreakProgressSmoothSpeed);
-        }
-
-        private void UpdateDoorBreakProgress()
-        {
-            if (!showDoorBreakProgress)
-                return;
-
-            EnsureDoorBreakProgress();
-            if (doorBreakProgressBar == null)
-                return;
-
-            float effectiveDuration = GetEffectiveDoorBreakDuration();
-            float normalized = effectiveDuration > 0.0001f
-                ? Mathf.Clamp01(doorBreakTimer / effectiveDuration)
-                : 1f;
-            doorBreakProgressBar.SetProgress(normalized, true);
-        }
-
-        private float GetEffectiveDoorBreakDuration()
-        {
-            return Mathf.Max(0.0001f, doorBreakDuration, minimumDoorBreakDuration);
-        }
-
-        private void HideDoorBreakProgress()
-        {
-            if (doorBreakProgressBar != null)
-                doorBreakProgressBar.SetVisible(false);
         }
 
         private bool TrySelectNearestFusionDoor(out RuntimeTileMeshFusionDoor nearestDoor)
@@ -570,6 +521,51 @@ namespace DuoCurtain.RuntimeTileMesh
             }
 
             return nearestDoor != null;
+        }
+
+        private void EnsureDoorAttackSource()
+        {
+            if (doorAttackSource == null)
+                doorAttackSource = GetComponent<CombatAttackSource>();
+            if (doorAttackSource == null)
+                doorAttackSource = gameObject.AddComponent<CombatAttackSource>();
+
+            doorAttackSource.attackDamage = Mathf.Max(0f, doorAttackDamage);
+            doorAttackSource.attackInterval = Mathf.Max(0.01f, doorAttackInterval);
+            doorAttackSource.windupDuration = Mathf.Max(0f, doorAttackWindup);
+            doorAttackSource.recoveryDuration = Mathf.Max(0f, doorAttackRecovery);
+            doorAttackSource.attackRange = Mathf.Max(0f, doorAttackRange);
+            doorAttackSource.impactPreset = doorImpactPreset;
+            doorAttackSource.Impacted -= HandleDoorAttackImpact;
+            doorAttackSource.TargetDestroyed -= HandleDoorDestroyed;
+            doorAttackSource.Impacted += HandleDoorAttackImpact;
+            doorAttackSource.TargetDestroyed += HandleDoorDestroyed;
+        }
+
+        private void UnbindDoorAttackSource()
+        {
+            if (doorAttackSource == null)
+                return;
+            doorAttackSource.Impacted -= HandleDoorAttackImpact;
+            doorAttackSource.TargetDestroyed -= HandleDoorDestroyed;
+        }
+
+        private void HandleDoorAttackImpact(CombatAttackSource source, DamageResult result)
+        {
+            if (debugEnemyFlow)
+            {
+                Debug.Log(
+                    "[EnemyCombat] phase=Impact hp=" + result.currentHealth.ToString("0.0") +
+                    " destroyed=" + result.destroyed,
+                    this);
+            }
+        }
+
+        private void HandleDoorDestroyed(CombatAttackSource source, IDamageReceiver receiver)
+        {
+            if (targetDoor == null || receiver == null || receiver.ReceiverObject != targetDoor.gameObject)
+                return;
+            SetState(TraceEnemyState.EnteredRoom);
         }
 
         private static bool IsHiddenPreviewDoor(RuntimeTileMeshFusionDoor door)

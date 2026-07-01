@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using DuoCurtain.Combat;
 using DuoCurtain.GameplayVisuals;
 using DuoCurtain.Vision;
 using UnityEngine;
@@ -6,7 +7,7 @@ using UnityEngine;
 namespace DuoCurtain.RuntimeTileMesh
 {
     [DisallowMultipleComponent]
-    public class RuntimeTileMeshFusionDoor : MonoBehaviour, IVisibilitySegmentSource, IVisibilityOpeningSource
+    public class RuntimeTileMeshFusionDoor : MonoBehaviour, IVisibilitySegmentSource, IVisibilityOpeningSource, IDamageReceiver
     {
         private const string DoorPanelName = "Door Panel";
         private const string WallVisualName = "Wall Visual";
@@ -57,6 +58,15 @@ namespace DuoCurtain.RuntimeTileMesh
         [Min(0.5f)]
         public float endWobbleOscillations = 2.5f;
 
+        [Header("Combat Health")]
+        [Min(0.01f)] public float maxHealth = 100f;
+        public bool invulnerable;
+        [Min(0f)] public float destroyDelay;
+        public ImpactFeedbackPreset impactPreset;
+        public bool showCombatProgress = true;
+        public Vector3 combatProgressOffset = new Vector3(0f, 0.75f, 0f);
+        [Min(0.01f)] public float combatProgressSmoothSpeed = 8f;
+
         [Header("Wall Edge")]
         public int wallEdgeCoordinate;
         public int wallVariableStart;
@@ -100,6 +110,10 @@ namespace DuoCurtain.RuntimeTileMesh
         private Material wallRuntimeMaterial;
         private MaterialPropertyBlock propertyBlock;
         private GameplayVisualRenderer adaptiveVisualRenderer;
+        private CombatHealth combatHealth;
+        private DamageReceiverProgressPresenter combatProgressPresenter;
+        private ImpactObjectFeedback impactObjectFeedback;
+        private bool isDestroyed;
         private Mesh runtimeMesh;
         private Transform wallVisualRoot;
         private float lastToggleTime = -999f;
@@ -115,6 +129,11 @@ namespace DuoCurtain.RuntimeTileMesh
         private readonly Dictionary<int, Vector2> wallVisualOffsetsByVariable = new Dictionary<int, Vector2>();
 
         public bool IsOpen => isOpen;
+        public bool IsDestroyed => isDestroyed || (combatHealth != null && combatHealth.IsDestroyed);
+        public GameObject ReceiverObject => gameObject;
+        public float CurrentHealth => combatHealth != null ? combatHealth.CurrentHealth : maxHealth;
+        public float MaxHealth => combatHealth != null ? combatHealth.MaxHealth : maxHealth;
+        public float NormalizedHealth => combatHealth != null ? combatHealth.NormalizedHealth : 1f;
         public Vector2 OpenDirection => openDirection;
         public DoorHingeEnd HingeEnd => hingeEnd;
         public Vector2 HingeWorldPoint => GetHingePoint(hingeEnd);
@@ -127,6 +146,7 @@ namespace DuoCurtain.RuntimeTileMesh
 
             currentOpenAmount = isOpen ? 1f : 0f;
             EnsureVisual();
+            EnsureCombatHealth();
             ApplyVisualState();
         }
 
@@ -172,6 +192,8 @@ namespace DuoCurtain.RuntimeTileMesh
             endWobbleDuration = Mathf.Max(0f, endWobbleDuration);
             endWobbleAmplitudeDegrees = Mathf.Max(0f, endWobbleAmplitudeDegrees);
             endWobbleOscillations = Mathf.Max(0.5f, endWobbleOscillations);
+            maxHealth = Mathf.Max(0.01f, maxHealth);
+            destroyDelay = Mathf.Max(0f, destroyDelay);
             wallCellLength = Mathf.Max(1, wallCellLength);
             doorVariableOffset = Mathf.Clamp(doorVariableOffset, 0, Mathf.Max(0, wallCellLength - 1));
             wallLineWidth = Mathf.Max(0.005f, wallLineWidth);
@@ -188,12 +210,14 @@ namespace DuoCurtain.RuntimeTileMesh
                 if (!isAnimating && !isWobbling)
                     currentOpenAmount = isOpen ? 1f : 0f;
                 ApplyVisualState();
+                EnsureCombatHealth();
                 MarkVisibilityDirty();
             }
         }
 
         void OnDestroy()
         {
+            UnbindCombatHealth();
             if (runtimeMaterial != null)
             {
                 if (Application.isPlaying)
@@ -249,6 +273,7 @@ namespace DuoCurtain.RuntimeTileMesh
             wallColor = debugWallColor;
             wallLineWidth = Mathf.Max(0.005f, debugWallLineWidth);
             isOpen = false;
+            isDestroyed = false;
             openDirection = axis == DoorAxis.Vertical ? Vector2.right : Vector2.up;
             hingeEnd = DoorHingeEnd.Negative;
             currentOpenAmount = 0f;
@@ -257,6 +282,8 @@ namespace DuoCurtain.RuntimeTileMesh
 
             CacheDefaultWallSupport();
             EnsureVisual();
+            EnsureCombatHealth();
+            ResetHealth();
             RebuildWallVisual();
             ApplyVisualState();
             MarkVisibilityDirty();
@@ -517,6 +544,8 @@ namespace DuoCurtain.RuntimeTileMesh
 
         public void OpenToward(Vector2 movement, Vector2 impactPoint)
         {
+            if (IsDestroyed)
+                return;
             Vector2 direction = GetAxisOpenDirection(movement);
             if (direction.sqrMagnitude > 0.0001f)
                 openDirection = direction.normalized;
@@ -530,6 +559,8 @@ namespace DuoCurtain.RuntimeTileMesh
 
         public void Close()
         {
+            if (IsDestroyed)
+                return;
             isOpen = false;
             lastToggleTime = Time.time;
             StartDoorTransition(0f, closeDuration);
@@ -613,6 +644,151 @@ namespace DuoCurtain.RuntimeTileMesh
             VisibilityWorld.MarkActiveWorldDirty();
         }
 
+        public DamageResult ReceiveDamage(DamageRequest request)
+        {
+            EnsureCombatHealth();
+            ImpactFeedbackPreset selectedPreset = request.impactPreset != null ? request.impactPreset : impactPreset;
+            DamageRequest resolvedRequest = new DamageRequest(
+                request.source,
+                request.amount,
+                request.worldPosition,
+                request.direction,
+                selectedPreset,
+                request.randomSeed);
+            return combatHealth != null
+                ? combatHealth.ReceiveDamage(resolvedRequest)
+                : new DamageResult(false, maxHealth, maxHealth, isDestroyed);
+        }
+
+        public void ReceiveDamage(float damage)
+        {
+            Vector2 direction = (Vector2)transform.position - seamCenter;
+            ReceiveDamage(new DamageRequest(null, damage, transform.position, direction, impactPreset));
+        }
+
+        public void Repair(float amount)
+        {
+            EnsureCombatHealth();
+            combatHealth?.Repair(amount);
+            if (combatHealth == null || combatHealth.IsDestroyed)
+                return;
+
+            if (isDestroyed)
+            {
+                isDestroyed = false;
+                isOpen = false;
+                currentOpenAmount = 0f;
+                if (meshRenderer != null)
+                    meshRenderer.enabled = true;
+                if (boxCollider != null)
+                    boxCollider.enabled = true;
+                ApplyVisualState();
+                MarkVisibilityDirty();
+            }
+        }
+
+        public void ResetHealth()
+        {
+            EnsureCombatHealth();
+            combatHealth?.ResetHealth();
+            isDestroyed = false;
+            isOpen = false;
+            currentOpenAmount = 0f;
+            isAnimating = false;
+            isWobbling = false;
+            if (meshRenderer != null)
+                meshRenderer.enabled = true;
+            if (boxCollider != null)
+                boxCollider.enabled = true;
+            ApplyVisualState();
+            MarkVisibilityDirty();
+        }
+
+        public void DestroyDoor()
+        {
+            if (isDestroyed)
+                return;
+
+            isDestroyed = true;
+            isOpen = true;
+            currentOpenAmount = 1f;
+            isAnimating = false;
+            isWobbling = false;
+            if (boxCollider != null)
+                boxCollider.enabled = false;
+            if (meshRenderer != null)
+                meshRenderer.enabled = false;
+            MarkVisibilityDirty();
+        }
+
+        private void EnsureCombatHealth()
+        {
+            if (combatHealth == null)
+                combatHealth = GetComponent<CombatHealth>();
+            if (combatHealth == null)
+                combatHealth = gameObject.AddComponent<CombatHealth>();
+
+            combatHealth.Configure(maxHealth, invulnerable, destroyDelay, impactPreset);
+            combatHealth.Damaged -= HandleCombatDamaged;
+            combatHealth.Destroyed -= HandleCombatDestroyed;
+            combatHealth.HealthReset -= HandleCombatReset;
+            combatHealth.Damaged += HandleCombatDamaged;
+            combatHealth.Destroyed += HandleCombatDestroyed;
+            combatHealth.HealthReset += HandleCombatReset;
+
+            if (showCombatProgress)
+            {
+                if (combatProgressPresenter == null)
+                    combatProgressPresenter = GetComponent<DamageReceiverProgressPresenter>();
+                if (combatProgressPresenter == null)
+                    combatProgressPresenter = gameObject.AddComponent<DamageReceiverProgressPresenter>();
+                combatProgressPresenter.Bind(
+                    combatHealth,
+                    transform,
+                    combatProgressOffset,
+                    combatProgressSmoothSpeed);
+            }
+
+            if (impactObjectFeedback == null)
+                impactObjectFeedback = GetComponent<ImpactObjectFeedback>();
+            if (impactObjectFeedback == null)
+                impactObjectFeedback = gameObject.AddComponent<ImpactObjectFeedback>();
+            impactObjectFeedback.receiverObject = gameObject;
+            impactObjectFeedback.visualTarget = panelTransform;
+        }
+
+        private void UnbindCombatHealth()
+        {
+            if (combatHealth == null)
+                return;
+            combatHealth.Damaged -= HandleCombatDamaged;
+            combatHealth.Destroyed -= HandleCombatDestroyed;
+            combatHealth.HealthReset -= HandleCombatReset;
+        }
+
+        private void HandleCombatDamaged(CombatHealth source, DamageResult result)
+        {
+            if (!result.destroyed)
+                return;
+            // Destruction is finalized by CombatHealth.Destroyed after the configured delay.
+        }
+
+        private void HandleCombatDestroyed(CombatHealth source, DamageResult result)
+        {
+            DestroyDoor();
+        }
+
+        private void HandleCombatReset(CombatHealth source)
+        {
+            if (!isDestroyed)
+                return;
+            isDestroyed = false;
+            if (meshRenderer != null)
+                meshRenderer.enabled = true;
+            if (boxCollider != null)
+                boxCollider.enabled = true;
+        }
+
         private bool CanToggleNow()
         {
             return !isAnimating && !isWobbling && Time.time >= lastToggleTime + toggleCooldown;
@@ -620,7 +796,7 @@ namespace DuoCurtain.RuntimeTileMesh
 
         private bool IsDoorwayPassable()
         {
-            return isOpen && currentOpenAmount >= doorwayPassableOpenAmount;
+            return IsDestroyed || (isOpen && currentOpenAmount >= doorwayPassableOpenAmount);
         }
 
         private void StartDoorTransition(float targetAmount, float duration)

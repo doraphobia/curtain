@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using DuoCurtain.Combat;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 /// <summary>
 /// Outside-room enemy that detects the player through cone vision and open windows,
@@ -56,18 +58,15 @@ public class EnemyController : MonoBehaviour
     [Min(0f)] public float roomMemoryDuration = 5f;
     public bool chaseLastKnownRoom = true;
 
-    [Header("Door Breaking")]
-    [Min(0f)] public float doorBreakSpeed = 25f;
-    [Min(0f)] public float doorBreakStartDelay = 0.5f;
-    [Min(0f)] public float doorBreakRange = 0.6f;
+    [Header("Door Attack")]
+    [FormerlySerializedAs("doorBreakSpeed"), Min(0f)] public float doorAttackDamage = 20f;
+    [Min(0.01f)] public float doorAttackInterval = 1f;
+    [FormerlySerializedAs("doorBreakStartDelay"), Min(0f)] public float doorAttackWindup = 0.25f;
+    [Min(0f)] public float doorAttackRecovery = 0.75f;
+    [FormerlySerializedAs("doorBreakRange"), Min(0f)] public float doorAttackRange = 0.6f;
+    public ImpactFeedbackPreset doorImpactPreset;
     public bool faceDoorWhileBreaking = true;
     public bool stopMovingWhileBreaking = true;
-
-    [Header("Door Break UI")]
-    public bool showDoorBreakProgress = true;
-    public Vector3 doorProgressBarOffset = new Vector3(0f, 1.2f, 0f);
-    public bool hideProgressBarWhenNotBreaking = true;
-    [Min(0.01f)] public float progressBarSmoothSpeed = 8f;
 
     [Header("Attack")]
     [Min(0f)] public float attackRange = 0.8f;
@@ -98,7 +97,6 @@ public class EnemyController : MonoBehaviour
     private float detectionTimer;
     private float searchTimer;
     private float windowCheckTimer;
-    private float doorBreakDelayTimer;
     private float attackCooldownTimer;
     private float attackWindupTimer;
     private float enterRoomTimer;
@@ -108,6 +106,7 @@ public class EnemyController : MonoBehaviour
 
     private Room targetRoom;
     private BreakableExteriorDoor targetDoor;
+    private CombatAttackSource doorAttackSource;
     private bool playerInsideRoom;
     private bool insideTargetRoom;
     private EnemyVision.VisionResult lastVisionResult;
@@ -131,6 +130,7 @@ public class EnemyController : MonoBehaviour
             footprintTrace = GetComponent<EnemyFootprintTrace>();
 
         ResolvePlayerReferences();
+        EnsureDoorAttackSource();
         RefreshWindowCache();
     }
 
@@ -279,29 +279,19 @@ public class EnemyController : MonoBehaviour
             FaceTowards(targetDoor.transform.position);
 
         float distance = Vector2.Distance(transform.position, targetDoor.OutsideApproachPosition);
-        if (distance > doorBreakRange)
+        if (distance > doorAttackRange)
         {
-            MoveTowards(targetDoor.OutsideApproachPosition, doorBreakRange * 0.5f);
+            doorAttackSource?.CancelAttack();
+            MoveTowards(targetDoor.OutsideApproachPosition, doorAttackRange * 0.5f);
             return;
         }
-
-        doorBreakDelayTimer += Time.deltaTime;
-        if (doorBreakDelayTimer < doorBreakStartDelay)
-            return;
 
         if (faceDoorWhileBreaking)
             FaceTowards(targetDoor.transform.position);
 
-        targetDoor.showDoorBreakProgress = showDoorBreakProgress;
-        targetDoor.doorProgressBarOffset = doorProgressBarOffset;
-        targetDoor.hideProgressBarWhenNotBreaking = hideProgressBarWhenNotBreaking;
-        if (targetDoor.progressBarInstance != null)
-            targetDoor.progressBarInstance.smoothSpeed = progressBarSmoothSpeed;
-
-        targetDoor.ApplyBreakProgress(doorBreakSpeed * Time.deltaTime);
-
-        if (targetDoor.IsOpen)
-            EnterState(EnemyState.EnterRoom);
+        EnsureDoorAttackSource();
+        if (doorAttackSource != null && !doorAttackSource.IsAttacking)
+            doorAttackSource.BeginAttack(targetDoor);
     }
 
     private void TickEnterRoom()
@@ -501,7 +491,10 @@ public class EnemyController : MonoBehaviour
             return;
 
         if (currentState == EnemyState.BreakingDoor && targetDoor != null)
+        {
+            doorAttackSource?.CancelAttack();
             targetDoor.StopBreaking();
+        }
 
         if (logStateChanges)
             Debug.Log("[EnemyController] " + name + ": " + currentState + " -> " + newState, this);
@@ -516,7 +509,9 @@ public class EnemyController : MonoBehaviour
                 detectionTimer = 0f;
                 break;
             case EnemyState.BreakingDoor:
-                doorBreakDelayTimer = 0f;
+                EnsureDoorAttackSource();
+                if (targetDoor != null)
+                    doorAttackSource?.BeginAttack(targetDoor);
                 break;
             case EnemyState.EnterRoom:
                 enterRoomTimer = 0f;
@@ -539,6 +534,41 @@ public class EnemyController : MonoBehaviour
             attackCooldownTimer -= Time.deltaTime;
         if (roomMemoryTimer > 0f && currentState != EnemyState.SearchLastKnownRoom)
             roomMemoryTimer -= Time.deltaTime;
+    }
+
+    void OnDestroy()
+    {
+        UnbindDoorAttackSource();
+    }
+
+    private void EnsureDoorAttackSource()
+    {
+        if (doorAttackSource == null)
+            doorAttackSource = GetComponent<CombatAttackSource>();
+        if (doorAttackSource == null)
+            doorAttackSource = gameObject.AddComponent<CombatAttackSource>();
+
+        doorAttackSource.attackDamage = Mathf.Max(0f, doorAttackDamage);
+        doorAttackSource.attackInterval = Mathf.Max(0.01f, doorAttackInterval);
+        doorAttackSource.windupDuration = Mathf.Max(0f, doorAttackWindup);
+        doorAttackSource.recoveryDuration = Mathf.Max(0f, doorAttackRecovery);
+        doorAttackSource.attackRange = Mathf.Max(0f, doorAttackRange);
+        doorAttackSource.impactPreset = doorImpactPreset;
+        doorAttackSource.TargetDestroyed -= HandleDoorDestroyed;
+        doorAttackSource.TargetDestroyed += HandleDoorDestroyed;
+    }
+
+    private void UnbindDoorAttackSource()
+    {
+        if (doorAttackSource != null)
+            doorAttackSource.TargetDestroyed -= HandleDoorDestroyed;
+    }
+
+    private void HandleDoorDestroyed(CombatAttackSource source, IDamageReceiver receiver)
+    {
+        if (targetDoor == null || receiver == null || receiver.ReceiverObject != targetDoor.gameObject)
+            return;
+        EnterState(EnemyState.EnterRoom);
     }
 
     private void UpdateFacingFromVelocity()
