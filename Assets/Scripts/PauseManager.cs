@@ -3,6 +3,7 @@ using System.Collections;
 using System.Reflection;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 public class PauseManager : MonoBehaviour
@@ -272,6 +273,8 @@ public class PauseManager : MonoBehaviour
         if (blurCanvas != null && blurImage != null && blurTintImage != null && pauseTitleText != null)
             return;
 
+        EnsureEventSystem();
+
         GameObject canvasObject = new GameObject(
             "Pause Blur Canvas",
             typeof(Canvas),
@@ -285,7 +288,7 @@ public class PauseManager : MonoBehaviour
         blurCanvas.sortingOrder = blurCanvasSortingOrder;
         blurCanvasGroup = canvasObject.GetComponent<CanvasGroup>();
         blurCanvasGroup.alpha = 0f;
-        blurCanvasGroup.interactable = false;
+        blurCanvasGroup.interactable = true;
         blurCanvasGroup.blocksRaycasts = true;
 
         CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
@@ -416,7 +419,11 @@ public class PauseManager : MonoBehaviour
 
         blurCanvas.sortingOrder = blurCanvasSortingOrder;
         if (blurCanvasGroup != null)
+        {
+            blurCanvasGroup.interactable = true;
+            blurCanvasGroup.blocksRaycasts = true;
             blurCanvasGroup.alpha = pauseFadeInDuration > 0.0001f ? 0f : 1f;
+        }
         blurCanvas.gameObject.SetActive(true);
 
         if (pauseFadeInDuration > 0.0001f)
@@ -438,6 +445,12 @@ public class PauseManager : MonoBehaviour
         if (blurCanvas != null)
             blurCanvas.gameObject.SetActive(false);
 
+        if (blurCanvasGroup != null)
+        {
+            blurCanvasGroup.interactable = false;
+            blurCanvasGroup.blocksRaycasts = false;
+        }
+
         if (blurImage != null)
             blurImage.texture = null;
 
@@ -453,6 +466,12 @@ public class PauseManager : MonoBehaviour
         EnsureBlurOverlay();
         if (blurCanvasGroup == null)
             yield break;
+
+        if (to > 0f)
+        {
+            blurCanvasGroup.interactable = true;
+            blurCanvasGroup.blocksRaycasts = true;
+        }
 
         if (duration <= 0.0001f)
         {
@@ -473,7 +492,23 @@ public class PauseManager : MonoBehaviour
         }
 
         blurCanvasGroup.alpha = to;
+        if (Mathf.Approximately(to, 0f))
+        {
+            blurCanvasGroup.interactable = false;
+            blurCanvasGroup.blocksRaycasts = false;
+        }
         blurFadeRoutine = null;
+    }
+
+    private static void EnsureEventSystem()
+    {
+        if (EventSystem.current != null || FindFirstObjectByType<EventSystem>() != null)
+            return;
+
+        new GameObject(
+            "EventSystem",
+            typeof(EventSystem),
+            typeof(StandaloneInputModule));
     }
 
     private static void StretchToParent(RectTransform rectTransform)

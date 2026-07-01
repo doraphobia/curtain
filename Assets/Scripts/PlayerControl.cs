@@ -80,6 +80,10 @@ public class PlayerControl : MonoBehaviour
     public float headingPointAlpha = 0.65f;
     [Min(1f)]
     public float headingPointSize = 14f;
+    public bool headingPointUseDedicatedOverlayCanvas = true;
+    public int headingPointCanvasSortingOrder = 6500;
+    public bool headingPointUseScreenInvertShader = true;
+    public bool headingPointUseAdaptiveVisualRenderer = false;
     public bool invertHeadingPointColorWhenPlayerInputDisabled = true;
     public bool limitHeadingPointReach = true;
     [Min(0f)]
@@ -171,7 +175,9 @@ public class PlayerControl : MonoBehaviour
     private GameplayVisualRenderer playerAdaptiveVisual;
     private RectTransform headingPointRectTransform;
     private Canvas headingPointCanvas;
+    private Canvas headingPointOverlayCanvas;
     private GameplayVisualRenderer headingPointAdaptiveVisual;
+    private Material headingPointInvertMaterial;
     private Texture2D runtimeCursorTexture;
     private Sprite runtimeCursorSprite;
     private Texture2D runtimeHeadingPointTexture;
@@ -889,24 +895,45 @@ public class PlayerControl : MonoBehaviour
         headingPointImage.enabled = true;
         headingPointRectTransform = headingPointImage.rectTransform;
         headingPointCanvas = headingPointImage.GetComponentInParent<Canvas>();
+        ConfigureHeadingPointVisualLayer();
+        ConfigureHeadingPointAdaptiveVisual();
+        ApplyHeadingPointVisualSettings();
+    }
+
+    private void ConfigureHeadingPointAdaptiveVisual()
+    {
+        if (headingPointImage == null)
+            return;
+
+        if (!headingPointUseAdaptiveVisualRenderer)
+        {
+            if (headingPointAdaptiveVisual == null)
+                headingPointAdaptiveVisual = headingPointImage.GetComponent<GameplayVisualRenderer>();
+
+            if (headingPointAdaptiveVisual != null)
+                headingPointAdaptiveVisual.enabled = false;
+            return;
+        }
+
         if (headingPointAdaptiveVisual == null)
         {
             headingPointAdaptiveVisual = GameplayVisualRenderer.Ensure(
                 headingPointImage,
                 GameplayVisualPriority.HeadingPoint);
-            if (headingPointAdaptiveVisual != null)
-            {
-                headingPointAdaptiveVisual.collectTargetsAutomatically = false;
-                headingPointAdaptiveVisual.graphics = new Graphic[] { headingPointImage };
-                headingPointAdaptiveVisual.contrastStrength = 1.25f;
-                headingPointAdaptiveVisual.edgeContrast = 0.7f;
-                headingPointAdaptiveVisual.enableOutline = true;
-                headingPointAdaptiveVisual.outlineWidth = 1.2f;
-                headingPointAdaptiveVisual.outlineStrength = 0.65f;
-                headingPointAdaptiveVisual.Refresh();
-            }
         }
-        ApplyHeadingPointVisualSettings();
+
+        if (headingPointAdaptiveVisual == null)
+            return;
+
+        headingPointAdaptiveVisual.enabled = true;
+        headingPointAdaptiveVisual.collectTargetsAutomatically = false;
+        headingPointAdaptiveVisual.graphics = new Graphic[] { headingPointImage };
+        headingPointAdaptiveVisual.contrastStrength = 1.25f;
+        headingPointAdaptiveVisual.edgeContrast = 0.7f;
+        headingPointAdaptiveVisual.enableOutline = true;
+        headingPointAdaptiveVisual.outlineWidth = 1.2f;
+        headingPointAdaptiveVisual.outlineStrength = 0.65f;
+        headingPointAdaptiveVisual.Refresh();
     }
 
     private Image CreateHeadingPointImage()
@@ -963,6 +990,70 @@ public class PlayerControl : MonoBehaviour
         scaler.matchWidthOrHeight = 0.5f;
 
         return canvas;
+    }
+
+    private void ConfigureHeadingPointVisualLayer()
+    {
+        if (headingPointImage == null)
+            return;
+
+        headingPointImage.raycastTarget = false;
+
+        if (headingPointUseDedicatedOverlayCanvas)
+        {
+            Canvas overlayCanvas = EnsureHeadingPointOverlayCanvas();
+            if (overlayCanvas != null && headingPointImage.transform.parent != overlayCanvas.transform)
+                headingPointImage.transform.SetParent(overlayCanvas.transform, false);
+
+            headingPointCanvas = overlayCanvas;
+        }
+        else
+        {
+            headingPointCanvas = headingPointImage.GetComponentInParent<Canvas>();
+            if (headingPointCanvas != null)
+                headingPointCanvas.sortingOrder = Mathf.Max(headingPointCanvas.sortingOrder, headingPointCanvasSortingOrder);
+        }
+
+        if (headingPointCanvas != null)
+        {
+            headingPointCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            headingPointCanvas.overrideSorting = true;
+            headingPointCanvas.sortingOrder = headingPointCanvasSortingOrder;
+        }
+
+        headingPointImage.transform.SetAsLastSibling();
+    }
+
+    private Canvas EnsureHeadingPointOverlayCanvas()
+    {
+        if (headingPointOverlayCanvas != null)
+            return headingPointOverlayCanvas;
+
+        Transform existing = transform.Find("Heading Point Overlay Canvas");
+        if (existing != null)
+            headingPointOverlayCanvas = existing.GetComponent<Canvas>();
+
+        if (headingPointOverlayCanvas == null)
+        {
+            GameObject canvasObject = new GameObject(
+                "Heading Point Overlay Canvas",
+                typeof(RectTransform),
+                typeof(Canvas),
+                typeof(CanvasScaler));
+            canvasObject.transform.SetParent(transform, false);
+
+            headingPointOverlayCanvas = canvasObject.GetComponent<Canvas>();
+            headingPointOverlayCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+
+            CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.matchWidthOrHeight = 0.5f;
+        }
+
+        headingPointOverlayCanvas.overrideSorting = true;
+        headingPointOverlayCanvas.sortingOrder = headingPointCanvasSortingOrder;
+        return headingPointOverlayCanvas;
     }
 
     private void UpdateOutdoorWarningVisual()
@@ -1054,11 +1145,19 @@ public class PlayerControl : MonoBehaviour
         if (headingPointImage == null)
             return;
 
+        ConfigureHeadingPointVisualLayer();
         Sprite sprite = headingPointSprite != null ? headingPointSprite : GetRuntimeHeadingPointSprite();
         if (sprite != null)
             headingPointImage.sprite = sprite;
 
-        Color color = ShouldInvertHeadingPointColor() ? InvertColor(headingPointColor) : headingPointColor;
+        ApplyHeadingPointMaterial();
+
+        Color color;
+        if (headingPointUseScreenInvertShader && headingPointInvertMaterial != null)
+            color = Color.white;
+        else
+            color = ShouldInvertHeadingPointColor() ? InvertColor(headingPointColor) : headingPointColor;
+
         color.a = Mathf.Clamp01(color.a * headingPointAlpha);
         headingPointImage.color = color;
 
@@ -1070,6 +1169,33 @@ public class PlayerControl : MonoBehaviour
             float size = Mathf.Max(1f, headingPointSize);
             headingPointRectTransform.sizeDelta = new Vector2(size, size);
         }
+    }
+
+    private void ApplyHeadingPointMaterial()
+    {
+        if (headingPointImage == null)
+            return;
+
+        if (!headingPointUseScreenInvertShader)
+        {
+            headingPointImage.material = null;
+            return;
+        }
+
+        if (headingPointInvertMaterial == null)
+        {
+            Shader shader = Shader.Find("DuoCurtain/UI/HeadingPointInvert");
+            if (shader != null)
+            {
+                headingPointInvertMaterial = new Material(shader)
+                {
+                    name = "Runtime Heading Point Invert Material",
+                    hideFlags = HideFlags.HideAndDontSave
+                };
+            }
+        }
+
+        headingPointImage.material = headingPointInvertMaterial;
     }
 
     private bool ShouldInvertHeadingPointColor()
@@ -1189,6 +1315,12 @@ public class PlayerControl : MonoBehaviour
         {
             Destroy(runtimeHeadingPointTexture);
             runtimeHeadingPointTexture = null;
+        }
+
+        if (headingPointInvertMaterial != null)
+        {
+            Destroy(headingPointInvertMaterial);
+            headingPointInvertMaterial = null;
         }
     }
 

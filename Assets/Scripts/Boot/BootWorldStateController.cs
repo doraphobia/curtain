@@ -24,7 +24,7 @@ public sealed class BootWorldStateController : MonoBehaviour
     [Header("State")]
     [SerializeField] private bool startInBootWorld = true;
     [SerializeField] private bool listenForAnyInput = true;
-    [SerializeField] private bool includeMouseInput = true;
+    [SerializeField] private bool includeMouseInput = false;
     [SerializeField] private bool includeGamepadInput = true;
     [SerializeField] private bool autoWireRedScene = true;
 
@@ -66,6 +66,11 @@ public sealed class BootWorldStateController : MonoBehaviour
     private Coroutine transitionCoroutine;
     private float savedSimulationSpeed = 1f;
     private bool hasAutoWiredScene;
+    private TextMeshProUGUI temporaryLogoLabel;
+    private TextMeshProUGUI temporaryPressAnyKeyLabel;
+    private TextMeshProUGUI temporaryLanguageLabel;
+    private TextMeshProUGUI temporarySettingsLabel;
+    private TextMeshProUGUI temporaryQuitLabel;
 
     public static BootWorldStateController Active { get; private set; }
     public BootWorldState CurrentState { get; private set; } = BootWorldState.ApplicationBoot;
@@ -95,12 +100,15 @@ public sealed class BootWorldStateController : MonoBehaviour
     private void OnEnable()
     {
         Active = this;
+        DuoCurtainLocalization.LanguageChanged += RefreshTemporaryTitleUiText;
     }
 
     private void OnDisable()
     {
         if (Active == this)
             Active = null;
+
+        DuoCurtainLocalization.LanguageChanged -= RefreshTemporaryTitleUiText;
     }
 
     private void Start()
@@ -334,7 +342,12 @@ public sealed class BootWorldStateController : MonoBehaviour
     private void EnsureTemporaryTitleUi()
     {
         if (!autoCreateTemporaryTitleUi || titleCanvasGroup != null)
+        {
+            RefreshTemporaryTitleUiText();
             return;
+        }
+
+        EnsureEventSystem();
 
         GameObject canvasObject = new GameObject(
             "Boot World Temporary Title Canvas",
@@ -364,11 +377,12 @@ public sealed class BootWorldStateController : MonoBehaviour
         canvasRect.offsetMin = Vector2.zero;
         canvasRect.offsetMax = Vector2.zero;
 
-        CreateTitleText(canvasRect, "Logo", temporaryLogoText, 86f, new Vector2(0f, 138f), TextAlignmentOptions.Center);
-        CreateTitleText(canvasRect, "Press Any Key", temporaryPressAnyKeyText, 32f, new Vector2(0f, 40f), TextAlignmentOptions.Center);
-        CreateTitleButton(canvasRect, "Language Button", temporaryLanguageText, new Vector2(-180f, -220f), HandleLanguagePressed);
-        CreateTitleButton(canvasRect, "Settings Button", temporarySettingsText, new Vector2(0f, -220f), HandleSettingsPressed);
-        CreateTitleButton(canvasRect, "Quit Button", temporaryQuitText, new Vector2(180f, -220f), HandleQuitPressed);
+        temporaryLogoLabel = CreateTitleText(canvasRect, "Logo", temporaryLogoText, 86f, new Vector2(0f, 138f), TextAlignmentOptions.Center);
+        temporaryPressAnyKeyLabel = CreateTitleText(canvasRect, "Press Any Key", temporaryPressAnyKeyText, 32f, new Vector2(0f, 40f), TextAlignmentOptions.Center);
+        temporaryLanguageLabel = CreateTitleButton(canvasRect, "Language Button", temporaryLanguageText, new Vector2(-180f, -220f), HandleLanguagePressed);
+        temporarySettingsLabel = CreateTitleButton(canvasRect, "Settings Button", temporarySettingsText, new Vector2(0f, -220f), HandleSettingsPressed);
+        temporaryQuitLabel = CreateTitleButton(canvasRect, "Quit Button", temporaryQuitText, new Vector2(180f, -220f), HandleQuitPressed);
+        RefreshTemporaryTitleUiText();
     }
 
     private TextMeshProUGUI CreateTitleText(
@@ -397,7 +411,7 @@ public sealed class BootWorldStateController : MonoBehaviour
         return label;
     }
 
-    private void CreateTitleButton(
+    private TextMeshProUGUI CreateTitleButton(
         Transform parent,
         string objectName,
         string labelText,
@@ -425,11 +439,13 @@ public sealed class BootWorldStateController : MonoBehaviour
         labelRect.anchorMax = Vector2.one;
         labelRect.offsetMin = Vector2.zero;
         labelRect.offsetMax = Vector2.zero;
+        return label;
     }
 
     private void HandleLanguagePressed()
     {
-        Debug.Log("[BootWorld] Temporary Language button pressed.", this);
+        DuoCurtainLocalization.ToggleLanguage();
+        RefreshTemporaryTitleUiText();
     }
 
     private void HandleSettingsPressed()
@@ -445,6 +461,36 @@ public sealed class BootWorldStateController : MonoBehaviour
     private static bool IsPointerOverBootWorldUi()
     {
         return EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+    }
+
+    private void RefreshTemporaryTitleUiText()
+    {
+        SetLocalizedLabel(temporaryLogoLabel, temporaryLogoText, temporaryLogoText);
+        SetLocalizedLabel(temporaryPressAnyKeyLabel, "按任意键开始", temporaryPressAnyKeyText);
+        SetLocalizedLabel(temporaryLanguageLabel, "语言", temporaryLanguageText);
+        SetLocalizedLabel(temporarySettingsLabel, "设置", temporarySettingsText);
+        SetLocalizedLabel(temporaryQuitLabel, "退出", temporaryQuitText);
+    }
+
+    private static void SetLocalizedLabel(TextMeshProUGUI label, string chinese, string english)
+    {
+        if (label == null)
+            return;
+
+        string text = DuoCurtainLocalization.Text("boot.temporary", chinese, english);
+        label.text = text;
+        DuoCurtainLocalization.ApplyFont(label, text);
+    }
+
+    private static void EnsureEventSystem()
+    {
+        if (EventSystem.current != null || FindFirstObjectByType<EventSystem>() != null)
+            return;
+
+        new GameObject(
+            "EventSystem",
+            typeof(EventSystem),
+            typeof(StandaloneInputModule));
     }
 
     private void SetTitleVisible(bool visible, bool immediate)
