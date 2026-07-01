@@ -24,6 +24,12 @@ namespace DuoCurtain.RuntimeTileMesh
         public float spawnPadding = 2.5f;
         public bool spawnImmediatelyIfAlreadyNight = true;
 
+        [Header("Day Cleanup")]
+        public bool clearOutdoorEnemiesWhenDayStarts = true;
+        public bool cancelPendingSpawnsWhenDayStarts = true;
+        public bool clearOutdoorEnemyFootprints = true;
+        public bool fadeOutdoorEnemyFootprints;
+
         [Header("Spawn Warning")]
         public bool warnBeforeOffscreenSpawn = true;
         public bool warnOnlyWhenOffscreen = true;
@@ -68,6 +74,7 @@ namespace DuoCurtain.RuntimeTileMesh
         public bool logSpawns = true;
 
         private readonly List<FusionNightFootprintEnemy> activeEnemies = new List<FusionNightFootprintEnemy>();
+        private readonly List<GameObject> activeSpawnWarnings = new List<GameObject>();
         private bool wasNight;
         private GameObject leftFootprintPrefab;
         private GameObject rightFootprintPrefab;
@@ -95,6 +102,8 @@ namespace DuoCurtain.RuntimeTileMesh
             bool isNight = stageController != null && stageController.IsNight;
             if (isNight && !wasNight)
                 SpawnNightWave();
+            else if (!isNight && wasNight)
+                HandleDayStarted();
 
             wasNight = isNight;
         }
@@ -400,6 +409,7 @@ namespace DuoCurtain.RuntimeTileMesh
             float grid = fusionSandbox != null ? Mathf.Max(0.0001f, Mathf.Abs(fusionSandbox.gridSize)) : 1f;
             visual.transform.localScale = Vector3.one * grid;
             ApplySpawnWarningColor(visual, spawnWarningColor);
+            activeSpawnWarnings.Add(visual);
             return visual;
         }
 
@@ -454,6 +464,7 @@ namespace DuoCurtain.RuntimeTileMesh
             if (visual == null)
                 return;
 
+            activeSpawnWarnings.Remove(visual);
             if (Application.isPlaying)
                 Destroy(visual);
             else
@@ -501,6 +512,94 @@ namespace DuoCurtain.RuntimeTileMesh
                 if (activeEnemies[i] == null)
                     activeEnemies.RemoveAt(i);
             }
+        }
+
+        private void HandleDayStarted()
+        {
+            if (cancelPendingSpawnsWhenDayStarts)
+            {
+                StopAllCoroutines();
+                pendingSpawnCount = 0;
+                ClearSpawnWarnings();
+                HideSpawnWarningIfCreated();
+            }
+
+            if (clearOutdoorEnemiesWhenDayStarts)
+                ClearOutdoorEnemiesForDay();
+        }
+
+        [ContextMenu("Clear Outdoor Enemies For Day")]
+        public void ClearOutdoorEnemiesForDay()
+        {
+            CleanupEnemyList();
+
+            int cleared = 0;
+            for (int i = activeEnemies.Count - 1; i >= 0; i--)
+            {
+                FusionNightFootprintEnemy enemy = activeEnemies[i];
+                if (enemy == null)
+                {
+                    activeEnemies.RemoveAt(i);
+                    continue;
+                }
+
+                if (ShouldKeepEnemyDuringDay(enemy))
+                    continue;
+
+                EnemyFootprintTrace trace = enemy.footprintTrace != null
+                    ? enemy.footprintTrace
+                    : enemy.GetComponent<EnemyFootprintTrace>();
+                if (clearOutdoorEnemyFootprints && trace != null)
+                    trace.ClearFootprints(!fadeOutdoorEnemyFootprints);
+
+                activeEnemies.RemoveAt(i);
+                if (Application.isPlaying)
+                    Destroy(enemy.gameObject);
+                else
+                    DestroyImmediate(enemy.gameObject);
+                cleared++;
+            }
+
+            if (logSpawns && cleared > 0)
+                Debug.Log("[EnemySpawn] Day cleanup removed outdoor enemies=" + cleared, this);
+        }
+
+        private bool ShouldKeepEnemyDuringDay(FusionNightFootprintEnemy enemy)
+        {
+            if (enemy == null)
+                return false;
+
+            if (enemy.HasEnemyEnteredRoom())
+                return true;
+
+            return enemy.IsInsideAnyFusionRoom(enemy.transform.position);
+        }
+
+        private void ClearSpawnWarnings()
+        {
+            for (int i = activeSpawnWarnings.Count - 1; i >= 0; i--)
+            {
+                GameObject warning = activeSpawnWarnings[i];
+                if (warning == null)
+                    continue;
+
+                if (Application.isPlaying)
+                    Destroy(warning);
+                else
+                    DestroyImmediate(warning);
+            }
+
+            activeSpawnWarnings.Clear();
+        }
+
+        private void HideSpawnWarningIfCreated()
+        {
+            if (warningCanvas == null)
+                return;
+
+            warningCanvas.gameObject.SetActive(false);
+            if (warningCanvasGroup != null)
+                warningCanvasGroup.alpha = 0f;
         }
 
         private void ResolveReferences()

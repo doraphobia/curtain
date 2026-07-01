@@ -101,6 +101,29 @@ public class EnemyFootprintTrace : MonoBehaviour
     public int MaxIndividualFootprints => Mathf.Max(1, maxFootprintPairs) * 2;
     public bool PreserveLastPairWhenStopped => preserveLastPairWhenStopped;
 
+    public void ClearFootprints(bool immediate)
+    {
+        for (int i = footprints.Count - 1; i >= 0; i--)
+        {
+            FootprintInstance footprint = footprints[i];
+            if (footprint == null)
+                continue;
+
+            if (!immediate)
+            {
+                footprint.FadeOutAndDestroy(fadeOutDuration, fadeOutCurve);
+                continue;
+            }
+
+            if (Application.isPlaying)
+                Destroy(footprint.gameObject);
+            else
+                DestroyImmediate(footprint.gameObject);
+        }
+
+        footprints.Clear();
+    }
+
     public void ConfigureFootprintPrefabs(GameObject leftPrefab, GameObject rightPrefab, Transform parent = null)
     {
         leftFootprintPrefab = leftPrefab;
