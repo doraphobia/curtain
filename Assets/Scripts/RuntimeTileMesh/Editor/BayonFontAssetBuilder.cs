@@ -37,7 +37,10 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
 
             TMP_FontAsset existing = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontAssetPath);
             if (!forceRebuild && IsFontAssetUsable(existing))
+            {
+                ConfigureForPlayerBuild(existing);
                 return existing;
+            }
 
             if (!forceRebuild && existing != null && TryRepairFontAsset(existing))
                 return existing;
@@ -97,6 +100,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
 
             fontAsset.name = "Bayon-Regular SDF";
             fontAsset.atlasPopulationMode = AtlasPopulationMode.Dynamic;
+            ConfigureForPlayerBuild(fontAsset);
             PrimeOverlayCharacters(fontAsset);
 
             if (!IsFontAssetUsable(fontAsset))
@@ -120,6 +124,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             if (!IsFontAssetUsable(fontAsset))
                 return false;
 
+            ConfigureForPlayerBuild(fontAsset);
             PersistSubAssets(fontAsset);
             EditorUtility.SetDirty(fontAsset);
             AssetDatabase.SaveAssets();
@@ -267,6 +272,20 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
 
             Match match = Regex.Match(File.ReadAllText(metaPath), @"guid: ([0-9a-f]+)");
             return match.Success ? match.Groups[1].Value : null;
+        }
+
+        private static void ConfigureForPlayerBuild(TMP_FontAsset fontAsset)
+        {
+            if (fontAsset == null)
+                return;
+
+            SerializedObject serializedFont = new SerializedObject(fontAsset);
+            SerializedProperty clearOnBuild = serializedFont.FindProperty("m_ClearDynamicDataOnBuild");
+            if (clearOnBuild != null)
+            {
+                clearOnBuild.boolValue = false;
+                serializedFont.ApplyModifiedPropertiesWithoutUndo();
+            }
         }
 
         private static void PersistSubAssets(TMP_FontAsset fontAsset)

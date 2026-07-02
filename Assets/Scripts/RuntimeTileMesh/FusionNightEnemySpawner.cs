@@ -100,7 +100,7 @@ namespace DuoCurtain.RuntimeTileMesh
         public float enemyUrgentFootstepPitchMultiplier = 1.04f;
 
         [Header("Debug")]
-        public bool logSpawns = true;
+        public bool logSpawns = false;
 
         private readonly List<FusionNightFootprintEnemy> activeEnemies = new List<FusionNightFootprintEnemy>();
         private readonly List<GameObject> activeSpawnWarnings = new List<GameObject>();

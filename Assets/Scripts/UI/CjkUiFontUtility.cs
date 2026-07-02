@@ -11,23 +11,15 @@ public static class CjkUiFontUtility
     public const string DefaultEditorFontAssetPath = "Assets/Fusion/Resources/Fonts/Cjk UI SDF.asset";
 
     private static TMP_FontAsset cachedFont;
+    private static bool loggedMissingFont;
 
     private static readonly string[] OsFontCandidates =
     {
 #if UNITY_STANDALONE_OSX || UNITY_EDITOR_OSX
         "Hiragino Sans GB",
-        "Hiragino Sans GB W3",
-        "Hiragino Sans GB W6",
-        "HiraginoSansGB-W3",
-        "HiraginoSansGB-W6",
         "PingFang SC",
-        "PingFang SC Regular",
-        "PingFangSC-Regular",
         "STHeiti",
-        "STHeiti Medium",
-        "STHeitiSC-Medium",
         "Heiti SC",
-        "Heiti SC Medium",
 #elif UNITY_STANDALONE_WIN
         "Microsoft YaHei",
         "Microsoft YaHei UI",
@@ -45,48 +37,68 @@ public static class CjkUiFontUtility
         string resourcesFontPath = DefaultResourcesFontPath,
         string textToPrime = null)
     {
-        if (preferredFont != null)
+        if (IsFontAssetUsable(preferredFont))
         {
-            if (CanPopulateAtlas(preferredFont))
-                PrimeCharacters(preferredFont, textToPrime);
+            PrimeCharacters(preferredFont, textToPrime);
             return preferredFont;
         }
 
-        if (cachedFont != null)
+        if (IsFontAssetUsable(cachedFont))
         {
-            if (CanPopulateAtlas(cachedFont))
-                PrimeCharacters(cachedFont, textToPrime);
+            PrimeCharacters(cachedFont, textToPrime);
             return cachedFont;
         }
+
+        cachedFont = null;
 
         if (!string.IsNullOrWhiteSpace(resourcesFontPath))
         {
             TMP_FontAsset resourcesFont = Resources.Load<TMP_FontAsset>(resourcesFontPath);
-            if (resourcesFont != null)
+            if (IsFontAssetUsable(resourcesFont))
             {
                 cachedFont = resourcesFont;
-                if (CanPopulateAtlas(cachedFont))
-                    PrimeCharacters(cachedFont, textToPrime);
+                PrimeCharacters(cachedFont, textToPrime);
                 return cachedFont;
             }
         }
 
 #if UNITY_EDITOR
         TMP_FontAsset editorFont = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(DefaultEditorFontAssetPath);
-        if (editorFont != null)
+        if (IsFontAssetUsable(editorFont))
         {
             cachedFont = editorFont;
-            if (CanPopulateAtlas(cachedFont))
-                PrimeCharacters(cachedFont, textToPrime);
+            PrimeCharacters(cachedFont, textToPrime);
+            return cachedFont;
+        }
+
+        TMP_FontAsset osFont = CreateEditorOsFont(textToPrime);
+        if (IsFontAssetUsable(osFont))
+        {
+            cachedFont = osFont;
             return cachedFont;
         }
 #endif
 
-        cachedFont = CreateRuntimeOsFont(textToPrime);
-        return cachedFont;
+        LogMissingFontOnce();
+        return TMP_Settings.defaultFontAsset;
     }
 
-    private static TMP_FontAsset CreateRuntimeOsFont(string textToPrime)
+    public static bool IsFontAssetUsable(TMP_FontAsset fontAsset)
+    {
+        if (fontAsset == null)
+            return false;
+
+        if (fontAsset.characterTable != null && fontAsset.characterTable.Count > 0)
+            return HasUsableAtlas(fontAsset);
+
+        if (fontAsset.glyphTable != null && fontAsset.glyphTable.Count > 0)
+            return HasUsableAtlas(fontAsset);
+
+        return false;
+    }
+
+#if UNITY_EDITOR
+    private static TMP_FontAsset CreateEditorOsFont(string textToPrime)
     {
         string primeText = string.IsNullOrWhiteSpace(textToPrime) ? "中文" : textToPrime;
 
@@ -117,20 +129,42 @@ public static class CjkUiFontUtility
             }
         }
 
-        TMP_FontAsset fallback = TMP_Settings.defaultFontAsset;
-        return fallback;
+        return null;
+    }
+#endif
+
+    private static bool HasUsableAtlas(TMP_FontAsset fontAsset)
+    {
+        Texture2D[] atlases = fontAsset.atlasTextures;
+        if (atlases == null || atlases.Length == 0 || atlases[0] == null)
+            return false;
+
+        return atlases[0].width > 1 && atlases[0].height > 1;
     }
 
     private static bool CanPopulateAtlas(TMP_FontAsset fontAsset)
     {
-        return fontAsset != null && fontAsset.atlasPopulationMode != AtlasPopulationMode.Static;
+        return fontAsset != null &&
+               fontAsset.atlasPopulationMode != AtlasPopulationMode.Static &&
+               fontAsset.sourceFontFile != null;
     }
 
     private static void PrimeCharacters(TMP_FontAsset fontAsset, string text)
     {
-        if (fontAsset == null || string.IsNullOrEmpty(text))
+        if (!CanPopulateAtlas(fontAsset) || string.IsNullOrEmpty(text))
             return;
 
         fontAsset.TryAddCharacters(text, out _);
+    }
+
+    private static void LogMissingFontOnce()
+    {
+        if (loggedMissingFont)
+            return;
+
+        loggedMissingFont = true;
+        Debug.LogWarning(
+            "[CjkUiFontUtility] CJK UI font is missing or empty. " +
+            "Rebuild it with Tools/Duo Curtain/Fusion/Rebuild CJK UI TMP Font Asset.");
     }
 }

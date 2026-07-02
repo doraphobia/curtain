@@ -325,7 +325,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 13c89b0630878484ab6492de1f1e9eae, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DuoCurtain.RuntimeTileMesh.RuntimeTileMeshFusionSandbox
   worldCamera: {fileID: 1518932443}
   blockLayerMask:
@@ -333,6 +333,7 @@ MonoBehaviour:
     m_Bits: 4294967295
   managementInputEnabled: 0
   ignorePointerOverUI: 1
+  cancelSelectionMouseButton: 1
   preserveGrabOffset: 1
   snapExistingBlocksOnAwake: 1
   mergeExistingBlocksOnAwake: 1
@@ -341,6 +342,10 @@ MonoBehaviour:
   mergeAfterPlacement: 1
   deactivateAbsorbedBlocksImmediately: 1
   logFusionEvents: 1
+  recordFusionIntegrity: 1
+  registerFusionBlocksForVisibility: 1
+  includeSelectedBlockInVisibility: 1
+  logVisibilitySourceSegments: 0
   generateDoorsOnFusion: 1
   doorSharedEdgeCells: 3
   doorThickness: 0.25
@@ -388,6 +393,7 @@ MonoBehaviour:
   excludeSelectedBlockFromWalkableArea: 1
   requireContinuousWalkablePath: 1
   pathSampleCellStep: 0.25
+  outdoorBoundarySkin: 0.03
   playerControl: {fileID: 1354921485}
   carryPlayerWithSelectedBlock: 1
   normalSortingOrder: 0
@@ -395,6 +401,13 @@ MonoBehaviour:
   drawSceneGrid: 1
   sceneGridHalfExtents: {x: 40, y: 24}
   sceneGridColor: {r: 0.45, g: 0.45, b: 0.5, a: 0.35}
+  renderRuntimeGridInGame: 1
+  disableLegacyRuntimeGridOverlay: 1
+  runtimeGridColor: {r: 1, g: 1, b: 1, a: 0.42}
+  runtimeGridLineWidth: 0.012
+  runtimeGridSortingOrder: -45
+  runtimeGridCameraPaddingCells: 2
+  runtimeGridMaterial: {fileID: 0}
 --- !u!114 &31788942
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -405,7 +418,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c64c0d6727471482c8a415b6e09e6532, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DuoCurtain.RuntimeTileMesh.RuntimeTileMeshBlockInfoOverlay
   displayKey: 0
   displayMode: 0
@@ -1299,6 +1312,7 @@ MonoBehaviour:
   drawDebugTiles: 1
   drawDebugBoundaryEdges: 1
   drawDebugLoopPoints: 1
+  enableBuildDebugLogging: 0
   debugTileColor: {r: 0.2, g: 0.8, b: 1, a: 0.25}
   debugBoundaryColor: {r: 1, g: 0.82, b: 0.1, a: 1}
   debugLoopPointColor: {r: 0.3, g: 1, b: 0.35, a: 1}
@@ -1474,6 +1488,7 @@ GameObject:
   - component: {fileID: 186715666}
   - component: {fileID: 186715665}
   - component: {fileID: 2147483001}
+  - component: {fileID: 2147483003}
   m_Layer: 0
   m_Name: Management Camera
   m_TagString: Untagged
@@ -1563,53 +1578,6 @@ MonoBehaviour:
     color: {r: 0, g: 0, b: 0, a: 1}
   cycleDuration: 10
   transitionDuration: 1
---- !u!114 &2147483001
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 186715663}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 86f83f1dbf07419bb9b513f83b3ee9a6, type: 3}
-  m_Name:
-  m_EditorClassIdentifier: Assembly-CSharp::FusionBackgroundShaderController
-  targetCamera: {fileID: 186715667}
-  stageController: {fileID: 1166734108}
-  backgroundMaterial: {fileID: 0}
-  planeDistance: 80
-  sizePadding: 1.08
-  sortingOrder: -32000
-  gridCellSize: {x: 1, y: 5}
-  gridLineWidth: 0.012
-  vignetteStrength: 0.16
-  driftSpeed: {x: 0.015, y: -0.006}
-  stageStyles:
-  - stageId: DayTop
-    topColor: {r: 0.68, g: 0.69, b: 0.7, a: 1}
-    bottomColor: {r: 0.49, g: 0.5, b: 0.51, a: 1}
-    gridColor: {r: 1, g: 1, b: 1, a: 0.2}
-    gridOpacity: 0.23
-    pulseStrength: 0.03
-  - stageId: DayBottom
-    topColor: {r: 0.54, g: 0.54, b: 0.55, a: 1}
-    bottomColor: {r: 0.36, g: 0.37, b: 0.38, a: 1}
-    gridColor: {r: 0.95, g: 0.95, b: 0.95, a: 0.18}
-    gridOpacity: 0.2
-    pulseStrength: 0.025
-  - stageId: BeforeNight
-    topColor: {r: 0.13, g: 0.13, b: 0.16, a: 1}
-    bottomColor: {r: 0.06, g: 0.06, b: 0.08, a: 1}
-    gridColor: {r: 0.48, g: 0.5, b: 0.58, a: 0.22}
-    gridOpacity: 0.16
-    pulseStrength: 0.02
-  - stageId: Night
-    topColor: {r: 0.025, g: 0.027, b: 0.04, a: 1}
-    bottomColor: {r: 0.005, g: 0.006, b: 0.012, a: 1}
-    gridColor: {r: 0.16, g: 0.2, b: 0.32, a: 0.18}
-    gridOpacity: 0.12
-    pulseStrength: 0.012
 --- !u!81 &186715666
 AudioListener:
   m_ObjectHideFlags: 0
@@ -3953,6 +3921,7 @@ MonoBehaviour:
   drawDebugTiles: 1
   drawDebugBoundaryEdges: 1
   drawDebugLoopPoints: 1
+  enableBuildDebugLogging: 0
   debugTileColor: {r: 0.2, g: 0.8, b: 1, a: 0.25}
   debugBoundaryColor: {r: 1, g: 0.82, b: 0.1, a: 1}
   debugLoopPointColor: {r: 0.3, g: 1, b: 0.35, a: 1}
@@ -5327,6 +5296,7 @@ MonoBehaviour:
     duration: 16
   transitionDuration: 1
   startStageIndex: 0
+  simulationSpeedMultiplier: 1
   nightLoopAudioSource: {fileID: 0}
   nightLoopClip: {fileID: 8300000, guid: c1ac1b15e62ab13468c0e916ccb8d754, type: 3}
   nightLoopVolume: 1
@@ -5953,6 +5923,7 @@ MonoBehaviour:
   targetCamera: {fileID: 1518932443}
   roomGrid: {fileID: 0}
   runtimeTileWalkableArea: {fileID: 31788941}
+  preferRuntimeTileWalkableArea: 1
   playerImage: {fileID: 1575785651}
   playerObjectName: Player
   hideSystemCursor: 1
@@ -5960,9 +5931,14 @@ MonoBehaviour:
   restoreSystemCursorOnDisable: 1
   playerInputEnabled: 1
   clampCursorToRoom: 1
+  allowOutdoorMovementFromRuntimeRooms: 1
   freezeWorldCursorWhenPointerOverUI: 1
   showPlayerAtHeadingPointOverUI: 0
   spawnAtRandomRuntimeTileBlockCenter: 1
+  waitForRuntimeTileSpawnBeforeMouseFallback: 1
+  requireRuntimeTileSpawnForRandomStart: 1
+  runtimeTileSpawnWaitSeconds: 3
+  startupInputLockSeconds: 0.35
   usePlayerCollisionRadius: 1
   playerCollisionRadius: 0.22
   drawDebugPlayerIndicator: 1
@@ -5978,6 +5954,10 @@ MonoBehaviour:
   headingPointColor: {r: 1, g: 1, b: 1, a: 1}
   headingPointAlpha: 0.65
   headingPointSize: 14
+  headingPointUseDedicatedOverlayCanvas: 1
+  headingPointCanvasSortingOrder: 6500
+  headingPointUseScreenInvertShader: 1
+  headingPointUseAdaptiveVisualRenderer: 0
   invertHeadingPointColorWhenPlayerInputDisabled: 1
   limitHeadingPointReach: 1
   headingPointReachRadius: 2.5
@@ -5989,6 +5969,15 @@ MonoBehaviour:
   cursorInputFullSpeedPixels: 0
   cursorInputResponsePower: 1
   normalizePointerOffsetByScreenSize: 1
+  outsideMoveSpeedMultiplier: 0.5
+  showOutdoorWarning: 1
+  outdoorWarningMessage: "type: \u73B0\u5728\u4F60\u5728\u5C4B\u5B50\u5916\u9762\uFF0C\u76EE\u524D\u7684\u4F60\u5F88\u8106\u5F31\uFF01"
+  outdoorWarningMessageEnglish: 'type: You are outside. You are vulnerable!'
+  outdoorWarningFont: {fileID: 0}
+  outdoorWarningFontResourcesPath: Fonts/Cjk UI SDF
+  outdoorWarningFontSize: 34
+  outdoorWarningColor: {r: 1, g: 0.92, b: 0.68, a: 1}
+  outdoorWarningAnchoredPosition: {x: 0, y: -64}
   cursorVisualMode: 0
   cursorSprite: {fileID: 0}
   cursorAnimatorController: {fileID: 0}
@@ -6041,6 +6030,10 @@ MonoBehaviour:
   maxPoolSize: 12
   createSourcesOnAwake: 1
   useUnscaledTime: 0
+  minDistance: 1
+  maxDistance: 500
+  rolloffMode: 0
+  spatialize: 0
 --- !u!114 &1354921487
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6615,6 +6608,7 @@ GameObject:
   - component: {fileID: 1518932445}
   - component: {fileID: 1518932444}
   - component: {fileID: 2147483002}
+  - component: {fileID: 2147483004}
   m_Layer: 0
   m_Name: Player Camera
   m_TagString: MainCamera
@@ -6755,53 +6749,6 @@ MonoBehaviour:
     color: {r: 0, g: 0, b: 0, a: 1}
   cycleDuration: 10
   transitionDuration: 1
---- !u!114 &2147483002
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1518932441}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 86f83f1dbf07419bb9b513f83b3ee9a6, type: 3}
-  m_Name:
-  m_EditorClassIdentifier: Assembly-CSharp::FusionBackgroundShaderController
-  targetCamera: {fileID: 1518932443}
-  stageController: {fileID: 1166734108}
-  backgroundMaterial: {fileID: 0}
-  planeDistance: 80
-  sizePadding: 1.08
-  sortingOrder: -32000
-  gridCellSize: {x: 1, y: 5}
-  gridLineWidth: 0.012
-  vignetteStrength: 0.16
-  driftSpeed: {x: 0.015, y: -0.006}
-  stageStyles:
-  - stageId: DayTop
-    topColor: {r: 0.68, g: 0.69, b: 0.7, a: 1}
-    bottomColor: {r: 0.49, g: 0.5, b: 0.51, a: 1}
-    gridColor: {r: 1, g: 1, b: 1, a: 0.2}
-    gridOpacity: 0.23
-    pulseStrength: 0.03
-  - stageId: DayBottom
-    topColor: {r: 0.54, g: 0.54, b: 0.55, a: 1}
-    bottomColor: {r: 0.36, g: 0.37, b: 0.38, a: 1}
-    gridColor: {r: 0.95, g: 0.95, b: 0.95, a: 0.18}
-    gridOpacity: 0.2
-    pulseStrength: 0.025
-  - stageId: BeforeNight
-    topColor: {r: 0.13, g: 0.13, b: 0.16, a: 1}
-    bottomColor: {r: 0.06, g: 0.06, b: 0.08, a: 1}
-    gridColor: {r: 0.48, g: 0.5, b: 0.58, a: 0.22}
-    gridOpacity: 0.16
-    pulseStrength: 0.02
-  - stageId: Night
-    topColor: {r: 0.025, g: 0.027, b: 0.04, a: 1}
-    bottomColor: {r: 0.005, g: 0.006, b: 0.012, a: 1}
-    gridColor: {r: 0.16, g: 0.2, b: 0.32, a: 0.18}
-    gridOpacity: 0.12
-    pulseStrength: 0.012
 --- !u!81 &1518932445
 AudioListener:
   m_ObjectHideFlags: 0
@@ -6926,6 +6873,7 @@ MonoBehaviour:
   drawDebugTiles: 1
   drawDebugBoundaryEdges: 1
   drawDebugLoopPoints: 1
+  enableBuildDebugLogging: 0
   debugTileColor: {r: 0.2, g: 0.8, b: 1, a: 0.25}
   debugBoundaryColor: {r: 1, g: 0.82, b: 0.1, a: 1}
   debugLoopPointColor: {r: 0.3, g: 1, b: 0.35, a: 1}
@@ -7353,19 +7301,31 @@ MonoBehaviour:
   dragPurchasedBlockImmediately: 1
   shopItems:
   - displayName: 1x3 Block
+    itemKind: 0
+    wallAttachmentCategory: 0
     blockPrefab: {fileID: 3775144941540477765, guid: c5435e5ffc78441239db4bb329af55c7, type: 3}
+    wallAttachmentPrefab: {fileID: 0}
     price: 10
     hotkey: 49
   - displayName: L Block
+    itemKind: 0
+    wallAttachmentCategory: 0
     blockPrefab: {fileID: 5150064308329436580, guid: dd7745e2553834c9d8a07af1b4de3b4b, type: 3}
+    wallAttachmentPrefab: {fileID: 0}
     price: 16
     hotkey: 50
   - displayName: T Block
+    itemKind: 0
+    wallAttachmentCategory: 0
     blockPrefab: {fileID: 3053433415197941911, guid: d725d7d9ed35e4c668e496dcb222617a, type: 3}
+    wallAttachmentPrefab: {fileID: 0}
     price: 18
     hotkey: 51
   - displayName: Z Block
+    itemKind: 0
+    wallAttachmentCategory: 0
     blockPrefab: {fileID: 1831955266697647503, guid: 34d6da30c56ca4c83bc4b69e323fdf26, type: 3}
+    wallAttachmentPrefab: {fileID: 0}
     price: 20
     hotkey: 52
   - displayName: Window
@@ -7385,22 +7345,103 @@ MonoBehaviour:
   createShopPanelIfMissing: 1
   showShopOnlyInManagementMode: 1
   shopPanelRoot: {fileID: 0}
+  shopViewportRoot: {fileID: 0}
   shopContentRoot: {fileID: 0}
   shopConfirmationText: {fileID: 0}
   confirmPurchaseFormat: Buy {0}? Click again to confirm.
+  confirmPurchaseFormatChinese: "\u8D2D\u4E70 {0}\uFF1F\u518D\u6B21\u70B9\u51FB\u786E\u8BA4\u3002"
+  confirmPurchaseFormatEnglish: Buy {0}? Click again to confirm.
   cannotAffordFormat: 'Not enough money: {0}'
-  shopPanelSize: {x: 360, y: 460}
-  shopPanelAnchoredPosition: {x: -32, y: -112}
+  cannotAffordFormatChinese: "\u94B1\u4E0D\u591F\uFF1A{0}"
+  cannotAffordFormatEnglish: 'Not enough money: {0}'
+  shopBannerHeight: 300
+  shopBottomInset: 0
+  shopSlideDuration: 0.38
+  shopSlideCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  shopCardSize: {x: 292, y: 220}
+  shopCardSpacing: 16
+  shopEdgeScrollZone: 180
+  shopEdgeScrollMinSpeed: 160
+  shopEdgeScrollMaxSpeed: 1050
   shopPanelColor: {r: 0, g: 0, b: 0, a: 0.72}
   shopButtonColor: {r: 1, g: 1, b: 1, a: 0.12}
   shopPendingButtonColor: {r: 0.1, g: 0.38, b: 1, a: 0.35}
   shopTextColor: {r: 1, g: 1, b: 1, a: 1}
   shopPriceColor: {r: 1, g: 0.84, b: 0.36, a: 1}
+  blockShopButtonColor: {r: 1, g: 1, b: 1, a: 0.12}
+  wallAttachmentShopButtonColor: {r: 1, g: 1, b: 1, a: 0.19}
+  blockShopStrokeColor: {r: 1, g: 1, b: 1, a: 0}
+  wallAttachmentShopStrokeColor: {r: 1, g: 1, b: 1, a: 0.75}
+  shopItemStrokeDistance: {x: 2, y: -2}
+  useShopBlurredBackdrop: 1
+  shopBackdropBlurDownsample: 3
+  shopBackdropBlurRadius: 4
+  shopBackdropBlurIterations: 2
+  shopBackdropTint: {r: 1, g: 1, b: 1, a: 0.16}
+  wallAttachmentSnapDistance: 1.25
+  windowAttachmentLengthInCells: 0.82
+  windowAttachmentThicknessInCells: 0.16
+  windowClosedColor: {r: 1, g: 0.92, b: 0.08, a: 1}
+  windowOpenColor: {r: 0.55, g: 0.85, b: 1, a: 1}
+  wallAttachmentValidPreviewColor: {r: 1, g: 0.92, b: 0.08, a: 0.72}
+  wallAttachmentInvalidPreviewColor: {r: 1, g: 0.15, b: 0.1, a: 0.45}
+  doorAttachmentValidPreviewColor: {r: 0, g: 0, b: 0, a: 0.72}
+  doorAttachmentInvalidPreviewColor: {r: 1, g: 0.15, b: 0.1, a: 0.45}
+  shopThumbnailSettings:
+    framingMode: 0
+    clearMode: 0
+    resolution: 256
+    framingPadding: 0.35
+    fixedOrthographicSize: 2
+    antiAliasing: 2
+    backgroundColor: {r: 0, g: 0, b: 0, a: 0}
+    tint: {r: 1, g: 1, b: 1, a: 1}
+    opacity: 1
+    useProceduralFallbackForWallAttachments: 1
+    fallbackWindowColor: {r: 1, g: 0.92, b: 0.08, a: 1}
+    fallbackDoorColor: {r: 0, g: 0, b: 0, a: 1}
+    fallbackDoorBackingColor: {r: 1, g: 1, b: 1, a: 0.2}
+    previewRotationEuler: {x: 0, y: 0, z: 0}
+    previewOffset: {x: 0, y: 0}
+    previewScale: 1
+    renderContinuously: 1
+  shopThumbnailResolution: 256
+  shopThumbnailFramingPadding: 0.35
+  shopThumbnailBackground: {r: 0, g: 0, b: 0, a: 0}
   currencySource: {fileID: 0}
   moneyText: {fileID: 0}
   createMoneyHudIfMissing: 1
   moneyFormat: 'Money: {0}'
+  moneyFormatChinese: "\u91D1\u94B1\uFF1A{0}"
+  moneyFormatEnglish: 'Money: {0}'
   defaultStartingMoney: 100
+  moneyHudAnchoredPosition: {x: 32, y: 24}
+  moneyHudSize: {x: 320, y: 64}
+  liftMoneyAboveShop: 1
+  moneyShopClearance: 18
 --- !u!4 &1577489645
 Transform:
   m_ObjectHideFlags: 0
@@ -8261,6 +8302,7 @@ MonoBehaviour:
   drawDebugTiles: 1
   drawDebugBoundaryEdges: 1
   drawDebugLoopPoints: 1
+  enableBuildDebugLogging: 0
   debugTileColor: {r: 0.2, g: 0.8, b: 1, a: 0.25}
   debugBoundaryColor: {r: 1, g: 0.82, b: 0.1, a: 1}
   debugLoopPointColor: {r: 0.3, g: 1, b: 0.35, a: 1}
@@ -8278,116 +8320,6 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 394604698}
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &2099612282
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 2099612285}
-  - component: {fileID: 2099612284}
-  - component: {fileID: 2099612283}
-  m_Layer: 0
-  m_Name: Label - Fusion Sandbox
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!102 &2099612283
-TextMesh:
-  serializedVersion: 3
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2099612282}
-  m_Text: 'Fusion Sandbox
-
-    Enter toggles Player / Management mode. Block labels
-    appear automatically in Management.
-
-    Use 1-5 to buy blocks or windows, then drag, snap,
-    place, and merge.'
-  m_OffsetZ: 0
-  m_CharacterSize: 0.09
-  m_LineSpacing: 1
-  m_Anchor: 0
-  m_Alignment: 0
-  m_TabSize: 4
-  m_FontSize: 48
-  m_FontStyle: 0
-  m_RichText: 1
-  m_Font: {fileID: 0}
-  m_Color:
-    serializedVersion: 2
-    rgba: 4294962144
---- !u!23 &2099612284
-MeshRenderer:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2099612282}
-  m_Enabled: 1
-  m_CastShadows: 1
-  m_ReceiveShadows: 1
-  m_DynamicOccludee: 1
-  m_StaticShadowCaster: 0
-  m_MotionVectors: 1
-  m_LightProbeUsage: 1
-  m_ReflectionProbeUsage: 1
-  m_RayTracingMode: 2
-  m_RayTraceProcedural: 0
-  m_RayTracingAccelStructBuildFlagsOverride: 0
-  m_RayTracingAccelStructBuildFlags: 1
-  m_SmallMeshCulling: 1
-  m_ForceMeshLod: -1
-  m_MeshLodSelectionBias: 0
-  m_RenderingLayerMask: 1
-  m_RendererPriority: 0
-  m_Materials:
-  - {fileID: 10100, guid: 0000000000000000e000000000000000, type: 0}
-  m_StaticBatchInfo:
-    firstSubMesh: 0
-    subMeshCount: 0
-  m_StaticBatchRoot: {fileID: 0}
-  m_ProbeAnchor: {fileID: 0}
-  m_LightProbeVolumeOverride: {fileID: 0}
-  m_ScaleInLightmap: 1
-  m_ReceiveGI: 1
-  m_PreserveUVs: 0
-  m_IgnoreNormalsForChartDetection: 0
-  m_ImportantGI: 0
-  m_StitchLightmapSeams: 1
-  m_SelectedEditorRenderState: 3
-  m_MinimumChartSize: 4
-  m_AutoUVMaxDistance: 0.5
-  m_AutoUVMaxAngle: 89
-  m_LightmapParameters: {fileID: 0}
-  m_GlobalIlluminationMeshLod: 0
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
-  m_SortingOrder: 0
-  m_MaskInteraction: 0
-  m_AdditionalVertexStreams: {fileID: 0}
---- !u!4 &2099612285
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2099612282}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -8.8, y: 5.45, z: -0.2}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1987600001
@@ -8432,7 +8364,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5ea0fccdf6e1497983c6e9cc393330c7, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DuoCurtain.RuntimeTileMesh.FusionNightEnemySpawner
   stageController: {fileID: 1166734108}
   fusionSandbox: {fileID: 31788941}
@@ -8442,6 +8374,50 @@ MonoBehaviour:
   maxActiveEnemies: 5
   spawnPadding: 2.5
   spawnImmediatelyIfAlreadyNight: 1
+  clearOutdoorEnemiesWhenDayStarts: 1
+  cancelPendingSpawnsWhenDayStarts: 1
+  clearOutdoorEnemyFootprints: 1
+  fadeOutdoorEnemyFootprints: 0
+  warnBeforeOffscreenSpawn: 1
+  suppressSpawnWarningsInBootWorld: 1
+  warnOnlyWhenOffscreen: 1
+  spawnWarningLeadTime: 1.25
+  spawnWarningText: SOMETHING IS OUTSIDE
+  spawnWarningTextColor: {r: 1, g: 0.95, b: 0.78, a: 1}
+  spawnWarningPanelColor: {r: 0, g: 0, b: 0, a: 0.34}
+  spawnWarningFontSize: 42
+  spawnWarningAnchoredPosition: {x: 0, y: 300}
+  spawnWarningCanvasSortingOrder: 1350
+  showGridCellSpawnWarning: 1
+  spawnWarningPrefab: {fileID: 0}
+  spawnWarningColor: {r: 1, g: 0.1, b: 0.08, a: 0.68}
+  warningPulseCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0.35
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  blockSpawnIfPlayerEntersWarningCell: 1
+  cancelSpawnIfCellBecomesInvalid: 1
+  spawnCandidateAttempts: 32
   enemyMoveSpeed: 2.1
   windowDetectionDistance: 12
   playerWindowDistance: 8
@@ -8451,7 +8427,205 @@ MonoBehaviour:
   footprintSpriteWidth: 40
   footprintSpriteHeight: 72
   footprintPixelsPerUnit: 64
-  logSpawns: 1
+  enemyFootstepFoleyProfile: {fileID: 0}
+  enemyIndoorFootstepSurfaceId: Concrete
+  enemyOutdoorFootstepSurfaceId: Outdoor
+  enemyOutdoorFallbackSurfaceId: Grass
+  enemyFootstepVolume: 0.72
+  enemyFootstepMinDistance: 0.75
+  enemyFootstepMaxDistance: 16
+  enemyFootstepRolloffMode: 0
+  enemyFootstepSpatialize: 1
+  enemyFootstepSpatialBlend: 1
+  enemyNormalFootstepVolumeMultiplier: 1
+  enemyTargetingDoorFootstepVolumeMultiplier: 1.18
+  enemyChasingFootstepVolumeMultiplier: 1.28
+  enemyWatchingFootstepVolumeMultiplier: 0.75
+  enemyNormalFootstepPitchMultiplier: 0.96
+  enemyUrgentFootstepPitchMultiplier: 1.04
+  logSpawns: 0
+--- !u!114 &2147483001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 186715663}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 86f83f1dbf07419bb9b513f83b3ee9a6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FusionBackgroundShaderController
+  targetCamera: {fileID: 186715667}
+  stageController: {fileID: 1166734108}
+  backgroundMaterial: {fileID: 0}
+  planeDistance: 80
+  sizePadding: 1.08
+  sortingOrder: -32000
+  gridCellSize: {x: 1, y: 5}
+  gridLineWidth: 0.012
+  vignetteStrength: 0.16
+  driftSpeed: {x: 0.015, y: -0.006}
+  stageStyles:
+  - stageId: DayTop
+    topColor: {r: 0.68, g: 0.69, b: 0.7, a: 1}
+    bottomColor: {r: 0.49, g: 0.5, b: 0.51, a: 1}
+    gridColor: {r: 1, g: 1, b: 1, a: 0.2}
+    gridOpacity: 0.23
+    pulseStrength: 0.03
+  - stageId: DayBottom
+    topColor: {r: 0.54, g: 0.54, b: 0.55, a: 1}
+    bottomColor: {r: 0.36, g: 0.37, b: 0.38, a: 1}
+    gridColor: {r: 0.95, g: 0.95, b: 0.95, a: 0.18}
+    gridOpacity: 0.2
+    pulseStrength: 0.025
+  - stageId: BeforeNight
+    topColor: {r: 0.13, g: 0.13, b: 0.16, a: 1}
+    bottomColor: {r: 0.06, g: 0.06, b: 0.08, a: 1}
+    gridColor: {r: 0.48, g: 0.5, b: 0.58, a: 0.22}
+    gridOpacity: 0.16
+    pulseStrength: 0.02
+  - stageId: Night
+    topColor: {r: 0.025, g: 0.027, b: 0.04, a: 1}
+    bottomColor: {r: 0.005, g: 0.006, b: 0.012, a: 1}
+    gridColor: {r: 0.16, g: 0.2, b: 0.32, a: 0.18}
+    gridOpacity: 0.12
+    pulseStrength: 0.012
+--- !u!114 &2147483002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1518932441}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 86f83f1dbf07419bb9b513f83b3ee9a6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FusionBackgroundShaderController
+  targetCamera: {fileID: 1518932443}
+  stageController: {fileID: 1166734108}
+  backgroundMaterial: {fileID: 0}
+  planeDistance: 80
+  sizePadding: 1.08
+  sortingOrder: -32000
+  gridCellSize: {x: 1, y: 5}
+  gridLineWidth: 0.012
+  vignetteStrength: 0.16
+  driftSpeed: {x: 0.015, y: -0.006}
+  stageStyles:
+  - stageId: DayTop
+    topColor: {r: 0.68, g: 0.69, b: 0.7, a: 1}
+    bottomColor: {r: 0.49, g: 0.5, b: 0.51, a: 1}
+    gridColor: {r: 1, g: 1, b: 1, a: 0.2}
+    gridOpacity: 0.23
+    pulseStrength: 0.03
+  - stageId: DayBottom
+    topColor: {r: 0.54, g: 0.54, b: 0.55, a: 1}
+    bottomColor: {r: 0.36, g: 0.37, b: 0.38, a: 1}
+    gridColor: {r: 0.95, g: 0.95, b: 0.95, a: 0.18}
+    gridOpacity: 0.2
+    pulseStrength: 0.025
+  - stageId: BeforeNight
+    topColor: {r: 0.13, g: 0.13, b: 0.16, a: 1}
+    bottomColor: {r: 0.06, g: 0.06, b: 0.08, a: 1}
+    gridColor: {r: 0.48, g: 0.5, b: 0.58, a: 0.22}
+    gridOpacity: 0.16
+    pulseStrength: 0.02
+  - stageId: Night
+    topColor: {r: 0.025, g: 0.027, b: 0.04, a: 1}
+    bottomColor: {r: 0.005, g: 0.006, b: 0.012, a: 1}
+    gridColor: {r: 0.16, g: 0.2, b: 0.32, a: 0.18}
+    gridOpacity: 0.12
+    pulseStrength: 0.012
+--- !u!114 &2147483003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 186715663}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a79441f348de89743a2939f4d699eac1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.UniversalAdditionalCameraData
+  m_RenderShadows: 1
+  m_RequiresDepthTextureOption: 2
+  m_RequiresOpaqueTextureOption: 2
+  m_CameraType: 0
+  m_Cameras: []
+  m_RendererIndex: -1
+  m_VolumeLayerMask:
+    serializedVersion: 2
+    m_Bits: 1
+  m_VolumeTrigger: {fileID: 0}
+  m_VolumeFrameworkUpdateModeOption: 2
+  m_RenderPostProcessing: 0
+  m_Antialiasing: 0
+  m_AntialiasingQuality: 2
+  m_StopNaN: 0
+  m_Dithering: 0
+  m_ClearDepth: 1
+  m_AllowXRRendering: 1
+  m_AllowHDROutput: 1
+  m_UseScreenCoordOverride: 0
+  m_ScreenSizeOverride: {x: 0, y: 0, z: 0, w: 0}
+  m_ScreenCoordScaleBias: {x: 0, y: 0, z: 0, w: 0}
+  m_RequiresDepthTexture: 0
+  m_RequiresColorTexture: 0
+  m_TaaSettings:
+    m_Quality: 3
+    m_FrameInfluence: 0.1
+    m_JitterScale: 1
+    m_MipBias: 0
+    m_VarianceClampScale: 0.9
+    m_ContrastAdaptiveSharpening: 0
+  m_Version: 2
+--- !u!114 &2147483004
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1518932441}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a79441f348de89743a2939f4d699eac1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.UniversalAdditionalCameraData
+  m_RenderShadows: 1
+  m_RequiresDepthTextureOption: 2
+  m_RequiresOpaqueTextureOption: 2
+  m_CameraType: 0
+  m_Cameras: []
+  m_RendererIndex: -1
+  m_VolumeLayerMask:
+    serializedVersion: 2
+    m_Bits: 1
+  m_VolumeTrigger: {fileID: 0}
+  m_VolumeFrameworkUpdateModeOption: 2
+  m_RenderPostProcessing: 0
+  m_Antialiasing: 0
+  m_AntialiasingQuality: 2
+  m_StopNaN: 0
+  m_Dithering: 0
+  m_ClearDepth: 1
+  m_AllowXRRendering: 1
+  m_AllowHDROutput: 1
+  m_UseScreenCoordOverride: 0
+  m_ScreenSizeOverride: {x: 0, y: 0, z: 0, w: 0}
+  m_ScreenCoordScaleBias: {x: 0, y: 0, z: 0, w: 0}
+  m_RequiresDepthTexture: 0
+  m_RequiresColorTexture: 0
+  m_TaaSettings:
+    m_Quality: 3
+    m_FrameInfluence: 0.1
+    m_JitterScale: 1
+    m_MipBias: 0
+    m_VarianceClampScale: 0.9
+    m_ContrastAdaptiveSharpening: 0
+  m_Version: 2
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -8459,7 +8633,6 @@ SceneRoots:
   - {fileID: 1518932446}
   - {fileID: 186715668}
   - {fileID: 1166734109}
-  - {fileID: 2099612285}
   - {fileID: 403253767}
   - {fileID: 31788943}
   - {fileID: 1873750851}

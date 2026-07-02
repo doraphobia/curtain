@@ -622,7 +622,9 @@ public sealed class BootWorldStateController : MonoBehaviour
         if (shader == null)
             return;
 
-        Material source = label.fontSharedMaterial != null ? label.fontSharedMaterial : label.fontMaterial;
+        Material source = label.font != null && label.font.material != null
+            ? label.font.material
+            : label.fontSharedMaterial;
         if (!temporaryTitleInvertMaterials.TryGetValue(label, out Material material) || material == null)
         {
             material = source != null ? new Material(source) : new Material(shader);
@@ -640,7 +642,7 @@ public sealed class BootWorldStateController : MonoBehaviour
             };
             temporaryTitleInvertMaterials[label] = material;
         }
-        else if (source != null)
+        else if (source != null && !ReferenceEquals(material, source))
         {
             material.CopyPropertiesFromMaterial(source);
         }

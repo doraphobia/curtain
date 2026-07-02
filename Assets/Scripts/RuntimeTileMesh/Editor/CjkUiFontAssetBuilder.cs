@@ -16,7 +16,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
         public const string FontAssetPath = "Assets/Fusion/Resources/Fonts/Cjk UI SDF.asset";
 
         private const string DefaultCharacterSet =
-            "type: 现在你在屋子外面，目前的你很脆弱！ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 -_,.!?";
+            "type: 现在你在屋子外面，目前的你很脆弱！游戏暂停语言：中文你死了重新开始购买钱不够金钱：ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 -_,.!?";
 
         static CjkUiFontAssetBuilder()
         {
@@ -36,8 +36,15 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                 return null;
 
             TMP_FontAsset existing = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontAssetPath);
-            if (!forceRebuild && BayonFontAssetBuilder.IsFontAssetUsable(existing))
-                return existing;
+            if (!forceRebuild && existing != null && BayonFontAssetBuilder.IsFontAssetUsable(existing))
+            {
+                ConfigureForPlayerBuild(existing);
+                if (HasAllDefaultCharacters(existing))
+                    return existing;
+
+                if (TryRepairFontAsset(existing))
+                    return AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontAssetPath);
+            }
 
             if (!forceRebuild && existing != null && TryRepairFontAsset(existing))
                 return existing;
@@ -97,6 +104,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
 
             fontAsset.name = "Cjk UI SDF";
             fontAsset.atlasPopulationMode = AtlasPopulationMode.Dynamic;
+            ConfigureForPlayerBuild(fontAsset);
             PrimeCharacters(fontAsset);
 
             if (!BayonFontAssetBuilder.IsFontAssetUsable(fontAsset))
@@ -117,6 +125,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             if (!BayonFontAssetBuilder.IsFontAssetUsable(fontAsset))
                 return false;
 
+            ConfigureForPlayerBuild(fontAsset);
             PersistSubAssets(fontAsset);
             EditorUtility.SetDirty(fontAsset);
             AssetDatabase.SaveAssets();
@@ -140,6 +149,24 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                     "[CjkUiFontAssetBuilder] CJK UI font is missing characters: " +
                     (string.IsNullOrEmpty(missingCharacters) ? "(none reported)" : missingCharacters));
             }
+        }
+
+        private static bool HasAllDefaultCharacters(TMP_FontAsset fontAsset)
+        {
+            if (fontAsset == null)
+                return false;
+
+            for (int i = 0; i < DefaultCharacterSet.Length; i++)
+            {
+                char character = DefaultCharacterSet[i];
+                if (char.IsWhiteSpace(character))
+                    continue;
+
+                if (!fontAsset.HasCharacter(character, true))
+                    return false;
+            }
+
+            return true;
         }
 
         private static bool EnsureSourceFontImported()
@@ -235,6 +262,20 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
 
             Match match = Regex.Match(File.ReadAllText(metaPath), @"guid: ([0-9a-f]+)");
             return match.Success ? match.Groups[1].Value : null;
+        }
+
+        private static void ConfigureForPlayerBuild(TMP_FontAsset fontAsset)
+        {
+            if (fontAsset == null)
+                return;
+
+            SerializedObject serializedFont = new SerializedObject(fontAsset);
+            SerializedProperty clearOnBuild = serializedFont.FindProperty("m_ClearDynamicDataOnBuild");
+            if (clearOnBuild != null)
+            {
+                clearOnBuild.boolValue = false;
+                serializedFont.ApplyModifiedPropertiesWithoutUndo();
+            }
         }
 
         private static void PersistSubAssets(TMP_FontAsset fontAsset)

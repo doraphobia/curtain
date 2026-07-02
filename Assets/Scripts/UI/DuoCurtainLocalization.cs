@@ -62,8 +62,9 @@ public static class DuoCurtainLocalization
         if (text == null)
             return;
 
-        TMP_FontAsset font = CjkUiFontUtility.Resolve(null, CjkUiFontUtility.DefaultResourcesFontPath, contentToPrime ?? text.text);
-        if (font != null)
+        string primeText = contentToPrime ?? text.text;
+        TMP_FontAsset font = CjkUiFontUtility.Resolve(null, CjkUiFontUtility.DefaultResourcesFontPath, primeText);
+        if (font != null && CjkUiFontUtility.IsFontAssetUsable(font))
             text.font = font;
     }
 

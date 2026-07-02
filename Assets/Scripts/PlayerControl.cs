@@ -1094,7 +1094,7 @@ public class PlayerControl : MonoBehaviour
             outdoorWarningFont,
             outdoorWarningFontResourcesPath,
             message);
-        if (warningFont != null)
+        if (warningFont != null && CjkUiFontUtility.IsFontAssetUsable(warningFont))
             outdoorWarningText.font = warningFont;
 
         outdoorWarningText.text = message;

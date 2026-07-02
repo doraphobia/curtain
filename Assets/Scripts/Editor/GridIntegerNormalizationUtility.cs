@@ -986,12 +986,33 @@ namespace DuoCurtain.Editor
             if (string.IsNullOrWhiteSpace(fullPath))
                 return true;
 
+            string normalizedPath = NormalizePath(fullPath);
+            if (normalizedPath.Contains("/Library/", StringComparison.OrdinalIgnoreCase) ||
+                normalizedPath.Contains("/Temp/", StringComparison.OrdinalIgnoreCase) ||
+                normalizedPath.Contains("/Logs/", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
             string fileName = Path.GetFileName(fullPath);
+            if (IsMacOsDuplicateCopy(fileName))
+                return true;
+
             return fileName.Equals(".DS_Store", StringComparison.OrdinalIgnoreCase) ||
                    fileName.EndsWith("~", StringComparison.Ordinal) ||
                    fileName.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase) ||
                    fileName.EndsWith(".swp", StringComparison.OrdinalIgnoreCase) ||
                    fileName.EndsWith(".lock", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsMacOsDuplicateCopy(string fileName)
+        {
+            if (string.IsNullOrWhiteSpace(fileName))
+                return false;
+
+            return fileName.EndsWith(" 2", StringComparison.Ordinal) ||
+                   fileName.EndsWith(" 2.meta", StringComparison.Ordinal) ||
+                   fileName.Contains(" 2.", StringComparison.Ordinal);
         }
 
         private static string ToProjectRelativePath(string fullPath)
