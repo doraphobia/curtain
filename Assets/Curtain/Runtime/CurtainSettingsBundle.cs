@@ -1,3 +1,4 @@
+#if UNITY_EDITOR
 using UnityEngine;
 
 namespace Curtain.Settings
@@ -17,3 +18,5 @@ namespace Curtain.Settings
         public DebugSettings debug;
     }
 }
+
+#endif

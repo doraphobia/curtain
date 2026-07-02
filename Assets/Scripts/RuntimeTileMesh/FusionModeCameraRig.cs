@@ -1,6 +1,7 @@
 using UnityEngine;
-using UnityEngine.Serialization;
+#if UNITY_EDITOR
 using Curtain.Settings;
+#endif
 
 namespace DuoCurtain.RuntimeTileMesh
 {
@@ -54,11 +55,6 @@ namespace DuoCurtain.RuntimeTileMesh
         [Min(0f)]
         public float defaultTransitionDuration = 0.65f;
         public AnimationCurve transitionCurve;
-
-        [Header("Dashboard Settings")]
-        [Tooltip("Optional. If assigned, the rig reads tuning values from the Dashboard settings asset.")]
-        [FormerlySerializedAs("settings")]
-        public CameraSettings settings;
 
         private Camera cachedCamera;
         private Vector3 followVelocity;
@@ -119,7 +115,8 @@ namespace DuoCurtain.RuntimeTileMesh
 
         private void ApplySettingsIfPresent()
         {
-            CameraSettings source = CurtainSettingsLocator.Resolve(settings);
+#if UNITY_EDITOR
+            CameraSettings source = CurtainSettingsLocator.Camera;
             if (source == null)
                 return;
 
@@ -137,6 +134,7 @@ namespace DuoCurtain.RuntimeTileMesh
             defaultTransitionDuration = source.defaultTransitionDuration;
             if (source.transitionCurve != null && source.transitionCurve.length > 0)
                 transitionCurve = source.transitionCurve;
+#endif
         }
 
         public void BeginBlendFrom(Camera sourceCamera, float duration)

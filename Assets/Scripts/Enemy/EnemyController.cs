@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+#if UNITY_EDITOR
 using Curtain.Settings;
+#endif
 using DuoCurtain.Combat;
 using UnityEngine;
 using UnityEngine.Serialization;
@@ -94,11 +96,6 @@ public class EnemyController : MonoBehaviour
 
     [Header("Boot World")]
     public bool suppressTrackingDuringBootWorld = true;
-
-    [Header("Dashboard Settings")]
-    [Tooltip("Optional. If assigned, the enemy reads tuning values from this Settings asset (Dashboard).")]
-    [FormerlySerializedAs("settings")]
-    public EnemySettings settings;
 
     [SerializeField] private EnemyState currentState = EnemyState.SpawnOutside;
 
@@ -716,7 +713,8 @@ public class EnemyController : MonoBehaviour
 
     private void ApplySettingsIfPresent()
     {
-        EnemySettings source = CurtainSettingsLocator.Resolve(settings);
+#if UNITY_EDITOR
+        EnemySettings source = CurtainSettingsLocator.Enemy;
         if (source == null)
             return;
 
@@ -761,5 +759,6 @@ public class EnemyController : MonoBehaviour
         drawLineOfSight = source.drawLineOfSight;
         drawWindowVisionSamples = source.drawWindowVisionSamples;
         logStateChanges = source.logStateChanges;
+#endif
     }
 }

@@ -1,0 +1,17 @@
+---
+description: After fixes, clear Console errors then verify with a Mac build launch
+alwaysApply: true
+---
+
+# Post-Fix Mac Build Verification
+
+After completing any code fix in this project:
+
+1. **Fix all Console errors first** — resolve every red `error CS` / `InvalidOperationException` before moving on. Warnings are secondary; errors block the workflow.
+2. **Confirm Unity recompile succeeded** — check `Editor.log` ends with `Tundra build success` and Console has no red errors.
+3. **Trigger Mac build** — run `Tools → Duo Curtain → Build → Build Mac` (or invoke `DuoCurtainBuildPackager.BuildMacMenu` when Editor is available).
+4. **Require smoke test pass** — build must log `[DuoCurtainBuildPackager] Mac player smoke test passed.` If smoke test fails, diagnose and fix before reporting done.
+5. **Open the new build** — launch `Builds/Curtain_Mac/Curtain_Mac.app` after a successful build.
+6. **Prune oldest archive** — delete the oldest folder under `Builds/Curtain_Mac/Archive/` to keep archive count within `BuildArchiveSettings.maxArchivesPerPlatform`.
+
+Do not mark a fix complete until steps 1–5 pass, or explain which step is blocked and why.

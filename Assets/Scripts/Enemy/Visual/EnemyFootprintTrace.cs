@@ -79,10 +79,8 @@ public class EnemyFootprintTrace : MonoBehaviour
     [SerializeField] private bool debugDrawStepPositions = true;
     [SerializeField] private bool debugLogFootprintStateChanges = false;
     [SerializeField] private bool debugLogFootprintDenials = false;
-#if UNITY_EDITOR
-    [SerializeField] private bool debugShowCurrentTraceState = true;
-#endif
     [SerializeField] private EnemyTraceState currentTraceState = EnemyTraceState.NormalMoving;
+    [SerializeField] private bool debugShowCurrentTraceState = true;
 
     private IFootprintSurfaceModifier SurfaceModifier =>
         surfaceModifierComponent as IFootprintSurfaceModifier;

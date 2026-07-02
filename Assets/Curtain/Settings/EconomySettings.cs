@@ -1,3 +1,4 @@
+#if UNITY_EDITOR
 using UnityEngine;
 
 namespace Curtain.Settings
@@ -12,4 +13,6 @@ namespace Curtain.Settings
         [Min(0)] public int repairCost = 50;
     }
 }
+
+#endif
 

@@ -1,11 +1,11 @@
+#if UNITY_EDITOR
 using UnityEngine;
 
 namespace Curtain.Settings
 {
     public static class CurtainSettingsLocator
     {
-        private const string BundleResourceName = "CurtainSettingsBundle";
-        private const string BundleAssetPath = "Assets/Resources/CurtainSettingsBundle.asset";
+        private const string BundleAssetPath = "Assets/Curtain/Settings/CurtainSettingsBundle.asset";
 
         private static CurtainSettingsBundle bundle;
 
@@ -29,6 +29,20 @@ namespace Curtain.Settings
         public static SanitySettings Resolve(SanitySettings assigned) => assigned != null ? assigned : Sanity;
         public static DebugSettings Resolve(DebugSettings assigned) => assigned != null ? assigned : Debug;
 
+        public static void RegisterBundle(CurtainSettingsBundle registered)
+        {
+            if (registered == null)
+                return;
+
+            bundle = registered;
+        }
+
+        public static void UnregisterBundle(CurtainSettingsBundle registered)
+        {
+            if (bundle == registered)
+                bundle = null;
+        }
+
         public static void InvalidateCache()
         {
             bundle = null;
@@ -36,14 +50,17 @@ namespace Curtain.Settings
 
         private static CurtainSettingsBundle LoadBundle()
         {
-            CurtainSettingsBundle loaded = Resources.Load<CurtainSettingsBundle>(BundleResourceName);
 #if UNITY_EDITOR
-            if (loaded == null)
-            {
-                loaded = UnityEditor.AssetDatabase.LoadAssetAtPath<CurtainSettingsBundle>(BundleAssetPath);
-            }
+            CurtainSettingsRuntimeProvider provider = Object.FindFirstObjectByType<CurtainSettingsRuntimeProvider>();
+            if (provider != null && provider.Bundle != null)
+                return provider.Bundle;
+
+            return UnityEditor.AssetDatabase.LoadAssetAtPath<CurtainSettingsBundle>(BundleAssetPath);
+#else
+            return null;
 #endif
-            return loaded;
         }
     }
 }
+
+#endif

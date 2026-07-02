@@ -56,6 +56,7 @@ namespace Curtain.Editor.Dashboard
             Door,
             Camera,
             Sanity,
+            Footprint,
             Economy,
             Accessibility,
             Localization,
@@ -88,6 +89,8 @@ namespace Curtain.Editor.Dashboard
         private GUIStyle cardHeader;
         private GUIStyle wrapLabel;
         private GUIStyle singleLineLabel;
+        private GUIStyle descriptionLabel;
+        private GUIStyle relatedAssetKindLabel;
         private GUIStyle rowBackground;
 
         private float navWidth = 252f;
@@ -152,6 +155,7 @@ namespace Curtain.Editor.Dashboard
                     DrawNavButton(Page.Door, "Door");
                     DrawNavButton(Page.Camera, "Camera");
                     DrawNavButton(Page.Sanity, "Sanity");
+                    DrawNavButton(Page.Footprint, "Footprint");
                     DrawNavButton(Page.Economy, "Economy");
                     GUILayout.Space(8f);
                     DrawNavButton(Page.Accessibility, "Accessibility");
@@ -246,6 +250,9 @@ namespace Curtain.Editor.Dashboard
                         case Page.Sanity:
                             DrawSanityPage();
                             break;
+                        case Page.Footprint:
+                            DrawFootprintPage();
+                            break;
                         case Page.Economy:
                             DrawEconomyPage();
                             break;
@@ -281,7 +288,8 @@ namespace Curtain.Editor.Dashboard
                     EditorGUILayout.HelpBox(
                         "This Dashboard centralizes gameplay tuning into ScriptableObject settings.\n" +
                         "Runtime state remains on components.\n" +
-                        "Edit values here; systems that reference these assets can live-tune in Play Mode.",
+                        "Edit values here; connected systems live-tune immediately in Editor Play Mode.\n" +
+                        "Shipping builds keep using scene/prefab inline values so editor-only settings do not enter Player Data.",
                         MessageType.None);
                 });
 
@@ -360,7 +368,7 @@ namespace Curtain.Editor.Dashboard
 
             DrawCard("Footprints (Placeholder)", () =>
             {
-                EditorGUILayout.HelpBox("Footprint tuning is on Footprint page (settings asset exists).", MessageType.None);
+                EditorGUILayout.HelpBox("Open the Footprint page for footprint lifetime, spacing, and fade tuning.", MessageType.None);
             });
 
             DrawCard("Debug", () =>
@@ -538,6 +546,29 @@ namespace Curtain.Editor.Dashboard
             so.ApplyModifiedProperties();
         }
 
+        private void DrawFootprintPage()
+        {
+            if (footprintSettings == null)
+            {
+                EditorGUILayout.HelpBox("FootprintSettings asset missing.", MessageType.Warning);
+                return;
+            }
+
+            SerializedObject so = new SerializedObject(footprintSettings);
+            DrawCard("Lifetime", () =>
+            {
+                DrawProp(so, "lifetimeSeconds");
+                DrawProp(so, "fadeSeconds");
+            });
+
+            DrawCard("Spacing", () =>
+            {
+                DrawProp(so, "spacing");
+            });
+
+            so.ApplyModifiedProperties();
+        }
+
         private void DrawEconomyPage()
         {
             if (economySettings == null)
@@ -631,12 +662,29 @@ namespace Curtain.Editor.Dashboard
 
         private void DrawAssetRow(string label, UnityEngine.Object asset)
         {
-            using (new EditorGUILayout.HorizontalScope())
+            GUIContent labelContent = new GUIContent(label);
+            float estimatedWidth = Mathf.Max(340f, position.width - navWidth - 112f);
+            float labelWidth = Mathf.Clamp(estimatedWidth * 0.35f, 160f, 280f);
+            float labelHeight = Mathf.Max(EditorGUIUtility.singleLineHeight, wrapLabel.CalcHeight(labelContent, labelWidth));
+            float rowHeight = Mathf.Max(labelHeight, EditorGUIUtility.singleLineHeight + 8f);
+            Rect rowRect = EditorGUILayout.GetControlRect(false, rowHeight);
+
+            Rect labelRect = new Rect(rowRect.x, rowRect.y + 4f, labelWidth, labelHeight);
+            Rect fieldRect = new Rect(labelRect.xMax + 12f, rowRect.y + 2f, Mathf.Max(140f, rowRect.width - labelWidth - 168f), EditorGUIUtility.singleLineHeight);
+            Rect pingRect = new Rect(fieldRect.xMax + 8f, rowRect.y + 1f, 64f, EditorGUIUtility.singleLineHeight + 2f);
+            Rect selectRect = new Rect(pingRect.xMax + 6f, rowRect.y + 1f, 72f, EditorGUIUtility.singleLineHeight + 2f);
+
+            EditorGUI.LabelField(labelRect, labelContent, wrapLabel);
+            EditorGUI.ObjectField(fieldRect, asset, typeof(UnityEngine.Object), false);
+            using (new EditorGUI.DisabledScope(asset == null))
             {
-                EditorGUILayout.LabelField(label, GUILayout.Width(160f));
-                EditorGUILayout.ObjectField(asset, typeof(UnityEngine.Object), false);
-                if (GUILayout.Button("Ping", GUILayout.Width(64f)) && asset != null)
+                if (GUI.Button(pingRect, "Ping"))
                     EditorGUIUtility.PingObject(asset);
+                if (GUI.Button(selectRect, "Select"))
+                {
+                    Selection.activeObject = asset;
+                    EditorGUIUtility.PingObject(asset);
+                }
             }
         }
 
@@ -689,14 +737,14 @@ namespace Curtain.Editor.Dashboard
 
             card = new GUIStyle(EditorStyles.helpBox)
             {
-                margin = new RectOffset(12, 12, 8, 8),
-                padding = new RectOffset(14, 14, 12, 14)
+                margin = new RectOffset(12, 12, 10, 10),
+                padding = new RectOffset(16, 16, 14, 16)
             };
 
             cardHeader = new GUIStyle(EditorStyles.boldLabel)
             {
                 fontSize = 13,
-                margin = new RectOffset(0, 0, 0, 6)
+                margin = new RectOffset(0, 0, 0, 8)
             };
 
             Color labelColor = EditorStyles.label.normal.textColor;
@@ -705,10 +753,10 @@ namespace Curtain.Editor.Dashboard
 
             singleLineLabel = new GUIStyle(EditorStyles.label)
             {
-                wordWrap = false,
+                wordWrap = true,
                 richText = false,
                 alignment = TextAnchor.MiddleLeft,
-                clipping = TextClipping.Clip,
+                clipping = TextClipping.Overflow,
                 margin = new RectOffset(0, 0, 0, 0),
                 padding = new RectOffset(0, 0, 0, 0)
             };
@@ -720,6 +768,23 @@ namespace Curtain.Editor.Dashboard
                 alignment = TextAnchor.UpperLeft
             };
             wrapLabel.normal.textColor = labelColor;
+
+            descriptionLabel = new GUIStyle(EditorStyles.wordWrappedMiniLabel)
+            {
+                margin = new RectOffset(0, 0, 2, 0),
+                padding = new RectOffset(0, 0, 0, 0),
+                wordWrap = true,
+                clipping = TextClipping.Overflow
+            };
+
+            relatedAssetKindLabel = new GUIStyle(EditorStyles.miniLabel)
+            {
+                alignment = TextAnchor.MiddleLeft,
+                fontStyle = FontStyle.Bold,
+                clipping = TextClipping.Overflow,
+                margin = new RectOffset(0, 0, 0, 0),
+                padding = new RectOffset(0, 0, 0, 0)
+            };
 
             rowBackground = new GUIStyle
             {
@@ -788,42 +853,45 @@ namespace Curtain.Editor.Dashboard
             if (prop == null)
                 return;
 
-            float availableWidth = position.width - navWidth - 56f;
-            float labelColumnWidth = Mathf.Clamp(availableWidth * 0.44f, 220f, 480f);
-            float gutter = 16f;
-            float valueColumnWidth = Mathf.Max(180f, availableWidth - labelColumnWidth - gutter);
-
-            GUIContent labelContent = new GUIContent(prop.displayName, DashboardPropertyDocumentation.ResolveTooltip(prop));
-
-            float singleLineLabelHeight = singleLineLabel.CalcHeight(labelContent, labelColumnWidth);
-            float wrappedLabelHeight = wrapLabel.CalcHeight(labelContent, labelColumnWidth);
-            bool useWrappedLabel = wrappedLabelHeight > singleLineLabelHeight + 1f;
-
-            GUIStyle labelStyle = useWrappedLabel ? wrapLabel : singleLineLabel;
-            float labelHeight = useWrappedLabel ? wrappedLabelHeight : EditorGUIUtility.singleLineHeight;
+            GUIContent labelContent = DashboardPropertyDocumentation.BuildLabelContent(prop);
             bool includeChildren = prop.hasVisibleChildren && prop.propertyType != SerializedPropertyType.Float &&
                                    prop.propertyType != SerializedPropertyType.Integer &&
                                    prop.propertyType != SerializedPropertyType.Boolean &&
                                    prop.propertyType != SerializedPropertyType.Enum;
-            float fieldHeight = EditorGUI.GetPropertyHeight(prop, includeChildren: includeChildren);
-            float rowHeight = Mathf.Max(labelHeight, fieldHeight) + (useWrappedLabel ? 8f : 4f);
+
+            float estimatedWidth = Mathf.Max(340f, position.width - navWidth - 112f);
+            CalculatePropertyColumns(estimatedWidth, out float labelColumnWidth, out float valueColumnWidth, out float gutter);
+
+            float labelHeight = Mathf.Max(EditorGUIUtility.singleLineHeight, wrapLabel.CalcHeight(labelContent, labelColumnWidth));
+            float fieldHeight = EditorGUI.GetPropertyHeight(prop, GUIContent.none, includeChildren: includeChildren);
+            float rowHeight = Mathf.Max(labelHeight, fieldHeight) + 10f;
 
             Rect rowRect = EditorGUILayout.GetControlRect(false, rowHeight);
+            CalculatePropertyColumns(rowRect.width, out labelColumnWidth, out valueColumnWidth, out gutter);
 
             Color tint = EditorGUIUtility.isProSkin ? new Color(1f, 1f, 1f, 0.03f) : new Color(0f, 0f, 0f, 0.035f);
             if ((prop.propertyPath.GetHashCode() & 1) == 0)
                 EditorGUI.DrawRect(rowRect, tint);
 
-            float labelY = useWrappedLabel
-                ? rowRect.y + 3f
-                : rowRect.y + (rowRect.height - labelHeight) * 0.5f;
+            float labelY = rowRect.y + 5f;
             Rect labelRect = new Rect(rowRect.x, labelY, labelColumnWidth, labelHeight);
 
             float fieldY = rowRect.y + (rowRect.height - fieldHeight) * 0.5f;
             Rect fieldRect = new Rect(labelRect.xMax + gutter, fieldY, valueColumnWidth, fieldHeight);
 
-            EditorGUI.LabelField(labelRect, labelContent, labelStyle);
+            EditorGUI.LabelField(labelRect, labelContent, wrapLabel);
             EditorGUI.PropertyField(fieldRect, prop, GUIContent.none, includeChildren: includeChildren);
+        }
+
+        private static void CalculatePropertyColumns(float totalWidth, out float labelWidth, out float valueWidth, out float gutter)
+        {
+            totalWidth = Mathf.Max(320f, totalWidth);
+            gutter = totalWidth < 520f ? 12f : 18f;
+            valueWidth = Mathf.Clamp(totalWidth * 0.42f, 180f, 340f);
+            if (totalWidth < 520f)
+                valueWidth = Mathf.Clamp(totalWidth * 0.46f, 160f, 220f);
+
+            labelWidth = Mathf.Max(128f, totalWidth - valueWidth - gutter);
         }
 
         private void DrawRelatedAssetsSection()
@@ -834,6 +902,11 @@ namespace Curtain.Editor.Dashboard
                 GUILayout.Space(6f);
                 using (new EditorGUILayout.VerticalScope(card))
                 {
+                    EditorGUILayout.LabelField(
+                        "Quick navigation for tuning assets, scripts, prefabs, folders, and scene objects related to this page.",
+                        descriptionLabel);
+                    GUILayout.Space(8f);
+
                     List<RelatedAssetEntry> entries = new List<RelatedAssetEntry>(GetRelatedAssetsForPage(currentPage));
                     if (entries.Count == 0)
                     {
@@ -845,7 +918,7 @@ namespace Curtain.Editor.Dashboard
                         {
                             DrawRelatedAssetEntry(entries[i]);
                             if (i < entries.Count - 1)
-                                GUILayout.Space(4f);
+                                GUILayout.Space(5f);
                         }
                     }
                 }
@@ -876,64 +949,99 @@ namespace Curtain.Editor.Dashboard
 
                 case Page.Enemy:
                     yield return new RelatedAssetEntry(RelatedAssetKind.ScriptableObject, "EnemySettings.asset", enemySettings);
+                    yield return new RelatedAssetEntry(RelatedAssetKind.ScriptableObject, "FootprintSettings.asset", footprintSettings);
+                    yield return PrefabEntry("Floorplan (2).prefab", "Assets/Frefab/Floorplan (2).prefab");
                     yield return ScriptEntry("EnemyController.cs", "Assets/Scripts/Enemy/EnemyController.cs");
                     yield return ScriptEntry("EnemyVision.cs", "Assets/Scripts/Enemy/EnemyVision.cs");
                     yield return ScriptEntry("EnemyFootprintTrace.cs", "Assets/Scripts/Enemy/Visual/EnemyFootprintTrace.cs");
+                    yield return ScriptEntry("FusionNightFootprintEnemy.cs", "Assets/Scripts/RuntimeTileMesh/FusionNightFootprintEnemy.cs");
+                    yield return ScriptEntry("EnemyFootstepAudio.cs", "Assets/Scripts/Enemy/Audio/EnemyFootstepAudio.cs");
+                    yield return new RelatedAssetEntry(RelatedAssetKind.SceneObject, "Night Enemy Spawner (Scene)", typeof(FusionNightEnemySpawner));
                     yield return new RelatedAssetEntry(RelatedAssetKind.SceneObject, "EnemyController (Scene)", typeof(EnemyController));
                     break;
 
                 case Page.Vision:
                     yield return new RelatedAssetEntry(RelatedAssetKind.ScriptableObject, "VisionSettings.asset", visionSettings);
+                    yield return PrefabEntry("Window Area LEFT.prefab", "Assets/Frefab/windowareaLEFT.prefab");
+                    yield return PrefabEntry("Window Area RIGHT.prefab", "Assets/Frefab/windowareaRIGHT.prefab");
                     yield return ScriptEntry("VisibilityWorld.cs", "Assets/Scripts/Enemy/Vision/Gameplay/VisibilityWorld.cs");
                     yield return ScriptEntry("VisionSensor2D.cs", "Assets/Scripts/Enemy/Vision/Gameplay/VisionSensor2D.cs");
+                    yield return ScriptEntry("WindowPortal.cs", "Assets/Scripts/Windows/WindowPortal.cs");
                     yield return ScriptEntry("ProceduralMeshVisionRenderer.cs", "Assets/Scripts/Enemy/Vision/Rendering/Mesh/ProceduralMeshVisionRenderer.cs");
                     yield return ScriptEntry("VisionDebugView2D.cs", "Assets/Scripts/Enemy/Vision/Debug/VisionDebugView2D.cs");
                     yield return new RelatedAssetEntry(RelatedAssetKind.SceneObject, "VisionSensor2D (Scene)", typeof(VisionSensor2D));
+                    yield return new RelatedAssetEntry(RelatedAssetKind.SceneObject, "VisibilityWorld (Scene)", typeof(VisibilityWorld));
                     break;
 
                 case Page.Door:
                     yield return new RelatedAssetEntry(RelatedAssetKind.ScriptableObject, "DoorSettings.asset", doorSettings);
+                    yield return PrefabEntry("Window Area LEFT.prefab", "Assets/Frefab/windowareaLEFT.prefab");
+                    yield return PrefabEntry("Window Area RIGHT.prefab", "Assets/Frefab/windowareaRIGHT.prefab");
                     yield return ScriptEntry("RuntimeTileMeshFusionDoor.cs", "Assets/Scripts/RuntimeTileMesh/RuntimeTileMeshFusionDoor.cs");
+                    yield return ScriptEntry("BreakableExteriorDoor.cs", "Assets/Scripts/Doors/BreakableExteriorDoor.cs");
                     yield return ScriptEntry("CombatHealth.cs", "Assets/Scripts/Combat/CombatHealth.cs");
+                    yield return ScriptEntry("DoorBreakProgressBar.cs", "Assets/Scripts/Doors/DoorBreakProgressBar.cs");
                     yield return ScriptEntry("ImpactObjectFeedback.cs", "Assets/Scripts/Combat/DamageReceiverFeedback.cs");
                     yield return new RelatedAssetEntry(RelatedAssetKind.SceneObject, "Fusion Door (Scene)", typeof(RuntimeTileMeshFusionDoor));
                     break;
 
                 case Page.Camera:
                     yield return new RelatedAssetEntry(RelatedAssetKind.ScriptableObject, "CameraSettings.asset", cameraSettings);
+                    yield return PrefabEntry("Fusion_PlayerCamera.prefab", "Assets/Fusion/Prefabs/Fusion_PlayerCamera.prefab");
+                    yield return PrefabEntry("Fusion_ManagementCamera.prefab", "Assets/Fusion/Prefabs/Fusion_ManagementCamera.prefab");
                     yield return ScriptEntry("FusionModeCameraRig.cs", "Assets/Scripts/RuntimeTileMesh/FusionModeCameraRig.cs");
                     yield return ScriptEntry("ImpactCameraFeedback.cs", "Assets/Scripts/Combat/ImpactCameraFeedback.cs");
+                    yield return ScriptEntry("FusionBackgroundShaderController.cs", "Assets/Scripts/RuntimeTileMesh/FusionBackgroundShaderController.cs");
                     yield return new RelatedAssetEntry(RelatedAssetKind.SceneObject, "FusionModeCameraRig (Scene)", typeof(FusionModeCameraRig));
                     break;
 
                 case Page.Sanity:
                     yield return new RelatedAssetEntry(RelatedAssetKind.ScriptableObject, "SanitySettings.asset", sanitySettings);
                     yield return ScriptEntry("FusionSanityController.cs", "Assets/Scripts/RuntimeTileMesh/FusionSanityController.cs");
+                    yield return ScriptEntry("PlayerSanityDamageable.cs", "Assets/Scripts/Enemy/PlayerSanityDamageable.cs");
                     yield return ScriptEntry("SanitySystem.cs (Legacy)", "Assets/Scripts/SanitySystem.cs");
                     yield return new RelatedAssetEntry(RelatedAssetKind.SceneObject, "FusionSanityController (Scene)", typeof(FusionSanityController));
                     break;
 
+                case Page.Footprint:
+                    yield return new RelatedAssetEntry(RelatedAssetKind.ScriptableObject, "FootprintSettings.asset", footprintSettings);
+                    yield return ScriptEntry("EnemyFootprintTrace.cs", "Assets/Scripts/Enemy/Visual/EnemyFootprintTrace.cs");
+                    yield return ScriptEntry("FootprintInstance.cs", "Assets/Scripts/Enemy/Visual/FootprintInstance.cs");
+                    yield return ScriptEntry("FootprintVisualProfile.cs", "Assets/Scripts/Enemy/Visual/FootprintVisualProfile.cs");
+                    yield return ScriptEntry("PrefabFootprintRenderer.cs", "Assets/Scripts/Enemy/Visual/PrefabFootprintRenderer.cs");
+                    yield return new RelatedAssetEntry(RelatedAssetKind.SceneObject, "EnemyFootprintTrace (Scene)", typeof(EnemyFootprintTrace));
+                    break;
+
                 case Page.Economy:
                     yield return new RelatedAssetEntry(RelatedAssetKind.ScriptableObject, "EconomySettings.asset", economySettings);
+                    yield return ScriptEntry("TileShopPanelUI.cs", "Assets/Scripts/TileShopPanelUI.cs");
                     yield return ScriptEntry("TimeCounterUI.cs", "Assets/Scripts/TimeCounterUI.cs");
                     yield return ScriptEntry("HoverScrollColorLerp2D.cs (Legacy)", "Assets/Scripts/HoverScrollColorLerp2D.cs");
+                    yield return new RelatedAssetEntry(RelatedAssetKind.SceneObject, "TimeCounterUI (Scene)", typeof(TimeCounterUI));
+                    yield return new RelatedAssetEntry(RelatedAssetKind.SceneObject, "TileShopPanelUI (Scene)", typeof(TileShopPanelUI));
                     break;
 
                 case Page.Accessibility:
                     yield return new RelatedAssetEntry(RelatedAssetKind.ScriptableObject, "AccessibilitySettings.asset", accessibilitySettings);
                     yield return ScriptEntry("GameplayVisualRenderer.cs", "Assets/Scripts/GameplayVisuals/GameplayVisualRenderer.cs");
+                    yield return ScriptEntry("GameplayVisualSystem.cs", "Assets/Scripts/GameplayVisuals/GameplayVisualSystem.cs");
+                    yield return ScriptEntry("GameplayVisualProfile.cs", "Assets/Scripts/GameplayVisuals/GameplayVisualProfile.cs");
+                    yield return ScriptEntry("CjkUiFontUtility.cs", "Assets/Scripts/UI/CjkUiFontUtility.cs");
                     break;
 
                 case Page.Localization:
                     yield return new RelatedAssetEntry(RelatedAssetKind.ScriptableObject, "LocalizationSettings.asset", localizationSettings);
                     yield return ScriptEntry("DuoCurtainLocalization.cs", "Assets/Scripts/UI/DuoCurtainLocalization.cs");
                     yield return ScriptEntry("LocalizedText.cs", "Assets/Scripts/UI/LocalizedText.cs");
+                    yield return new RelatedAssetEntry(RelatedAssetKind.SceneObject, "LocalizedText (Scene)", typeof(LocalizedText));
                     break;
 
                 case Page.Debug:
                     yield return new RelatedAssetEntry(RelatedAssetKind.ScriptableObject, "DebugSettings.asset", debugSettings);
                     yield return ScriptEntry("CombatDebugOverlay.cs", "Assets/Scripts/Combat/CombatDebugOverlay.cs");
                     yield return ScriptEntry("RuntimeTileMeshBlockInfoOverlay.cs", "Assets/Scripts/RuntimeTileMesh/RuntimeTileMeshBlockInfoOverlay.cs");
+                    yield return ScriptEntry("RuntimeTileMeshFusionIntegrityMonitor.cs", "Assets/Scripts/RuntimeTileMesh/RuntimeTileMeshFusionIntegrityMonitor.cs");
+                    yield return new RelatedAssetEntry(RelatedAssetKind.SceneObject, "RuntimeTileMeshBlockInfoOverlay (Scene)", typeof(RuntimeTileMeshBlockInfoOverlay));
                     break;
             }
         }
@@ -944,31 +1052,41 @@ namespace Curtain.Editor.Dashboard
             return new RelatedAssetEntry(RelatedAssetKind.Script, label, script);
         }
 
+        private static RelatedAssetEntry PrefabEntry(string label, string prefabPath)
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            return new RelatedAssetEntry(RelatedAssetKind.Prefab, label, prefab);
+        }
+
         private void DrawRelatedAssetEntry(RelatedAssetEntry entry)
         {
-            using (new EditorGUILayout.HorizontalScope())
+            using (new EditorGUILayout.HorizontalScope(GUILayout.MinHeight(24f)))
             {
-                GUIContent icon = GetIcon(entry);
-                GUILayout.Label(icon, GUILayout.Width(18f), GUILayout.Height(18f));
+                GUILayout.Label(GetKindTag(entry.kind), relatedAssetKindLabel, GUILayout.Width(64f), GUILayout.Height(20f));
 
                 if (entry.kind == RelatedAssetKind.SceneObject)
                 {
                     UnityEngine.Object sceneObject = FindSceneObject(entry.sceneObjectType, entry.sceneObjectNameHint);
                     using (new EditorGUI.DisabledScope(sceneObject == null))
                     {
-                        if (GUILayout.Button(entry.label, EditorStyles.linkLabel))
+                        if (GUILayout.Button(entry.label, EditorStyles.linkLabel, GUILayout.MinWidth(160f)))
                         {
                             SelectAndFrameSceneObject(sceneObject);
                         }
                     }
                     GUILayout.FlexibleSpace();
+                    using (new EditorGUI.DisabledScope(sceneObject == null))
+                    {
+                        if (GUILayout.Button("Frame", GUILayout.Width(58f)))
+                            SelectAndFrameSceneObject(sceneObject);
+                    }
                     return;
                 }
 
                 UnityEngine.Object asset = entry.asset;
                 using (new EditorGUI.DisabledScope(asset == null))
                 {
-                    if (GUILayout.Button(entry.label, EditorStyles.linkLabel))
+                    if (GUILayout.Button(entry.label, EditorStyles.linkLabel, GUILayout.MinWidth(160f)))
                     {
                         ActivateAsset(entry.kind, asset);
                     }
@@ -977,30 +1095,41 @@ namespace Curtain.Editor.Dashboard
 
                 using (new EditorGUI.DisabledScope(asset == null))
                 {
-                    if (GUILayout.Button("Ping", GUILayout.Width(52f)))
-                        EditorGUIUtility.PingObject(asset);
-                    if (GUILayout.Button("Select", GUILayout.Width(58f)))
-                        Selection.activeObject = asset;
+                    if (entry.kind == RelatedAssetKind.Script)
+                    {
+                        if (GUILayout.Button("Open", GUILayout.Width(58f)))
+                            ActivateAsset(entry.kind, asset);
+                    }
+                    else
+                    {
+                        if (GUILayout.Button("Ping", GUILayout.Width(52f)))
+                            EditorGUIUtility.PingObject(asset);
+                        if (GUILayout.Button("Select", GUILayout.Width(58f)))
+                        {
+                            Selection.activeObject = asset;
+                            EditorGUIUtility.PingObject(asset);
+                        }
+                    }
                 }
             }
         }
 
-        private static GUIContent GetIcon(RelatedAssetEntry entry)
+        private static string GetKindTag(RelatedAssetKind kind)
         {
-            switch (entry.kind)
+            switch (kind)
             {
                 case RelatedAssetKind.ScriptableObject:
-                    return EditorGUIUtility.IconContent("ScriptableObject Icon");
+                    return "[SO]";
                 case RelatedAssetKind.Prefab:
-                    return EditorGUIUtility.IconContent("Prefab Icon");
+                    return "[Prefab]";
                 case RelatedAssetKind.Script:
-                    return EditorGUIUtility.IconContent("cs Script Icon");
+                    return "[Script]";
                 case RelatedAssetKind.SceneObject:
-                    return EditorGUIUtility.IconContent("GameObject Icon");
+                    return "[Scene]";
                 case RelatedAssetKind.Folder:
-                    return EditorGUIUtility.IconContent("Folder Icon");
+                    return "[Folder]";
                 default:
-                    return EditorGUIUtility.IconContent("DefaultAsset Icon");
+                    return "[Asset]";
             }
         }
 
@@ -1044,6 +1173,8 @@ namespace Curtain.Editor.Dashboard
             EditorGUIUtility.PingObject(sceneObject);
 
             SceneView view = SceneView.lastActiveSceneView;
+            if (view == null && SceneView.sceneViews != null && SceneView.sceneViews.Count > 0)
+                view = SceneView.sceneViews[0] as SceneView;
             if (view != null)
                 view.FrameSelected();
         }

@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using Curtain.Editor;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
@@ -166,6 +167,7 @@ namespace DuoCurtain.Editor
             options = NormalizeBuildOptions(options);
             EnsureReadyForBuild();
 
+            bool buildSucceeded = false;
             try
             {
                 for (int i = 0; i < specs.Count; i++)
@@ -178,12 +180,21 @@ namespace DuoCurtain.Editor
 
                     BuildSinglePlatform(spec, scenes, options, outputRoot, stagingRoot);
                 }
+
+                buildSucceeded = true;
             }
             finally
             {
                 EditorUtility.ClearProgressBar();
-                if (Directory.Exists(stagingRoot))
+                if (buildSucceeded && Directory.Exists(stagingRoot))
+                {
                     FileUtil.DeleteFileOrDirectory(stagingRoot);
+                }
+                else if (!buildSucceeded && Directory.Exists(stagingRoot))
+                {
+                    LogInfo("[DuoCurtainBuildPackager] Preserved failed staging output for diagnosis: " + ToProjectRelativePath(stagingRoot));
+                }
+
                 AssetDatabase.Refresh();
             }
         }
@@ -287,12 +298,12 @@ namespace DuoCurtain.Editor
             }
 
             string platformOutputRoot = Path.Combine(outputRoot, spec.folderName);
+            ValidatePublishedBuild(spec, platformStagingRoot);
             DuoCurtainBuildArchiveService.ArchiveExistingBuild(
                 platformOutputRoot,
                 spec.platform.ToString(),
                 spec.displayName);
             int publishedCount = PublishStagedBuild(platformStagingRoot, platformOutputRoot);
-            ValidatePublishedBuild(spec, platformOutputRoot);
 
             bool isDevelopmentBuild = (options & BuildOptions.Development) != 0;
             DuoCurtainBuildArchiveService.WriteLatestManifest(
@@ -441,7 +452,146 @@ namespace DuoCurtain.Editor
             ValidateRequiredFile(Path.Combine(dataRoot, "level0"), 1024, "Mac level0");
             ValidateRequiredFile(Path.Combine(dataRoot, "resources.assets"), 1024, "Mac resources.assets");
             ValidateRequiredFile(Path.Combine(dataRoot, "sharedassets0.assets"), 1024, "Mac sharedassets0.assets");
+            SmokeTestMacPlayerBuild(appRoot);
         }
+
+#if UNITY_EDITOR_OSX
+        private static void SmokeTestMacPlayerBuild(string appRoot)
+        {
+            string playerBinary = Path.Combine(appRoot, "Contents", "MacOS", AppName.ToLowerInvariant());
+            if (!File.Exists(playerBinary))
+                throw new InvalidOperationException("Mac player binary is missing after publish: " + playerBinary);
+
+            string logPath = Path.Combine(Path.GetTempPath(), "duocurtain_mac_smoke.log");
+            if (File.Exists(logPath))
+                File.Delete(logPath);
+
+            System.Diagnostics.ProcessStartInfo startInfo = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = playerBinary,
+                Arguments = "-batchmode -nographics -quit -logFile \"" + logPath + "\"",
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using System.Diagnostics.Process process = System.Diagnostics.Process.Start(startInfo);
+            if (process == null)
+                throw new InvalidOperationException("Failed to launch Mac player smoke test.");
+
+            bool startupValidated = false;
+            DateTime deadline = DateTime.UtcNow.AddSeconds(15);
+            while (DateTime.UtcNow < deadline)
+            {
+                if (process.HasExited)
+                    break;
+
+                if (TryReadSmokeLog(logPath, out string liveLog))
+                {
+                    ThrowIfSmokeLogContainsCorruption(liveLog, logPath);
+                    if (liveLog.IndexOf("UnloadTime:", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        startupValidated = true;
+                        break;
+                    }
+                }
+
+                System.Threading.Thread.Sleep(250);
+            }
+
+            if (startupValidated && !process.HasExited)
+            {
+                TryKill(process);
+            }
+
+            if (!startupValidated && !process.HasExited)
+            {
+                TryKill(process);
+                throw new InvalidOperationException("Mac player smoke test timed out before player data finished loading.");
+            }
+
+            if (startupValidated)
+            {
+                if (TryReadSmokeLog(logPath, out string validatedLog))
+                    ThrowIfSmokeLogContainsCorruption(validatedLog, logPath);
+
+                LogInfo("[DuoCurtainBuildPackager] Mac player smoke test passed.");
+                return;
+            }
+
+            if (process.ExitCode == 133 || process.ExitCode == 134 || process.ExitCode == 139)
+            {
+                string logTail = ReadTail(logPath, 40);
+                throw new InvalidOperationException(
+                    "Mac player smoke test crashed with exit code " + process.ExitCode +
+                    ". This usually means sharedassets/level0 serialization is corrupt.\n" + logTail);
+            }
+
+            if (!File.Exists(logPath))
+                return;
+
+            string logText = File.ReadAllText(logPath);
+            ThrowIfSmokeLogContainsCorruption(logText, logPath);
+
+            LogInfo("[DuoCurtainBuildPackager] Mac player smoke test passed.");
+        }
+
+        private static bool TryReadSmokeLog(string logPath, out string logText)
+        {
+            logText = string.Empty;
+            if (!File.Exists(logPath))
+                return false;
+
+            try
+            {
+                logText = File.ReadAllText(logPath);
+                return true;
+            }
+            catch (IOException)
+            {
+                return false;
+            }
+        }
+
+        private static void ThrowIfSmokeLogContainsCorruption(string logText, string logPath)
+        {
+            if (logText.IndexOf("is corrupted", StringComparison.OrdinalIgnoreCase) < 0 &&
+                logText.IndexOf("Position out of bounds", StringComparison.OrdinalIgnoreCase) < 0 &&
+                logText.IndexOf("serialization layout mismatch", StringComparison.OrdinalIgnoreCase) < 0)
+                return;
+
+            throw new InvalidOperationException(
+                "Mac player smoke test detected corrupt player data. Re-save RedScene and rebuild.\n" +
+                ReadTail(logPath, 40));
+        }
+
+        private static void TryKill(System.Diagnostics.Process process)
+        {
+            try
+            {
+                process.Kill();
+            }
+            catch
+            {
+                // ignored
+            }
+        }
+
+        private static string ReadTail(string path, int maxLines)
+        {
+            if (!File.Exists(path))
+                return string.Empty;
+
+            string[] lines = File.ReadAllLines(path);
+            int start = Mathf.Max(0, lines.Length - maxLines);
+            StringBuilder builder = new StringBuilder();
+            for (int i = start; i < lines.Length; i++)
+            {
+                builder.AppendLine(lines[i]);
+            }
+
+            return builder.ToString();
+        }
+#endif
 
         private static void ValidateRequiredDirectory(string path, string label)
         {

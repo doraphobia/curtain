@@ -1,3 +1,4 @@
+#if UNITY_EDITOR
 using UnityEngine;
 
 namespace Curtain.Settings
@@ -13,4 +14,6 @@ namespace Curtain.Settings
         [Min(0f)] public float spacing = 0.25f;
     }
 }
+
+#endif
 

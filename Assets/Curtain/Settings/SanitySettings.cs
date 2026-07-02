@@ -1,3 +1,4 @@
+#if UNITY_EDITOR
 using UnityEngine;
 
 namespace Curtain.Settings
@@ -26,4 +27,6 @@ namespace Curtain.Settings
         [Range(1, 4)] public int deathBlurIterations = 2;
     }
 }
+
+#endif
 

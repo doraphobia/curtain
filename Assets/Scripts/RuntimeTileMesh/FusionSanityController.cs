@@ -1,9 +1,10 @@
 using System.Collections;
 using TMPro;
+#if UNITY_EDITOR
 using Curtain.Settings;
+#endif
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 namespace DuoCurtain.RuntimeTileMesh
@@ -90,11 +91,6 @@ namespace DuoCurtain.RuntimeTileMesh
         public int deathBlurRadius = 6;
         [Range(1, 4)]
         public int deathBlurIterations = 2;
-
-        [Header("Dashboard Settings")]
-        [Tooltip("Optional. If assigned, this controller reads tuning values from the Dashboard settings asset.")]
-        [FormerlySerializedAs("settings")]
-        public SanitySettings settings;
 
         private float currentSanity;
         private bool initialized;
@@ -185,7 +181,8 @@ namespace DuoCurtain.RuntimeTileMesh
 
         private void ApplySettingsIfPresent()
         {
-            SanitySettings source = CurtainSettingsLocator.Resolve(settings);
+#if UNITY_EDITOR
+            SanitySettings source = CurtainSettingsLocator.Sanity;
             if (source == null)
                 return;
 
@@ -204,6 +201,7 @@ namespace DuoCurtain.RuntimeTileMesh
             deathBlurDownsample = source.deathBlurDownsample;
             deathBlurRadius = source.deathBlurRadius;
             deathBlurIterations = source.deathBlurIterations;
+#endif
         }
 
         public void DrainSanity(float amount)

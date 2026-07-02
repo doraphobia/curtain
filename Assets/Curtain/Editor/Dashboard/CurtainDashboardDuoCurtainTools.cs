@@ -31,7 +31,7 @@ namespace Curtain.Editor.Dashboard
             new ToolEntry("Build", "Build Windows", "Tools/Duo Curtain/Build/Build Windows", "Builds/Curtain_Windows/Curtain_Windows.exe"),
             new ToolEntry("Build", "Build WebGL", "Tools/Duo Curtain/Build/Build WebGL", "Builds/Curtain_Web/"),
 
-            new ToolEntry("Curtain", "Ensure Settings Bundle", "Tools/Curtain/Ensure Settings Bundle", "Resources/CurtainSettingsBundle.asset"),
+            new ToolEntry("Curtain", "Ensure Settings Bundle", "Tools/Curtain/Ensure Settings Bundle", "Assets/Curtain/Settings/CurtainSettingsBundle.asset"),
 
             new ToolEntry("Auto Reload", "Toggle Enabled", "Tools/Duo Curtain/Auto Reload/Enabled"),
             new ToolEntry("Auto Reload", "Reload Project Now", "Tools/Duo Curtain/Auto Reload/Reload Project Now"),

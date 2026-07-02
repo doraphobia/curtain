@@ -1,10 +1,11 @@
 using System.Collections.Generic;
+#if UNITY_EDITOR
 using Curtain.Settings;
+#endif
 using DuoCurtain.Combat;
 using DuoCurtain.GameplayVisuals;
 using DuoCurtain.Vision;
 using UnityEngine;
-using UnityEngine.Serialization;
 
 namespace DuoCurtain.RuntimeTileMesh
 {
@@ -97,11 +98,6 @@ namespace DuoCurtain.RuntimeTileMesh
         [Header("Visibility")]
         public bool registerForVisibility = true;
 
-        [Header("Dashboard Settings")]
-        [Tooltip("Optional. If assigned, this door reads tuning values from the Dashboard settings asset.")]
-        [FormerlySerializedAs("settings")]
-        public DoorSettings settings;
-
         [SerializeField]
         private bool isOpen;
         [SerializeField]
@@ -182,7 +178,8 @@ namespace DuoCurtain.RuntimeTileMesh
 
         private void ApplySettingsIfPresent()
         {
-            DoorSettings source = CurtainSettingsLocator.Resolve(settings);
+#if UNITY_EDITOR
+            DoorSettings source = CurtainSettingsLocator.Door;
             if (source == null)
                 return;
 
@@ -211,6 +208,7 @@ namespace DuoCurtain.RuntimeTileMesh
             wallGapLength = source.wallGapLength;
 
             registerForVisibility = source.registerForVisibility;
+#endif
         }
 
         void OnDisable()
