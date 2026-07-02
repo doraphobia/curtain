@@ -19,18 +19,20 @@ public sealed class DuoCurtainSettingsManager : MonoBehaviour
     [Tooltip("Optional. If assigned and exposes 'MasterVolume', this controls volume. Otherwise falls back to AudioListener.volume.")]
     [SerializeField] private AudioMixer audioMixer;
 
-    public DuoCurtainSettingsData Current { get; private set; } = new DuoCurtainSettingsData();
+    private DuoCurtainSettingsData current = new DuoCurtainSettingsData();
+
+    public DuoCurtainSettingsData Current => current;
 
     public event Action SettingsChanged;
 
-    private static readonly (int w, int h)[] CommonResolutions =
+    private static readonly Vector2Int[] CommonResolutions =
     {
-        (1280, 720),
-        (1600, 900),
-        (1920, 1080),
-        (2560, 1440),
-        (2880, 1800),
-        (3840, 2160)
+        new Vector2Int(1280, 720),
+        new Vector2Int(1600, 900),
+        new Vector2Int(1920, 1080),
+        new Vector2Int(2560, 1440),
+        new Vector2Int(2880, 1800),
+        new Vector2Int(3840, 2160)
     };
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -121,20 +123,20 @@ public sealed class DuoCurtainSettingsManager : MonoBehaviour
 
     public IReadOnlyList<Vector2Int> GetSupportedCommonResolutions()
     {
-        HashSet<(int, int)> supported = new HashSet<(int, int)>();
+        HashSet<Vector2Int> supported = new HashSet<Vector2Int>();
         Resolution[] all = Screen.resolutions;
         if (all != null)
         {
             for (int i = 0; i < all.Length; i++)
-                supported.Add((all[i].width, all[i].height));
+                supported.Add(new Vector2Int(all[i].width, all[i].height));
         }
 
         List<Vector2Int> results = new List<Vector2Int>();
         for (int i = 0; i < CommonResolutions.Length; i++)
         {
-            (int w, int h) = CommonResolutions[i];
-            if (supported.Count == 0 || supported.Contains((w, h)))
-                results.Add(new Vector2Int(w, h));
+            Vector2Int resolution = CommonResolutions[i];
+            if (supported.Count == 0 || supported.Contains(resolution))
+                results.Add(resolution);
         }
 
         if (results.Count == 0)

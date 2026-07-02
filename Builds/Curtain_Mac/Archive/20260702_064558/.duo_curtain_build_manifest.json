@@ -1,0 +1,13 @@
+{
+    "platform": "Mac",
+    "platformDisplayName": "Mac",
+    "role": "archive",
+    "createdUtc": "2026-07-02T13:43:36.7657870Z",
+    "archivedUtc": "2026-07-02T13:45:58.9382210Z",
+    "archiveFolderName": "20260702_064558",
+    "gitCommitHash": "5178af6a5822c9c79505ef7cd235a03eaf83681b",
+    "gitCommitShort": "5178af6",
+    "gitBranch": "master",
+    "gitDirty": true,
+    "developmentBuild": false
+}

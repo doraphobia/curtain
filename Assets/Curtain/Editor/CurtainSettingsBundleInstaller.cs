@@ -1,11 +1,8 @@
 #if UNITY_EDITOR
 using System.IO;
 using Curtain.Settings;
-using DuoCurtain.RuntimeTileMesh;
 using UnityEditor;
-using UnityEditor.SceneManagement;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 namespace Curtain.Editor
 {
@@ -15,7 +12,6 @@ namespace Curtain.Editor
         private const string LegacyBundleAssetPath = "Assets/Resources/CurtainSettingsBundle.asset";
         private const string BundleAssetPath = "Assets/Curtain/Settings/CurtainSettingsBundle.asset";
         private const string SettingsFolder = "Assets/Curtain/Settings";
-        private const string RedScenePath = "Assets/Scenes/RedScene.unity";
 
         static CurtainSettingsBundleInstaller()
         {
@@ -31,7 +27,7 @@ namespace Curtain.Editor
         public static void EnsureBundle()
         {
             EnsureFolder(SettingsFolder);
-            MigrateLegacyBundleAsset();
+            DeleteLegacyResourcesBundle();
 
             CurtainSettingsBundle bundle = AssetDatabase.LoadAssetAtPath<CurtainSettingsBundle>(BundleAssetPath);
             if (bundle == null)
@@ -61,20 +57,13 @@ namespace Curtain.Editor
             CurtainSettingsLocator.InvalidateCache();
         }
 
-        private static void MigrateLegacyBundleAsset()
+        private static void DeleteLegacyResourcesBundle()
         {
-            if (!AssetDatabase.LoadAssetAtPath<CurtainSettingsBundle>(LegacyBundleAssetPath))
+            if (AssetDatabase.LoadAssetAtPath<Object>(LegacyBundleAssetPath) == null &&
+                !File.Exists(LegacyBundleAssetPath))
                 return;
 
-            if (AssetDatabase.LoadAssetAtPath<CurtainSettingsBundle>(BundleAssetPath))
-            {
-                AssetDatabase.DeleteAsset(LegacyBundleAssetPath);
-                return;
-            }
-
-            string error = AssetDatabase.MoveAsset(LegacyBundleAssetPath, BundleAssetPath);
-            if (!string.IsNullOrEmpty(error))
-                Debug.LogWarning("[CurtainSettingsBundleInstaller] Failed to migrate legacy bundle asset: " + error);
+            AssetDatabase.DeleteAsset(LegacyBundleAssetPath);
         }
 
         private static bool Assign<T>(ref T field, string assetPath) where T : Object

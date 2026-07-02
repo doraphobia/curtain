@@ -6,7 +6,6 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.Events;
 using UnityEngine.SceneManagement;
-using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 public enum BootWorldState
@@ -44,7 +43,6 @@ public sealed class BootWorldStateController : MonoBehaviour
     [SerializeField] private CanvasGroup titleCanvasGroup;
     [SerializeField] private GameObject[] titleUiObjects;
     [SerializeField] private bool autoCreateTemporaryTitleUi = true;
-    [FormerlySerializedAs("temporaryLogoText")]
     [SerializeField] private string temporaryLogoTextChinese = "CURTAIN";
     [SerializeField] private string temporaryLogoTextEnglish = "CURTAIN";
     [SerializeField] private string temporaryPressAnyKeyText = "PRESS ANY KEY";

@@ -181,7 +181,6 @@ public class FusionBackgroundShaderController : MonoBehaviour
             else
             {
                 backgroundObject = new GameObject(BackgroundObjectName);
-                backgroundObject.AddComponent<FusionBackgroundPlane>();
             }
 
             backgroundObject.hideFlags = HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild;
@@ -189,9 +188,6 @@ public class FusionBackgroundShaderController : MonoBehaviour
             backgroundFilter = null;
             backgroundRenderer = null;
         }
-
-        if (backgroundObject.GetComponent<FusionBackgroundPlane>() == null)
-            backgroundObject.AddComponent<FusionBackgroundPlane>();
 
         if (backgroundFilter == null)
             backgroundFilter = backgroundObject.GetComponent<MeshFilter>();
@@ -367,10 +363,4 @@ public class FusionBackgroundShaderController : MonoBehaviour
         else
             DestroyImmediate(target);
     }
-}
-
-[DisallowMultipleComponent]
-[RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
-internal sealed class FusionBackgroundPlane : MonoBehaviour
-{
 }
