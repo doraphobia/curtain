@@ -18,6 +18,11 @@ namespace DuoCurtain.Editor
         private const string MenuPath = "Tools/Duo Curtain/Grid/Normalize Integer Tile Grid";
         private const string RunOnceMarkerPath = "Temp/DuoCurtainRunGridNormalizationOnce.flag";
 
+        private static void LogInfo(string message)
+        {
+            Debug.LogFormat(LogType.Log, LogOption.NoStacktrace, null, "{0}", message);
+        }
+
         [InitializeOnLoadMethod]
         private static void RunPendingNormalizationOnce()
         {
@@ -26,7 +31,7 @@ namespace DuoCurtain.Editor
                 return;
 
             File.Delete(markerPath);
-            Debug.Log("[GridIntegerNormalizationUtility] Running pending one-shot normalization.");
+            LogInfo("[GridIntegerNormalizationUtility] Running pending one-shot normalization.");
             EditorApplication.delayCall += NormalizeIntegerTileGrid;
         }
 
@@ -42,7 +47,7 @@ namespace DuoCurtain.Editor
             if (!string.IsNullOrWhiteSpace(activeScenePath) && File.Exists(activeScenePath))
                 EditorSceneManager.OpenScene(activeScenePath, OpenSceneMode.Single);
 
-            Debug.Log("[GridIntegerNormalizationUtility] Normalized " + changedPrefabs + " prefab(s) and " + changedScenes + " scene(s).");
+            LogInfo("[GridIntegerNormalizationUtility] Normalized " + changedPrefabs + " prefab(s) and " + changedScenes + " scene(s).");
         }
 
         public static void NormalizeProjectAssets()
@@ -516,6 +521,11 @@ namespace DuoCurtain.Editor
         private static volatile bool autoReloadEnabled;
         private static bool ownsAutoRefreshLock;
 
+        private static void LogInfo(string message)
+        {
+            Debug.LogFormat(LogType.Log, LogOption.NoStacktrace, null, "{0}", message);
+        }
+
         static DuoCurtainAutoReload()
         {
             if (Application.isBatchMode)
@@ -551,7 +561,7 @@ namespace DuoCurtain.Editor
                 ReleaseAutoRefreshLock();
             }
 
-            Debug.Log("[DuoCurtain Auto Reload] " + (enabled ? "Enabled." : "Disabled."));
+            LogInfo("[DuoCurtain Auto Reload] " + (enabled ? "Enabled." : "Disabled."));
         }
 
         [MenuItem(ToggleMenuPath, true)]
@@ -587,7 +597,7 @@ namespace DuoCurtain.Editor
             CreateWatcher("Assets");
             CreateWatcher("Packages");
             CreateWatcher("ProjectSettings");
-            Debug.Log("[DuoCurtain Auto Reload] Watching Assets, Packages, and ProjectSettings.");
+            LogInfo("[DuoCurtain Auto Reload] Watching Assets, Packages, and ProjectSettings.");
         }
 
         private static void CreateWatcher(string projectRelativeDirectory)
@@ -722,7 +732,7 @@ namespace DuoCurtain.Editor
             string scope = fullReload
                 ? "the project"
                 : changedPaths.Count + " changed path(s)";
-            Debug.Log(
+            LogInfo(
                 "[DuoCurtain Auto Reload] Reloaded " +
                 scope +
                 " without a confirmation dialog.");
@@ -823,7 +833,7 @@ namespace DuoCurtain.Editor
                 }
 
                 SceneView.RepaintAll();
-                Debug.Log(
+                LogInfo(
                     "[DuoCurtain Auto Reload] Reloaded externally changed open scene(s) from disk.");
                 return true;
             }

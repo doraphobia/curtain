@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dc8a12b727a204b049e3b78b986dd602, type: 3}
+  m_Name: CameraSettings
+  m_EditorClassIdentifier: Assembly-CSharp::Curtain.Settings.CameraSettings
+  followSmoothTime: 0.28
+  maxFollowSpeed: 24
+  deadZoneRadius: 0.35
+  lookAheadDistance: 0.75
+  lookAheadSmoothTime: 0.18
+  overviewSmoothTime: 0.35
+  overviewPadding: 1.5
+  minOverviewOrthographicSize: 4
+  maxOverviewOrthographicSize: 32
+  defaultTransitionDuration: 0.65
+  transitionCurve:
+    serializedVersion: 2
+    m_Curve: []
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4

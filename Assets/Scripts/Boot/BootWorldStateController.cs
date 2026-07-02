@@ -43,7 +43,8 @@ public sealed class BootWorldStateController : MonoBehaviour
     [SerializeField] private CanvasGroup titleCanvasGroup;
     [SerializeField] private GameObject[] titleUiObjects;
     [SerializeField] private bool autoCreateTemporaryTitleUi = true;
-    [SerializeField] private string temporaryLogoText = "CURTAIN";
+    [SerializeField] private string temporaryLogoTextChinese = "CURTAIN";
+    [SerializeField] private string temporaryLogoTextEnglish = "CURTAIN";
     [SerializeField] private string temporaryPressAnyKeyText = "PRESS ANY KEY";
     [SerializeField] private string temporaryLanguageText = "LANGUAGE";
     [SerializeField] private string temporarySettingsText = "SETTINGS";
@@ -82,6 +83,8 @@ public sealed class BootWorldStateController : MonoBehaviour
     private TextMeshProUGUI temporaryQuitLabel;
     private readonly Dictionary<TextMeshProUGUI, Material> temporaryTitleInvertMaterials =
         new Dictionary<TextMeshProUGUI, Material>();
+    private readonly Dictionary<TextMeshProUGUI, Material> temporaryTitleSourceMaterials =
+        new Dictionary<TextMeshProUGUI, Material>();
     private Canvas temporaryTitleCursorCanvas;
     private Image temporaryTitleCursorImage;
     private Material temporaryTitleCursorMaterial;
@@ -90,6 +93,7 @@ public sealed class BootWorldStateController : MonoBehaviour
     private FusionGameModeController gameModeController;
     private FusionModeCameraRig playerCameraRig;
     private FusionModeCameraRig managementCameraRig;
+    private BootWorldSettingsPanel settingsPanel;
 
     private const string MainCameraTag = "MainCamera";
     private const string UntaggedCameraTag = "Untagged";
@@ -142,6 +146,7 @@ public sealed class BootWorldStateController : MonoBehaviour
             DestroyRuntimeObject(material);
 
         temporaryTitleInvertMaterials.Clear();
+        temporaryTitleSourceMaterials.Clear();
         DestroyRuntimeObject(temporaryTitleCursorMaterial);
         DestroyRuntimeObject(temporaryTitleCursorSprite);
         DestroyRuntimeObject(temporaryTitleCursorTexture);
@@ -505,7 +510,7 @@ public sealed class BootWorldStateController : MonoBehaviour
         canvasRect.offsetMin = Vector2.zero;
         canvasRect.offsetMax = Vector2.zero;
 
-        temporaryLogoLabel = CreateTitleText(canvasRect, "Logo", temporaryLogoText, 86f, new Vector2(0f, 138f), TextAlignmentOptions.Center);
+        temporaryLogoLabel = CreateTitleText(canvasRect, "Logo", temporaryLogoTextEnglish, 86f, new Vector2(0f, 138f), TextAlignmentOptions.Center);
         temporaryPressAnyKeyLabel = CreateTitleText(canvasRect, "Press Any Key", temporaryPressAnyKeyText, 32f, new Vector2(0f, 40f), TextAlignmentOptions.Center);
         temporaryLanguageLabel = CreateTitleButton(canvasRect, "Language Button", temporaryLanguageText, new Vector2(-180f, -220f), HandleLanguagePressed);
         temporarySettingsLabel = CreateTitleButton(canvasRect, "Settings Button", temporarySettingsText, new Vector2(0f, -220f), HandleSettingsPressed);
@@ -580,7 +585,45 @@ public sealed class BootWorldStateController : MonoBehaviour
 
     private void HandleSettingsPressed()
     {
-        Debug.Log("[BootWorld] Temporary Settings button pressed.", this);
+        Debug.LogFormat(LogType.Log, LogOption.NoStacktrace, this, "[BootWorld] Temporary Settings button pressed.");
+        ToggleSettingsPanel();
+    }
+
+    private void ToggleSettingsPanel()
+    {
+        EnsureSettingsPanel();
+        if (settingsPanel == null)
+            return;
+
+        bool nextVisible = !settingsPanel.IsVisible;
+        settingsPanel.Show(nextVisible);
+
+        if (titleCanvasGroup != null)
+        {
+            titleCanvasGroup.interactable = !nextVisible;
+            titleCanvasGroup.blocksRaycasts = !nextVisible;
+        }
+    }
+
+    private void EnsureSettingsPanel()
+    {
+        if (settingsPanel != null)
+            return;
+
+        BootWorldSettingsPanel existing = FindFirstObjectByType<BootWorldSettingsPanel>();
+        if (existing != null)
+        {
+            settingsPanel = existing;
+            settingsPanel.Initialize();
+            settingsPanel.Show(false);
+            return;
+        }
+
+        GameObject go = new GameObject("BootWorld Settings Panel");
+        go.transform.SetParent(transform, false);
+        settingsPanel = go.AddComponent<BootWorldSettingsPanel>();
+        settingsPanel.Initialize();
+        settingsPanel.Show(false);
     }
 
     private void HandleQuitPressed()
@@ -595,7 +638,8 @@ public sealed class BootWorldStateController : MonoBehaviour
 
     private void RefreshTemporaryTitleUiText()
     {
-        SetLocalizedLabel(temporaryLogoLabel, temporaryLogoText, temporaryLogoText);
+        // Logo intentionally defaults to the same text in both languages for now.
+        SetLocalizedLabel(temporaryLogoLabel, temporaryLogoTextChinese, temporaryLogoTextEnglish);
         SetLocalizedLabel(temporaryPressAnyKeyLabel, "按任意键开始", temporaryPressAnyKeyText);
         SetLocalizedLabel(temporaryLanguageLabel, "语言", temporaryLanguageText);
         SetLocalizedLabel(temporarySettingsLabel, "设置", temporarySettingsText);
@@ -625,26 +669,23 @@ public sealed class BootWorldStateController : MonoBehaviour
         Material source = label.font != null && label.font.material != null
             ? label.font.material
             : label.fontSharedMaterial;
-        if (!temporaryTitleInvertMaterials.TryGetValue(label, out Material material) || material == null)
+        bool needsRecreate =
+            !temporaryTitleInvertMaterials.TryGetValue(label, out Material material) ||
+            material == null ||
+            !temporaryTitleSourceMaterials.TryGetValue(label, out Material trackedSource) ||
+            !ReferenceEquals(trackedSource, source) ||
+            (source != null && material.mainTexture != source.mainTexture);
+
+        if (needsRecreate)
         {
+            if (material != null)
+                DestroyRuntimeObject(material);
+
             material = source != null ? new Material(source) : new Material(shader);
             material.name = $"{label.gameObject.name} TMP Screen Invert";
             material.hideFlags = HideFlags.HideAndDontSave;
             temporaryTitleInvertMaterials[label] = material;
-        }
-        else if (source != null && material.mainTexture != source.mainTexture)
-        {
-            DestroyRuntimeObject(material);
-            material = new Material(source)
-            {
-                name = $"{label.gameObject.name} TMP Screen Invert",
-                hideFlags = HideFlags.HideAndDontSave
-            };
-            temporaryTitleInvertMaterials[label] = material;
-        }
-        else if (source != null && !ReferenceEquals(material, source))
-        {
-            material.CopyPropertiesFromMaterial(source);
+            temporaryTitleSourceMaterials[label] = source;
         }
 
         if (material.shader != shader)

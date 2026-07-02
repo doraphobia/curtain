@@ -1,0 +1,58 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cca8c7174640048bda6c872b402639b0, type: 3}
+  m_Name: DoorSettings
+  m_EditorClassIdentifier: Assembly-CSharp::Curtain.Settings.DoorSettings
+  maxHealth: 100
+  invulnerable: 0
+  destroyDelay: 0
+  toggleCooldown: 0.22
+  openAngleDegrees: 90
+  doorwayPassableOpenAmount: 0.82
+  animateDoor: 1
+  openDuration: 0.25
+  closeDuration: 0.2
+  swingCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  useEndWobble: 1
+  endWobbleDuration: 0.18
+  endWobbleAmplitudeDegrees: 6
+  endWobbleOscillations: 2.5
+  includeWallVisual: 1
+  useDefaultWallDebugVisual: 1
+  wallColor: {r: 0.38, g: 0.38, b: 0.38, a: 0.95}
+  wallLineWidth: 0.035
+  wallDashLength: 0.28
+  wallGapLength: 0.16
+  registerForVisibility: 1

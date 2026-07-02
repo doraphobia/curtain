@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7581e9b8c812c4b9dac10d3cbf9a88ab, type: 3}
+  m_Name: VisionSettings
+  m_EditorClassIdentifier: Assembly-CSharp::Curtain.Settings.VisionSettings
+  useVisibilityWorld: 1
+  requireActualVisibilityPolygonContainment: 1
+  baseRayCount: 96
+  maxRayCount: 384
+  edgeRefinementIterations: 2
+  edgeDistanceThreshold: 0.35
+  requireOpenWindow: 1
+  windowVisionSampleCount: 5
+  windowVisionSamplePadding: 0.05
+  debugLogDetectionSource: 0

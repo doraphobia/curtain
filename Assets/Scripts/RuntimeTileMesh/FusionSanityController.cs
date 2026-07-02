@@ -1,5 +1,6 @@
 using System.Collections;
 using TMPro;
+using Curtain.Settings;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -20,6 +21,8 @@ namespace DuoCurtain.RuntimeTileMesh
         public FusionGameModeController gameModeController;
         public TimeCounterUI currencySource;
         public Camera blurSourceCamera;
+        [Tooltip("Optional. If assigned, this controller reads tuning values from the Dashboard settings asset.")]
+        public SanitySettings settings;
 
         [Header("Sanity")]
         [Min(1f)]
@@ -125,6 +128,7 @@ namespace DuoCurtain.RuntimeTileMesh
             }
 
             Active = this;
+            ApplySettingsIfPresent();
             currentSanity = Mathf.Clamp(startSanity, 0f, maxSanity);
             initialized = true;
             ResolveReferences();
@@ -160,6 +164,7 @@ namespace DuoCurtain.RuntimeTileMesh
                 return;
 
             ResolveReferences();
+            ApplySettingsIfPresent();
             if (deathActive)
             {
                 if (Input.GetKeyDown(KeyCode.Space))
@@ -172,6 +177,28 @@ namespace DuoCurtain.RuntimeTileMesh
             RefreshHud();
             RefreshGreyOverlay();
             UpdateRestoreButtonVisibility();
+        }
+
+        private void ApplySettingsIfPresent()
+        {
+            if (settings == null)
+                return;
+
+            maxSanity = settings.maxSanity;
+            startSanity = settings.startSanity;
+            nightOutdoorDrainPerSecond = settings.nightOutdoorDrainPerSecond;
+            nightIndoorRecoveryPerSecond = settings.nightIndoorRecoveryPerSecond;
+            dayIndoorRecoveryPerSecond = settings.dayIndoorRecoveryPerSecond;
+            dayOutdoorRecoveryPerSecond = settings.dayOutdoorRecoveryPerSecond;
+            enemyTouchDamage = settings.enemyTouchDamage;
+            windowDetectionDamage = settings.windowDetectionDamage;
+
+            freezeOnDeath = settings.freezeOnDeath;
+            deathTint = settings.deathTint;
+            deathFadeDuration = settings.deathFadeDuration;
+            deathBlurDownsample = settings.deathBlurDownsample;
+            deathBlurRadius = settings.deathBlurRadius;
+            deathBlurIterations = settings.deathBlurIterations;
         }
 
         public void DrainSanity(float amount)

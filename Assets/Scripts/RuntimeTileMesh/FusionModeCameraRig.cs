@@ -1,4 +1,5 @@
 using UnityEngine;
+using Curtain.Settings;
 
 namespace DuoCurtain.RuntimeTileMesh
 {
@@ -16,6 +17,8 @@ namespace DuoCurtain.RuntimeTileMesh
         public RigMode mode = RigMode.PlayerFollow;
         public PlayerControl playerControl;
         public RuntimeTileMeshFusionSandbox fusionSandbox;
+        [Tooltip("Optional. If assigned, the rig reads tuning values from the Dashboard settings asset.")]
+        public CameraSettings settings;
 
         [Header("Shared Camera")]
         public bool forceOrthographic = true;
@@ -83,6 +86,7 @@ namespace DuoCurtain.RuntimeTileMesh
         {
             cachedCamera = GetComponent<Camera>();
             EnsureTransitionCurve();
+            ApplySettingsIfPresent();
             ApplyCameraDefaults();
         }
 
@@ -90,6 +94,7 @@ namespace DuoCurtain.RuntimeTileMesh
         {
             EnsureTransitionCurve();
             ResolveReferences();
+            ApplySettingsIfPresent();
             ApplyCameraDefaults();
         }
 
@@ -97,13 +102,36 @@ namespace DuoCurtain.RuntimeTileMesh
         {
             EnsureTransitionCurve();
             ResolveReferences();
+            ApplySettingsIfPresent();
             ApplyCameraDefaults();
         }
 
         void LateUpdate()
         {
             ResolveReferences();
+            ApplySettingsIfPresent();
             Tick(GetDeltaTime());
+        }
+
+        private void ApplySettingsIfPresent()
+        {
+            if (settings == null)
+                return;
+
+            followSmoothTime = settings.followSmoothTime;
+            maxFollowSpeed = settings.maxFollowSpeed;
+            deadZoneRadius = settings.deadZoneRadius;
+            lookAheadDistance = settings.lookAheadDistance;
+            lookAheadSmoothTime = settings.lookAheadSmoothTime;
+
+            overviewSmoothTime = settings.overviewSmoothTime;
+            overviewPadding = settings.overviewPadding;
+            minOverviewOrthographicSize = settings.minOverviewOrthographicSize;
+            maxOverviewOrthographicSize = settings.maxOverviewOrthographicSize;
+
+            defaultTransitionDuration = settings.defaultTransitionDuration;
+            if (settings.transitionCurve != null && settings.transitionCurve.length > 0)
+                transitionCurve = settings.transitionCurve;
         }
 
         public void BeginBlendFrom(Camera sourceCamera, float duration)

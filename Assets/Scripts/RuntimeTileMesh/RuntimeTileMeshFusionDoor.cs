@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Curtain.Settings;
 using DuoCurtain.Combat;
 using DuoCurtain.GameplayVisuals;
 using DuoCurtain.Vision;
@@ -40,6 +41,8 @@ namespace DuoCurtain.RuntimeTileMesh
         public float openAngleDegrees = 90f;
         public Color closedColor = Color.black;
         public Color openColor = new Color(0f, 0f, 0f, 0.82f);
+        [Tooltip("Optional. If assigned, this door reads tuning values from the Dashboard settings asset.")]
+        public DoorSettings settings;
 
         [Header("Door Animation")]
         public bool animateDoor = true;
@@ -141,6 +144,7 @@ namespace DuoCurtain.RuntimeTileMesh
 
         void Awake()
         {
+            ApplySettingsIfPresent();
             if (supportedWallVariables.Count == 0)
                 CacheDefaultWallSupport();
 
@@ -152,6 +156,7 @@ namespace DuoCurtain.RuntimeTileMesh
 
         void Update()
         {
+            ApplySettingsIfPresent();
             if (UpdateDoorAnimation())
             {
                 ApplyVisualState();
@@ -161,6 +166,7 @@ namespace DuoCurtain.RuntimeTileMesh
 
         void OnEnable()
         {
+            ApplySettingsIfPresent();
             if (!registerForVisibility)
                 return;
 
@@ -168,6 +174,38 @@ namespace DuoCurtain.RuntimeTileMesh
             world.RegisterSource(this);
             world.RegisterOpeningSource(this);
             MarkVisibilityDirty();
+        }
+
+        private void ApplySettingsIfPresent()
+        {
+            if (settings == null)
+                return;
+
+            maxHealth = settings.maxHealth;
+            invulnerable = settings.invulnerable;
+            destroyDelay = settings.destroyDelay;
+
+            toggleCooldown = settings.toggleCooldown;
+            openAngleDegrees = settings.openAngleDegrees;
+            doorwayPassableOpenAmount = settings.doorwayPassableOpenAmount;
+
+            animateDoor = settings.animateDoor;
+            openDuration = settings.openDuration;
+            closeDuration = settings.closeDuration;
+            swingCurve = settings.swingCurve;
+            useEndWobble = settings.useEndWobble;
+            endWobbleDuration = settings.endWobbleDuration;
+            endWobbleAmplitudeDegrees = settings.endWobbleAmplitudeDegrees;
+            endWobbleOscillations = settings.endWobbleOscillations;
+
+            includeWallVisual = settings.includeWallVisual;
+            useDefaultWallDebugVisual = settings.useDefaultWallDebugVisual;
+            wallColor = settings.wallColor;
+            wallLineWidth = settings.wallLineWidth;
+            wallDashLength = settings.wallDashLength;
+            wallGapLength = settings.wallGapLength;
+
+            registerForVisibility = settings.registerForVisibility;
         }
 
         void OnDisable()

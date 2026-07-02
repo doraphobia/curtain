@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Curtain.Settings;
 using DuoCurtain.Vision;
 using UnityEngine;
 
@@ -39,6 +40,8 @@ public class EnemyVision : MonoBehaviour
 
     [Header("Debug")]
     public bool debugLogDetectionSource;
+    [Tooltip("Optional. If assigned, this component reads sampling/debug parameters from the Dashboard settings asset.")]
+    public VisionSettings settings;
 
     public VisionResult EvaluateVisibility(
         Vector2 observerPosition,
@@ -55,6 +58,7 @@ public class EnemyVision : MonoBehaviour
         float windowVisionSamplePadding,
         IEnumerable<WindowPortal> windows)
     {
+        ApplySettingsIfPresent();
         VisionResult result = new VisionResult();
         if (playerRoot == null)
             return result;
@@ -94,6 +98,20 @@ public class EnemyVision : MonoBehaviour
         }
 
         return result;
+    }
+
+    private void ApplySettingsIfPresent()
+    {
+        if (settings == null)
+            return;
+
+        useVisibilityWorld = settings.useVisibilityWorld;
+        requireActualVisibilityPolygonContainment = settings.requireActualVisibilityPolygonContainment;
+        baseRayCount = settings.baseRayCount;
+        maxRayCount = settings.maxRayCount;
+        edgeRefinementIterations = settings.edgeRefinementIterations;
+        edgeDistanceThreshold = settings.edgeDistanceThreshold;
+        debugLogDetectionSource = settings.debugLogDetectionSource;
     }
 
     public bool HasClearWallLine(Vector2 from, Vector2 to, LayerMask wallLayer, Collider2D ignoredCollider)

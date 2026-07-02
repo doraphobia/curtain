@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Collections;
 using TMPro;
+using Curtain.Settings;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -14,6 +15,8 @@ namespace DuoCurtain.RuntimeTileMesh
         public RuntimeTileMeshFusionSandbox fusionSandbox;
         public PlayerControl playerControl;
         public Transform footprintParent;
+        [Tooltip("Optional. If assigned, the spawner reads tuning values from the Dashboard settings asset.")]
+        public DebugSettings debugSettings;
 
         [Header("Spawn Rules")]
         [Min(0)]
@@ -126,6 +129,8 @@ namespace DuoCurtain.RuntimeTileMesh
         void Update()
         {
             ResolveReferences();
+            if (debugSettings != null)
+                logSpawns = debugSettings.logEnemySpawns;
             CleanupEnemyList();
 
             bool isNight = stageController != null && stageController.IsNight;
