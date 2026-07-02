@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using DuoCurtain.RuntimeTileMesh;
 using TMPro;
 using UnityEngine;
@@ -42,19 +43,27 @@ public sealed class BootWorldStateController : MonoBehaviour
     [SerializeField] private CanvasGroup titleCanvasGroup;
     [SerializeField] private GameObject[] titleUiObjects;
     [SerializeField] private bool autoCreateTemporaryTitleUi = true;
-    [SerializeField] private string temporaryLogoText = "DUO CURTAIN";
+    [SerializeField] private string temporaryLogoText = "CURTAIN";
     [SerializeField] private string temporaryPressAnyKeyText = "PRESS ANY KEY";
     [SerializeField] private string temporaryLanguageText = "LANGUAGE";
     [SerializeField] private string temporarySettingsText = "SETTINGS";
     [SerializeField] private string temporaryQuitText = "QUIT";
     [SerializeField] private float titleFadeOutDuration = 0.35f;
+    [SerializeField] private int titleCanvasSortingOrder = 2400;
+    [SerializeField] private bool useScreenInvertTitleText = true;
+
+    [Header("Title Cursor")]
+    [SerializeField] private bool showTemporaryTitleCursor = true;
+    [SerializeField] private int titleCursorCanvasSortingOrder = 7200;
+    [SerializeField] private float titleCursorSize = 18f;
+    [Range(0f, 1f)]
+    [SerializeField] private float titleCursorAlpha = 0.95f;
 
     [Header("Boot World Disabled During Title")]
     [SerializeField] private Behaviour[] playerBehaviours;
     [SerializeField] private GameObject[] playerObjects;
     [SerializeField] private Behaviour[] gameplayUiBehaviours;
     [SerializeField] private GameObject[] gameplayUiObjects;
-    [SerializeField] private Behaviour[] gameplayCameraBehaviours;
 
     [Header("Boot World Enabled During Title")]
     [SerializeField] private Behaviour[] bootWorldBehaviours;
@@ -71,6 +80,21 @@ public sealed class BootWorldStateController : MonoBehaviour
     private TextMeshProUGUI temporaryLanguageLabel;
     private TextMeshProUGUI temporarySettingsLabel;
     private TextMeshProUGUI temporaryQuitLabel;
+    private readonly Dictionary<TextMeshProUGUI, Material> temporaryTitleInvertMaterials =
+        new Dictionary<TextMeshProUGUI, Material>();
+    private Canvas temporaryTitleCursorCanvas;
+    private Image temporaryTitleCursorImage;
+    private Material temporaryTitleCursorMaterial;
+    private Texture2D temporaryTitleCursorTexture;
+    private Sprite temporaryTitleCursorSprite;
+    private FusionGameModeController gameModeController;
+    private FusionModeCameraRig playerCameraRig;
+    private FusionModeCameraRig managementCameraRig;
+
+    private const string MainCameraTag = "MainCamera";
+    private const string UntaggedCameraTag = "Untagged";
+    private const string TmpScreenInvertShaderName = "DuoCurtain/UI/TMP Screen Invert";
+    private const string HeadingPointInvertShaderName = "DuoCurtain/UI/HeadingPointInvert";
 
     public static BootWorldStateController Active { get; private set; }
     public BootWorldState CurrentState { get; private set; } = BootWorldState.ApplicationBoot;
@@ -109,6 +133,18 @@ public sealed class BootWorldStateController : MonoBehaviour
             Active = null;
 
         DuoCurtainLocalization.LanguageChanged -= RefreshTemporaryTitleUiText;
+        SetTemporaryTitleCursorVisible(false);
+    }
+
+    private void OnDestroy()
+    {
+        foreach (Material material in temporaryTitleInvertMaterials.Values)
+            DestroyRuntimeObject(material);
+
+        temporaryTitleInvertMaterials.Clear();
+        DestroyRuntimeObject(temporaryTitleCursorMaterial);
+        DestroyRuntimeObject(temporaryTitleCursorSprite);
+        DestroyRuntimeObject(temporaryTitleCursorTexture);
     }
 
     private void Start()
@@ -126,6 +162,8 @@ public sealed class BootWorldStateController : MonoBehaviour
 
     private void Update()
     {
+        UpdateTemporaryTitleCursor();
+
         if (!listenForAnyInput || CurrentState != BootWorldState.BootWorld)
             return;
 
@@ -248,14 +286,107 @@ public sealed class BootWorldStateController : MonoBehaviour
 
     private void ApplyBootWorldActive(bool bootActive)
     {
+        if (bootActive)
+            ActivateBootWorldCamera();
+        else
+            RestoreGameplayCamera();
+
         SetBehavioursEnabled(playerBehaviours, !bootActive);
         SetObjectsActive(playerObjects, !bootActive);
         SetBehavioursEnabled(gameplayUiBehaviours, !bootActive);
         SetObjectsActive(gameplayUiObjects, !bootActive);
-        SetBehavioursEnabled(gameplayCameraBehaviours, !bootActive);
-
         SetBehavioursEnabled(bootWorldBehaviours, bootActive);
         SetObjectsActive(bootWorldObjects, bootActive);
+    }
+
+    private void ActivateBootWorldCamera()
+    {
+        ResolveCameraRigs();
+        if (managementCameraRig == null)
+            return;
+
+        Camera managementCamera = managementCameraRig.Camera;
+        if (managementCamera == null)
+            return;
+
+        managementCameraRig.enabled = true;
+        managementCamera.gameObject.SetActive(true);
+        managementCamera.enabled = true;
+        managementCamera.tag = MainCameraTag;
+        managementCameraRig.SnapToDesiredPose();
+
+        if (playerCameraRig != null)
+        {
+            playerCameraRig.enabled = false;
+            if (playerCameraRig.Camera != null)
+            {
+                playerCameraRig.Camera.enabled = false;
+                if (playerCameraRig.Camera.CompareTag(MainCameraTag))
+                    playerCameraRig.Camera.tag = UntaggedCameraTag;
+            }
+        }
+    }
+
+    private void RestoreGameplayCamera()
+    {
+        ResolveCameraRigs();
+        if (gameModeController != null)
+        {
+            if (!gameModeController.enabled)
+                gameModeController.enabled = true;
+
+            gameModeController.SetMode(FusionGameModeController.GameMode.Player, false);
+            return;
+        }
+
+        if (playerCameraRig != null)
+        {
+            playerCameraRig.enabled = true;
+            if (playerCameraRig.Camera != null)
+            {
+                playerCameraRig.Camera.gameObject.SetActive(true);
+                playerCameraRig.Camera.enabled = true;
+                playerCameraRig.Camera.tag = MainCameraTag;
+                playerCameraRig.SnapToDesiredPose();
+            }
+        }
+
+        if (managementCameraRig?.Camera != null)
+        {
+            managementCameraRig.Camera.enabled = false;
+            if (managementCameraRig.Camera.CompareTag(MainCameraTag))
+                managementCameraRig.Camera.tag = UntaggedCameraTag;
+        }
+    }
+
+    private void ResolveCameraRigs()
+    {
+        if (gameModeController == null)
+            gameModeController = FindFirstObjectByType<FusionGameModeController>();
+
+        if (gameModeController != null)
+        {
+            if (playerCameraRig == null)
+                playerCameraRig = gameModeController.playerCamera;
+            if (managementCameraRig == null)
+                managementCameraRig = gameModeController.managementCamera;
+        }
+
+        if (playerCameraRig != null && managementCameraRig != null)
+            return;
+
+        FusionModeCameraRig[] rigs = FindObjectsByType<FusionModeCameraRig>(FindObjectsSortMode.None);
+        for (int i = 0; i < rigs.Length; i++)
+        {
+            FusionModeCameraRig rig = rigs[i];
+            if (rig == null)
+                continue;
+
+            if (rig.mode == FusionModeCameraRig.RigMode.PlayerFollow && playerCameraRig == null)
+                playerCameraRig = rig;
+            else if (rig.mode == FusionModeCameraRig.RigMode.ManagementOverview && managementCameraRig == null)
+                managementCameraRig = rig;
+        }
     }
 
     private void ResolveReferencesAndAutoWire()
@@ -271,17 +402,14 @@ public sealed class BootWorldStateController : MonoBehaviour
             return;
 
         PlayerControl playerControl = FindFirstObjectByType<PlayerControl>();
-        FusionGameModeController gameModeController = FindFirstObjectByType<FusionGameModeController>();
-        FusionModeCameraRig cameraRig = FindFirstObjectByType<FusionModeCameraRig>();
+        gameModeController = FindFirstObjectByType<FusionGameModeController>();
+        ResolveCameraRigs();
 
         if (playerBehaviours == null || playerBehaviours.Length == 0)
             playerBehaviours = CompactBehaviours(playerControl);
 
         if (gameplayUiBehaviours == null || gameplayUiBehaviours.Length == 0)
             gameplayUiBehaviours = CompactBehaviours(gameModeController);
-
-        if (gameplayCameraBehaviours == null || gameplayCameraBehaviours.Length == 0)
-            gameplayCameraBehaviours = CompactBehaviours(cameraRig);
 
         if (playerObjects == null || playerObjects.Length == 0)
         {
@@ -360,7 +488,7 @@ public sealed class BootWorldStateController : MonoBehaviour
 
         Canvas canvas = canvasObject.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 2400;
+        canvas.sortingOrder = titleCanvasSortingOrder;
 
         CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
@@ -408,6 +536,8 @@ public sealed class BootWorldStateController : MonoBehaviour
         label.alignment = alignment;
         label.color = Color.white;
         label.raycastTarget = false;
+        DuoCurtainLocalization.ApplyFont(label, text);
+        ApplyTemporaryTitleTextMaterial(label);
         return label;
     }
 
@@ -472,7 +602,7 @@ public sealed class BootWorldStateController : MonoBehaviour
         SetLocalizedLabel(temporaryQuitLabel, "退出", temporaryQuitText);
     }
 
-    private static void SetLocalizedLabel(TextMeshProUGUI label, string chinese, string english)
+    private void SetLocalizedLabel(TextMeshProUGUI label, string chinese, string english)
     {
         if (label == null)
             return;
@@ -480,6 +610,51 @@ public sealed class BootWorldStateController : MonoBehaviour
         string text = DuoCurtainLocalization.Text("boot.temporary", chinese, english);
         label.text = text;
         DuoCurtainLocalization.ApplyFont(label, text);
+        ApplyTemporaryTitleTextMaterial(label);
+    }
+
+    private void ApplyTemporaryTitleTextMaterial(TextMeshProUGUI label)
+    {
+        if (label == null || !useScreenInvertTitleText)
+            return;
+
+        Shader shader = Shader.Find(TmpScreenInvertShaderName);
+        if (shader == null)
+            return;
+
+        Material source = label.fontSharedMaterial != null ? label.fontSharedMaterial : label.fontMaterial;
+        if (!temporaryTitleInvertMaterials.TryGetValue(label, out Material material) || material == null)
+        {
+            material = source != null ? new Material(source) : new Material(shader);
+            material.name = $"{label.gameObject.name} TMP Screen Invert";
+            material.hideFlags = HideFlags.HideAndDontSave;
+            temporaryTitleInvertMaterials[label] = material;
+        }
+        else if (source != null && material.mainTexture != source.mainTexture)
+        {
+            DestroyRuntimeObject(material);
+            material = new Material(source)
+            {
+                name = $"{label.gameObject.name} TMP Screen Invert",
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            temporaryTitleInvertMaterials[label] = material;
+        }
+        else if (source != null)
+        {
+            material.CopyPropertiesFromMaterial(source);
+        }
+
+        if (material.shader != shader)
+            material.shader = shader;
+
+        if (material.HasProperty("_FaceColor"))
+            material.SetColor("_FaceColor", Color.white);
+        if (material.HasProperty("_OutlineColor"))
+            material.SetColor("_OutlineColor", Color.clear);
+
+        label.color = Color.white;
+        label.fontMaterial = material;
     }
 
     private static void EnsureEventSystem()
@@ -499,6 +674,7 @@ public sealed class BootWorldStateController : MonoBehaviour
             titleCanvasGroup.gameObject.SetActive(true);
 
         SetObjectsActive(titleUiObjects, visible);
+        SetTemporaryTitleCursorVisible(visible);
         if (titleCanvasGroup == null)
             return;
 
@@ -515,6 +691,145 @@ public sealed class BootWorldStateController : MonoBehaviour
 
         titleCanvasGroup.interactable = interactable;
         titleCanvasGroup.blocksRaycasts = interactable;
+    }
+
+    private void SetTemporaryTitleCursorVisible(bool visible)
+    {
+        if (visible && showTemporaryTitleCursor)
+            EnsureTemporaryTitleCursor();
+
+        if (temporaryTitleCursorCanvas != null)
+            temporaryTitleCursorCanvas.gameObject.SetActive(visible && showTemporaryTitleCursor);
+    }
+
+    private void UpdateTemporaryTitleCursor()
+    {
+        bool visible =
+            showTemporaryTitleCursor &&
+            (CurrentState == BootWorldState.BootWorld || CurrentState == BootWorldState.GameplayTransition) &&
+            titleCanvasGroup != null &&
+            titleCanvasGroup.gameObject.activeInHierarchy &&
+            titleCanvasGroup.alpha > 0.001f;
+
+        if (!visible)
+        {
+            if (temporaryTitleCursorCanvas != null && temporaryTitleCursorCanvas.gameObject.activeSelf)
+                temporaryTitleCursorCanvas.gameObject.SetActive(false);
+            return;
+        }
+
+        EnsureTemporaryTitleCursor();
+        if (temporaryTitleCursorCanvas == null || temporaryTitleCursorImage == null)
+            return;
+
+        if (!temporaryTitleCursorCanvas.gameObject.activeSelf)
+            temporaryTitleCursorCanvas.gameObject.SetActive(true);
+
+        temporaryTitleCursorCanvas.sortingOrder = titleCursorCanvasSortingOrder;
+        RectTransform rect = temporaryTitleCursorImage.rectTransform;
+        float size = Mathf.Max(1f, titleCursorSize);
+        rect.sizeDelta = new Vector2(size, size);
+        rect.position = Input.mousePosition;
+        temporaryTitleCursorImage.color = new Color(1f, 1f, 1f, Mathf.Clamp01(titleCursorAlpha * titleCanvasGroup.alpha));
+    }
+
+    private void EnsureTemporaryTitleCursor()
+    {
+        if (temporaryTitleCursorCanvas != null && temporaryTitleCursorImage != null)
+            return;
+
+        GameObject canvasObject = new GameObject(
+            "Boot World Title Heading Point Canvas",
+            typeof(RectTransform),
+            typeof(Canvas),
+            typeof(CanvasScaler));
+        canvasObject.transform.SetParent(transform, false);
+
+        RectTransform canvasRect = canvasObject.GetComponent<RectTransform>();
+        canvasRect.anchorMin = Vector2.zero;
+        canvasRect.anchorMax = Vector2.one;
+        canvasRect.offsetMin = Vector2.zero;
+        canvasRect.offsetMax = Vector2.zero;
+
+        temporaryTitleCursorCanvas = canvasObject.GetComponent<Canvas>();
+        temporaryTitleCursorCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        temporaryTitleCursorCanvas.sortingOrder = titleCursorCanvasSortingOrder;
+
+        CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.matchWidthOrHeight = 0.5f;
+
+        GameObject imageObject = new GameObject("Title Heading Point", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        imageObject.transform.SetParent(canvasObject.transform, false);
+        temporaryTitleCursorImage = imageObject.GetComponent<Image>();
+        temporaryTitleCursorImage.raycastTarget = false;
+        temporaryTitleCursorImage.sprite = EnsureTemporaryTitleCursorSprite();
+        ApplyTemporaryTitleCursorMaterial();
+
+        canvasObject.SetActive(false);
+    }
+
+    private void ApplyTemporaryTitleCursorMaterial()
+    {
+        if (temporaryTitleCursorImage == null)
+            return;
+
+        Shader shader = Shader.Find(HeadingPointInvertShaderName);
+        if (shader == null)
+            return;
+
+        if (temporaryTitleCursorMaterial == null)
+        {
+            temporaryTitleCursorMaterial = new Material(shader);
+            temporaryTitleCursorMaterial.name = "Boot World Title Heading Point Invert";
+            temporaryTitleCursorMaterial.hideFlags = HideFlags.HideAndDontSave;
+        }
+
+        if (temporaryTitleCursorMaterial.shader != shader)
+            temporaryTitleCursorMaterial.shader = shader;
+
+        temporaryTitleCursorImage.material = temporaryTitleCursorMaterial;
+    }
+
+    private Sprite EnsureTemporaryTitleCursorSprite()
+    {
+        if (temporaryTitleCursorSprite != null)
+            return temporaryTitleCursorSprite;
+
+        const int textureSize = 64;
+        temporaryTitleCursorTexture = new Texture2D(textureSize, textureSize, TextureFormat.RGBA32, false)
+        {
+            name = "Boot World Title Heading Point Circle",
+            filterMode = FilterMode.Bilinear,
+            wrapMode = TextureWrapMode.Clamp,
+            hideFlags = HideFlags.HideAndDontSave
+        };
+
+        Color[] pixels = new Color[textureSize * textureSize];
+        Vector2 center = new Vector2((textureSize - 1) * 0.5f, (textureSize - 1) * 0.5f);
+        float radius = textureSize * 0.38f;
+        float softEdge = Mathf.Max(1f, textureSize * 0.06f);
+        for (int y = 0; y < textureSize; y++)
+        {
+            for (int x = 0; x < textureSize; x++)
+            {
+                float distance = Vector2.Distance(new Vector2(x, y), center);
+                float alpha = Mathf.Clamp01((radius - distance) / softEdge);
+                pixels[y * textureSize + x] = new Color(1f, 1f, 1f, alpha);
+            }
+        }
+
+        temporaryTitleCursorTexture.SetPixels(pixels);
+        temporaryTitleCursorTexture.Apply(false, false);
+        temporaryTitleCursorSprite = Sprite.Create(
+            temporaryTitleCursorTexture,
+            new Rect(0f, 0f, textureSize, textureSize),
+            new Vector2(0.5f, 0.5f),
+            textureSize);
+        temporaryTitleCursorSprite.name = "Boot World Title Heading Point Sprite";
+        temporaryTitleCursorSprite.hideFlags = HideFlags.HideAndDontSave;
+        return temporaryTitleCursorSprite;
     }
 
     private void RestoreStageSimulationSpeed()
@@ -637,5 +952,16 @@ public sealed class BootWorldStateController : MonoBehaviour
         }
 
         return result;
+    }
+
+    private static void DestroyRuntimeObject(Object target)
+    {
+        if (target == null)
+            return;
+
+        if (Application.isPlaying)
+            Destroy(target);
+        else
+            DestroyImmediate(target);
     }
 }

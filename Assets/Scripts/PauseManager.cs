@@ -4,6 +4,8 @@ using System.Reflection;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.Events;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public class PauseManager : MonoBehaviour
@@ -54,6 +56,20 @@ public class PauseManager : MonoBehaviour
     public Color languageToggleBackgroundColor = new Color(1f, 1f, 1f, 0.16f);
     public Color languageToggleTextColor = Color.white;
 
+    [Header("Pause Actions")]
+    public bool showReturnToTitleButton = true;
+    public bool showQuitButton = true;
+    public Vector2 returnToTitleAnchoredPosition = new Vector2(0f, -238f);
+    public Vector2 quitAnchoredPosition = new Vector2(0f, -320f);
+    public Vector2 pauseActionButtonSize = new Vector2(360f, 64f);
+    public float pauseActionFontSize = 26f;
+    public Color pauseActionBackgroundColor = new Color(1f, 1f, 1f, 0.14f);
+    public Color pauseActionTextColor = Color.white;
+    public string returnToTitleChinese = "回到标题";
+    public string returnToTitleEnglish = "Return to Title";
+    public string quitChinese = "退出游戏";
+    public string quitEnglish = "Quit Game";
+
     public static bool IsGamePaused { get; private set; }
     public static event Action<bool> PauseChanged;
 
@@ -69,6 +85,10 @@ public class PauseManager : MonoBehaviour
     private TextMeshProUGUI pauseTitleText;
     private Button languageToggleButton;
     private TextMeshProUGUI languageToggleText;
+    private Button returnToTitleButton;
+    private TextMeshProUGUI returnToTitleText;
+    private Button quitButton;
+    private TextMeshProUGUI quitText;
     private Texture2D blurTexture;
     private Coroutine blurFadeRoutine;
     private Coroutine resumeRoutine;
@@ -270,7 +290,13 @@ public class PauseManager : MonoBehaviour
 
     private void EnsureBlurOverlay()
     {
-        if (blurCanvas != null && blurImage != null && blurTintImage != null && pauseTitleText != null)
+        if (blurCanvas != null &&
+            blurImage != null &&
+            blurTintImage != null &&
+            pauseTitleText != null &&
+            (!showLanguageToggle || languageToggleButton != null) &&
+            (!showReturnToTitleButton || returnToTitleButton != null) &&
+            (!showQuitButton || quitButton != null))
             return;
 
         EnsureEventSystem();
@@ -327,6 +353,7 @@ public class PauseManager : MonoBehaviour
         pauseTitleText.color = pauseTitleColor;
 
         CreateLanguageToggle(canvasObject.transform);
+        CreatePauseActionButtons(canvasObject.transform);
         RefreshLocalizedPauseText();
 
         canvasObject.SetActive(false);
@@ -369,6 +396,68 @@ public class PauseManager : MonoBehaviour
         languageToggleText.alignment = TextAlignmentOptions.Center;
     }
 
+    private void CreatePauseActionButtons(Transform parent)
+    {
+        if (returnToTitleButton == null)
+            returnToTitleButton = CreatePauseActionButton(
+                parent,
+                "Return To Title",
+                returnToTitleAnchoredPosition,
+                HandleReturnToTitlePressed,
+                out returnToTitleText);
+
+        if (quitButton == null)
+            quitButton = CreatePauseActionButton(
+                parent,
+                "Quit Game",
+                quitAnchoredPosition,
+                HandleQuitPressed,
+                out quitText);
+    }
+
+    private Button CreatePauseActionButton(
+        Transform parent,
+        string objectName,
+        Vector2 anchoredPosition,
+        UnityAction callback,
+        out TextMeshProUGUI label)
+    {
+        GameObject buttonObject = new GameObject(
+            objectName,
+            typeof(RectTransform),
+            typeof(CanvasRenderer),
+            typeof(Image),
+            typeof(Button));
+        buttonObject.transform.SetParent(parent, false);
+
+        RectTransform rect = buttonObject.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = anchoredPosition;
+        rect.sizeDelta = pauseActionButtonSize;
+
+        Image image = buttonObject.GetComponent<Image>();
+        image.color = pauseActionBackgroundColor;
+
+        Button button = buttonObject.GetComponent<Button>();
+        button.onClick.AddListener(callback);
+
+        GameObject textObject = new GameObject(
+            $"{objectName} Text",
+            typeof(RectTransform),
+            typeof(CanvasRenderer),
+            typeof(TextMeshProUGUI));
+        textObject.transform.SetParent(buttonObject.transform, false);
+        RectTransform textRect = textObject.GetComponent<RectTransform>();
+        StretchToParent(textRect);
+
+        label = textObject.GetComponent<TextMeshProUGUI>();
+        label.raycastTarget = false;
+        label.alignment = TextAlignmentOptions.Center;
+        return button;
+    }
+
     private void RefreshLocalizedPauseText()
     {
         if (pauseTitleText != null)
@@ -394,6 +483,109 @@ public class PauseManager : MonoBehaviour
             languageToggleText.color = languageToggleTextColor;
             DuoCurtainLocalization.ApplyFont(languageToggleText, text);
         }
+
+        RefreshPauseActionButton(
+            returnToTitleButton,
+            returnToTitleText,
+            showReturnToTitleButton,
+            returnToTitleChinese,
+            returnToTitleEnglish);
+        RefreshPauseActionButton(
+            quitButton,
+            quitText,
+            showQuitButton,
+            quitChinese,
+            quitEnglish);
+    }
+
+    private void RefreshPauseActionButton(
+        Button button,
+        TextMeshProUGUI label,
+        bool visible,
+        string chinese,
+        string english)
+    {
+        if (button != null)
+            button.gameObject.SetActive(visible);
+
+        if (label == null)
+            return;
+
+        string text = DuoCurtainLocalization.Text("pause.action", chinese, english);
+        label.text = text;
+        label.fontSize = pauseActionFontSize;
+        label.color = pauseActionTextColor;
+        DuoCurtainLocalization.ApplyFont(label, text);
+
+        Image image = button != null ? button.GetComponent<Image>() : null;
+        if (image != null)
+            image.color = pauseActionBackgroundColor;
+    }
+
+    private void HandleReturnToTitlePressed()
+    {
+        ForceResumeForExternalNavigation();
+        BootWorldStateController bootWorld = BootWorldStateController.Active;
+        if (bootWorld == null)
+            bootWorld = FindFirstObjectByType<BootWorldStateController>();
+
+        if (bootWorld != null)
+        {
+            bootWorld.SetListenForAnyInput(true);
+            bootWorld.EnterBootWorld();
+            return;
+        }
+
+        Scene activeScene = SceneManager.GetActiveScene();
+        if (activeScene.IsValid() && activeScene.buildIndex >= 0)
+            SceneManager.LoadScene(activeScene.buildIndex);
+        else if (activeScene.IsValid() && !string.IsNullOrEmpty(activeScene.name))
+            SceneManager.LoadScene(activeScene.name);
+    }
+
+    private void HandleQuitPressed()
+    {
+        ForceResumeForExternalNavigation();
+        Application.Quit();
+
+        #if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+        #endif
+    }
+
+    private void ForceResumeForExternalNavigation()
+    {
+        if (blurCaptureRoutine != null)
+        {
+            StopCoroutine(blurCaptureRoutine);
+            blurCaptureRoutine = null;
+        }
+        if (blurFadeRoutine != null)
+        {
+            StopCoroutine(blurFadeRoutine);
+            blurFadeRoutine = null;
+        }
+        if (resumeRoutine != null)
+        {
+            StopCoroutine(resumeRoutine);
+            resumeRoutine = null;
+        }
+
+        resumeInProgress = false;
+        HideBlurOverlay(true);
+
+        Time.timeScale = prevTimeScale <= 0f ? 1f : prevTimeScale;
+        Time.fixedDeltaTime = prevFixedDeltaTime > 0f ? prevFixedDeltaTime : Time.fixedDeltaTime;
+        if (pauseAudio)
+            AudioListener.pause = prevAudioPaused;
+        if (pauseDotweenTweens)
+            TrySetDotweenPaused(false);
+
+        bool wasPaused = paused || IsGamePaused;
+        paused = false;
+        IsGamePaused = false;
+        if (wasPaused)
+            PauseChanged?.Invoke(false);
     }
 
     private void SetBlurTexture(Texture2D texture)

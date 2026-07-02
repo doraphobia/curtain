@@ -9,6 +9,7 @@ public class FusionBackgroundShaderController : MonoBehaviour
 {
     private const string ShaderName = "Duo Curtain/Fusion Background Grid";
     private const string BackgroundObjectName = "Fusion Background Plane";
+    private const string ResourcesBackgroundMaterialPath = "Materials/Fusion Background Grid";
 
     private static readonly int TopColorId = Shader.PropertyToID("_TopColor");
     private static readonly int BottomColorId = Shader.PropertyToID("_BottomColor");
@@ -192,6 +193,9 @@ public class FusionBackgroundShaderController : MonoBehaviour
 
     private Material ResolveMaterial()
     {
+        if (backgroundMaterial == null)
+            backgroundMaterial = Resources.Load<Material>(ResourcesBackgroundMaterialPath);
+
         if (backgroundMaterial != null)
             return backgroundMaterial;
 

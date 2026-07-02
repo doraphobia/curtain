@@ -405,6 +405,8 @@ namespace DuoCurtain.RuntimeTileMesh
             if (targetRig == null)
                 return;
 
+            targetRig.enabled = true;
+
             Camera previousCamera = activeCamera != null ? activeCamera : Camera.main;
             Camera targetCamera = targetRig.Camera;
             if (targetCamera == null)
@@ -412,6 +414,7 @@ namespace DuoCurtain.RuntimeTileMesh
 
             if (previousCamera == targetCamera)
             {
+                targetRig.enabled = true;
                 targetCamera.enabled = true;
                 targetCamera.tag = "MainCamera";
                 SyncAudioListeners(targetCamera);
