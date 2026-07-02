@@ -106,9 +106,29 @@ public class FusionBackgroundShaderController : MonoBehaviour
     void OnEnable()
     {
         ResolveReferences();
+#if UNITY_EDITOR
+        if (!Application.isPlaying)
+        {
+            UnityEditor.EditorApplication.delayCall += DeferredEnsureBackground;
+            return;
+        }
+#endif
         EnsureBackgroundPlane();
         ApplyBackgroundState();
     }
+
+#if UNITY_EDITOR
+    private void DeferredEnsureBackground()
+    {
+        UnityEditor.EditorApplication.delayCall -= DeferredEnsureBackground;
+        if (this == null)
+            return;
+
+        ResolveReferences();
+        EnsureBackgroundPlane();
+        ApplyBackgroundState();
+    }
+#endif
 
     void OnDisable()
     {
@@ -154,22 +174,36 @@ public class FusionBackgroundShaderController : MonoBehaviour
         if (backgroundObject == null)
         {
             Transform existing = targetCamera.transform.Find(BackgroundObjectName);
-            backgroundObject = existing != null ? existing.gameObject : new GameObject(BackgroundObjectName);
+            if (existing != null)
+            {
+                backgroundObject = existing.gameObject;
+            }
+            else
+            {
+                backgroundObject = new GameObject(BackgroundObjectName);
+                backgroundObject.AddComponent<FusionBackgroundPlane>();
+            }
+
             backgroundObject.hideFlags = HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild;
             backgroundObject.transform.SetParent(targetCamera.transform, false);
+            backgroundFilter = null;
+            backgroundRenderer = null;
         }
 
-        if (backgroundFilter == null)
-            backgroundFilter = backgroundObject.GetComponent<MeshFilter>() ?? backgroundObject.AddComponent<MeshFilter>();
+        if (backgroundObject.GetComponent<FusionBackgroundPlane>() == null)
+            backgroundObject.AddComponent<FusionBackgroundPlane>();
 
         if (backgroundFilter == null)
-            return;
+            backgroundFilter = backgroundObject.GetComponent<MeshFilter>();
+
+        if (backgroundFilter == null)
+            backgroundFilter = backgroundObject.AddComponent<MeshFilter>();
 
         if (backgroundRenderer == null)
-            backgroundRenderer = backgroundObject.GetComponent<MeshRenderer>() ?? backgroundObject.AddComponent<MeshRenderer>();
+            backgroundRenderer = backgroundObject.GetComponent<MeshRenderer>();
 
         if (backgroundRenderer == null)
-            return;
+            backgroundRenderer = backgroundObject.AddComponent<MeshRenderer>();
 
         if (runtimeMesh == null)
             runtimeMesh = CreateQuadMesh();
@@ -333,4 +367,10 @@ public class FusionBackgroundShaderController : MonoBehaviour
         else
             DestroyImmediate(target);
     }
+}
+
+[DisallowMultipleComponent]
+[RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
+internal sealed class FusionBackgroundPlane : MonoBehaviour
+{
 }

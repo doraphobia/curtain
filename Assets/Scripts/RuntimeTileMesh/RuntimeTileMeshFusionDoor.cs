@@ -4,6 +4,7 @@ using DuoCurtain.Combat;
 using DuoCurtain.GameplayVisuals;
 using DuoCurtain.Vision;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace DuoCurtain.RuntimeTileMesh
 {
@@ -41,8 +42,6 @@ namespace DuoCurtain.RuntimeTileMesh
         public float openAngleDegrees = 90f;
         public Color closedColor = Color.black;
         public Color openColor = new Color(0f, 0f, 0f, 0.82f);
-        [Tooltip("Optional. If assigned, this door reads tuning values from the Dashboard settings asset.")]
-        public DoorSettings settings;
 
         [Header("Door Animation")]
         public bool animateDoor = true;
@@ -97,6 +96,11 @@ namespace DuoCurtain.RuntimeTileMesh
 
         [Header("Visibility")]
         public bool registerForVisibility = true;
+
+        [Header("Dashboard Settings")]
+        [Tooltip("Optional. If assigned, this door reads tuning values from the Dashboard settings asset.")]
+        [FormerlySerializedAs("settings")]
+        public DoorSettings settings;
 
         [SerializeField]
         private bool isOpen;
@@ -178,34 +182,35 @@ namespace DuoCurtain.RuntimeTileMesh
 
         private void ApplySettingsIfPresent()
         {
-            if (settings == null)
+            DoorSettings source = CurtainSettingsLocator.Resolve(settings);
+            if (source == null)
                 return;
 
-            maxHealth = settings.maxHealth;
-            invulnerable = settings.invulnerable;
-            destroyDelay = settings.destroyDelay;
+            maxHealth = source.maxHealth;
+            invulnerable = source.invulnerable;
+            destroyDelay = source.destroyDelay;
 
-            toggleCooldown = settings.toggleCooldown;
-            openAngleDegrees = settings.openAngleDegrees;
-            doorwayPassableOpenAmount = settings.doorwayPassableOpenAmount;
+            toggleCooldown = source.toggleCooldown;
+            openAngleDegrees = source.openAngleDegrees;
+            doorwayPassableOpenAmount = source.doorwayPassableOpenAmount;
 
-            animateDoor = settings.animateDoor;
-            openDuration = settings.openDuration;
-            closeDuration = settings.closeDuration;
-            swingCurve = settings.swingCurve;
-            useEndWobble = settings.useEndWobble;
-            endWobbleDuration = settings.endWobbleDuration;
-            endWobbleAmplitudeDegrees = settings.endWobbleAmplitudeDegrees;
-            endWobbleOscillations = settings.endWobbleOscillations;
+            animateDoor = source.animateDoor;
+            openDuration = source.openDuration;
+            closeDuration = source.closeDuration;
+            swingCurve = source.swingCurve;
+            useEndWobble = source.useEndWobble;
+            endWobbleDuration = source.endWobbleDuration;
+            endWobbleAmplitudeDegrees = source.endWobbleAmplitudeDegrees;
+            endWobbleOscillations = source.endWobbleOscillations;
 
-            includeWallVisual = settings.includeWallVisual;
-            useDefaultWallDebugVisual = settings.useDefaultWallDebugVisual;
-            wallColor = settings.wallColor;
-            wallLineWidth = settings.wallLineWidth;
-            wallDashLength = settings.wallDashLength;
-            wallGapLength = settings.wallGapLength;
+            includeWallVisual = source.includeWallVisual;
+            useDefaultWallDebugVisual = source.useDefaultWallDebugVisual;
+            wallColor = source.wallColor;
+            wallLineWidth = source.wallLineWidth;
+            wallDashLength = source.wallDashLength;
+            wallGapLength = source.wallGapLength;
 
-            registerForVisibility = settings.registerForVisibility;
+            registerForVisibility = source.registerForVisibility;
         }
 
         void OnDisable()

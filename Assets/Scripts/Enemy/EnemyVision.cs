@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Curtain.Settings;
 using DuoCurtain.Vision;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 /// <summary>
 /// Cone vision and world-geometry line-of-sight for enemies.
@@ -40,7 +41,10 @@ public class EnemyVision : MonoBehaviour
 
     [Header("Debug")]
     public bool debugLogDetectionSource;
+
+    [Header("Dashboard Settings")]
     [Tooltip("Optional. If assigned, this component reads sampling/debug parameters from the Dashboard settings asset.")]
+    [FormerlySerializedAs("settings")]
     public VisionSettings settings;
 
     public VisionResult EvaluateVisibility(
@@ -102,16 +106,17 @@ public class EnemyVision : MonoBehaviour
 
     private void ApplySettingsIfPresent()
     {
-        if (settings == null)
+        VisionSettings source = CurtainSettingsLocator.Resolve(settings);
+        if (source == null)
             return;
 
-        useVisibilityWorld = settings.useVisibilityWorld;
-        requireActualVisibilityPolygonContainment = settings.requireActualVisibilityPolygonContainment;
-        baseRayCount = settings.baseRayCount;
-        maxRayCount = settings.maxRayCount;
-        edgeRefinementIterations = settings.edgeRefinementIterations;
-        edgeDistanceThreshold = settings.edgeDistanceThreshold;
-        debugLogDetectionSource = settings.debugLogDetectionSource;
+        useVisibilityWorld = source.useVisibilityWorld;
+        requireActualVisibilityPolygonContainment = source.requireActualVisibilityPolygonContainment;
+        baseRayCount = source.baseRayCount;
+        maxRayCount = source.maxRayCount;
+        edgeRefinementIterations = source.edgeRefinementIterations;
+        edgeDistanceThreshold = source.edgeDistanceThreshold;
+        debugLogDetectionSource = source.debugLogDetectionSource;
     }
 
     public bool HasClearWallLine(Vector2 from, Vector2 to, LayerMask wallLayer, Collider2D ignoredCollider)

@@ -1,0 +1,9 @@
+[FusionIntegrity] Play session started at t=0.000 scene=RedScene
+[FusionIntegrity] ManualAudit OK | tiles=5 | Play Session End Audit
+Frame: t=93.877 f=621338
+Before blocks: 0 | After blocks: 1
+
+[FusionIntegrity] Play session ended at t=93.877 | activeBlocks=1 | worldTiles=5
+[FusionIntegrity] ManualAudit OK | tiles=5 | Play Session End Audit
+Frame: t=93.877 f=621338
+Before blocks: 0 | After blocks: 1

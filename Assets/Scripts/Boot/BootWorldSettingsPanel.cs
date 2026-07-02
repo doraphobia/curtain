@@ -39,6 +39,11 @@ public sealed class BootWorldSettingsPanel : MonoBehaviour
 
     private bool initialized;
     private bool suppressEvents;
+    private bool visibleState;
+
+#pragma warning disable CS0067
+    public event Action<bool> VisibilityChanged;
+#pragma warning restore CS0067
 
     public void Initialize()
     {
@@ -73,13 +78,15 @@ public sealed class BootWorldSettingsPanel : MonoBehaviour
         if (canvasGroup == null)
             return;
 
+        visibleState = visible;
         canvasGroup.alpha = visible ? 1f : 0f;
         canvasGroup.interactable = visible;
         canvasGroup.blocksRaycasts = visible;
         gameObject.SetActive(visible);
+        VisibilityChanged?.Invoke(visible);
     }
 
-    public bool IsVisible => canvasGroup != null && canvasGroup.alpha > 0.5f && canvasGroup.blocksRaycasts;
+    public bool IsVisible => visibleState;
 
     private void RefreshOptions()
     {
@@ -366,6 +373,10 @@ public sealed class BootWorldSettingsPanel : MonoBehaviour
 
         Image image = buttonObject.GetComponent<Image>();
         image.color = buttonColor;
+        HeadingPointUiHoverEffect.Ensure(
+            image,
+            buttonColor,
+            new Color(Mathf.Lerp(buttonColor.r, 1f, 0.55f), Mathf.Lerp(buttonColor.g, 1f, 0.55f), Mathf.Lerp(buttonColor.b, 1f, 0.55f), Mathf.Clamp01(buttonColor.a + 0.18f)));
 
         Button button = buttonObject.GetComponent<Button>();
         button.onClick.AddListener(callback);

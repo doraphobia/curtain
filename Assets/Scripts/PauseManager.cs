@@ -378,6 +378,14 @@ public class PauseManager : MonoBehaviour
 
         Image image = buttonObject.GetComponent<Image>();
         image.color = languageToggleBackgroundColor;
+        HeadingPointUiHoverEffect.Ensure(
+            image,
+            languageToggleBackgroundColor,
+            new Color(
+                Mathf.Lerp(languageToggleBackgroundColor.r, 1f, 0.55f),
+                Mathf.Lerp(languageToggleBackgroundColor.g, 1f, 0.55f),
+                Mathf.Lerp(languageToggleBackgroundColor.b, 1f, 0.55f),
+                Mathf.Clamp01(languageToggleBackgroundColor.a + 0.18f)));
 
         languageToggleButton = buttonObject.GetComponent<Button>();
         languageToggleButton.onClick.AddListener(DuoCurtainLocalization.ToggleLanguage);
@@ -439,6 +447,14 @@ public class PauseManager : MonoBehaviour
 
         Image image = buttonObject.GetComponent<Image>();
         image.color = pauseActionBackgroundColor;
+        HeadingPointUiHoverEffect.Ensure(
+            image,
+            pauseActionBackgroundColor,
+            new Color(
+                Mathf.Lerp(pauseActionBackgroundColor.r, 1f, 0.55f),
+                Mathf.Lerp(pauseActionBackgroundColor.g, 1f, 0.55f),
+                Mathf.Lerp(pauseActionBackgroundColor.b, 1f, 0.55f),
+                Mathf.Clamp01(pauseActionBackgroundColor.a + 0.18f)));
 
         Button button = buttonObject.GetComponent<Button>();
         button.onClick.AddListener(callback);

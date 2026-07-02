@@ -32,8 +32,6 @@ public class EnemyController : MonoBehaviour
     public SanitySystem playerSanity;
     public EnemyVision vision;
     public EnemyFootprintTrace footprintTrace;
-    [Tooltip("Optional. If assigned, the enemy reads tuning values from this Settings asset (Dashboard).")]
-    public EnemySettings settings;
 
     [Header("Movement")]
     [Min(0f)] public float moveSpeed = 2.5f;
@@ -96,6 +94,11 @@ public class EnemyController : MonoBehaviour
 
     [Header("Boot World")]
     public bool suppressTrackingDuringBootWorld = true;
+
+    [Header("Dashboard Settings")]
+    [Tooltip("Optional. If assigned, the enemy reads tuning values from this Settings asset (Dashboard).")]
+    [FormerlySerializedAs("settings")]
+    public EnemySettings settings;
 
     [SerializeField] private EnemyState currentState = EnemyState.SpawnOutside;
 
@@ -713,49 +716,50 @@ public class EnemyController : MonoBehaviour
 
     private void ApplySettingsIfPresent()
     {
-        if (settings == null)
+        EnemySettings source = CurtainSettingsLocator.Resolve(settings);
+        if (source == null)
             return;
 
-        moveSpeed = settings.moveSpeed;
-        doorTargetingSpeedMultiplier = settings.doorTargetingSpeedMultiplier;
-        rotationSpeed = settings.rotationSpeed;
-        stoppingDistance = settings.stoppingDistance;
-        doorApproachDistance = settings.doorApproachDistance;
+        moveSpeed = source.moveSpeed;
+        doorTargetingSpeedMultiplier = source.doorTargetingSpeedMultiplier;
+        rotationSpeed = source.rotationSpeed;
+        stoppingDistance = source.stoppingDistance;
+        doorApproachDistance = source.doorApproachDistance;
 
-        searchInterval = settings.searchInterval;
-        lostSightDelay = settings.lostSightDelay;
-        investigateDuration = settings.investigateDuration;
-        enterRoomDelay = settings.enterRoomDelay;
-        chaseLastKnownRoom = settings.chaseLastKnownRoom;
-        roomMemoryDuration = settings.roomMemoryDuration;
+        searchInterval = source.searchInterval;
+        lostSightDelay = source.lostSightDelay;
+        investigateDuration = source.investigateDuration;
+        enterRoomDelay = source.enterRoomDelay;
+        chaseLastKnownRoom = source.chaseLastKnownRoom;
+        roomMemoryDuration = source.roomMemoryDuration;
 
-        viewDistance = settings.viewDistance;
-        viewAngle = settings.viewAngle;
-        detectionConfirmTime = settings.detectionConfirmTime;
+        viewDistance = source.viewDistance;
+        viewAngle = source.viewAngle;
+        detectionConfirmTime = source.detectionConfirmTime;
 
-        requireOpenWindow = settings.requireOpenWindow;
-        windowVisionSampleCount = settings.windowVisionSampleCount;
-        windowVisionSamplePadding = settings.windowVisionSamplePadding;
-        windowCheckInterval = settings.windowCheckInterval;
+        requireOpenWindow = source.requireOpenWindow;
+        windowVisionSampleCount = source.windowVisionSampleCount;
+        windowVisionSamplePadding = source.windowVisionSamplePadding;
+        windowCheckInterval = source.windowCheckInterval;
 
-        attackRange = settings.attackRange;
-        attackDamage = settings.attackDamage;
-        attackCooldown = settings.attackCooldown;
-        attackWindupTime = settings.attackWindupTime;
+        attackRange = source.attackRange;
+        attackDamage = source.attackDamage;
+        attackCooldown = source.attackCooldown;
+        attackWindupTime = source.attackWindupTime;
 
-        doorAttackDamage = settings.doorAttackDamage;
-        doorAttackInterval = settings.doorAttackInterval;
-        doorAttackWindup = settings.doorAttackWindup;
-        doorAttackRecovery = settings.doorAttackRecovery;
-        doorAttackRange = settings.doorAttackRange;
+        doorAttackDamage = source.doorAttackDamage;
+        doorAttackInterval = source.doorAttackInterval;
+        doorAttackWindup = source.doorAttackWindup;
+        doorAttackRecovery = source.doorAttackRecovery;
+        doorAttackRange = source.doorAttackRange;
 
-        spawnNearPlayerMinDistance = settings.spawnNearPlayerMinDistance;
-        spawnNearPlayerMaxDistance = settings.spawnNearPlayerMaxDistance;
-        autoRelocateInvalidSpawn = settings.autoRelocateInvalidSpawn;
+        spawnNearPlayerMinDistance = source.spawnNearPlayerMinDistance;
+        spawnNearPlayerMaxDistance = source.spawnNearPlayerMaxDistance;
+        autoRelocateInvalidSpawn = source.autoRelocateInvalidSpawn;
 
-        drawVisionCone = settings.drawVisionCone;
-        drawLineOfSight = settings.drawLineOfSight;
-        drawWindowVisionSamples = settings.drawWindowVisionSamples;
-        logStateChanges = settings.logStateChanges;
+        drawVisionCone = source.drawVisionCone;
+        drawLineOfSight = source.drawLineOfSight;
+        drawWindowVisionSamples = source.drawWindowVisionSamples;
+        logStateChanges = source.logStateChanges;
     }
 }

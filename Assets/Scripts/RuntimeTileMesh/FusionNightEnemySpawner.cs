@@ -3,6 +3,7 @@ using System.Collections;
 using TMPro;
 using Curtain.Settings;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 namespace DuoCurtain.RuntimeTileMesh
@@ -15,8 +16,6 @@ namespace DuoCurtain.RuntimeTileMesh
         public RuntimeTileMeshFusionSandbox fusionSandbox;
         public PlayerControl playerControl;
         public Transform footprintParent;
-        [Tooltip("Optional. If assigned, the spawner reads tuning values from the Dashboard settings asset.")]
-        public DebugSettings debugSettings;
 
         [Header("Spawn Rules")]
         [Min(0)]
@@ -105,6 +104,11 @@ namespace DuoCurtain.RuntimeTileMesh
         [Header("Debug")]
         public bool logSpawns = false;
 
+        [Header("Dashboard Settings")]
+        [Tooltip("Optional. If assigned, the spawner reads tuning values from the Dashboard settings asset.")]
+        [FormerlySerializedAs("debugSettings")]
+        public DebugSettings debugSettings;
+
         private readonly List<FusionNightFootprintEnemy> activeEnemies = new List<FusionNightFootprintEnemy>();
         private readonly List<GameObject> activeSpawnWarnings = new List<GameObject>();
         private bool wasNight;
@@ -129,8 +133,9 @@ namespace DuoCurtain.RuntimeTileMesh
         void Update()
         {
             ResolveReferences();
-            if (debugSettings != null)
-                logSpawns = debugSettings.logEnemySpawns;
+            DebugSettings source = CurtainSettingsLocator.Resolve(debugSettings);
+            if (source != null)
+                logSpawns = source.logEnemySpawns;
             CleanupEnemyList();
 
             bool isNight = stageController != null && stageController.IsNight;

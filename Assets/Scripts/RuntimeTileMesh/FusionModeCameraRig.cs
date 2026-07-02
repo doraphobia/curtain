@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 using Curtain.Settings;
 
 namespace DuoCurtain.RuntimeTileMesh
@@ -17,8 +18,6 @@ namespace DuoCurtain.RuntimeTileMesh
         public RigMode mode = RigMode.PlayerFollow;
         public PlayerControl playerControl;
         public RuntimeTileMeshFusionSandbox fusionSandbox;
-        [Tooltip("Optional. If assigned, the rig reads tuning values from the Dashboard settings asset.")]
-        public CameraSettings settings;
 
         [Header("Shared Camera")]
         public bool forceOrthographic = true;
@@ -55,6 +54,11 @@ namespace DuoCurtain.RuntimeTileMesh
         [Min(0f)]
         public float defaultTransitionDuration = 0.65f;
         public AnimationCurve transitionCurve;
+
+        [Header("Dashboard Settings")]
+        [Tooltip("Optional. If assigned, the rig reads tuning values from the Dashboard settings asset.")]
+        [FormerlySerializedAs("settings")]
+        public CameraSettings settings;
 
         private Camera cachedCamera;
         private Vector3 followVelocity;
@@ -115,23 +119,24 @@ namespace DuoCurtain.RuntimeTileMesh
 
         private void ApplySettingsIfPresent()
         {
-            if (settings == null)
+            CameraSettings source = CurtainSettingsLocator.Resolve(settings);
+            if (source == null)
                 return;
 
-            followSmoothTime = settings.followSmoothTime;
-            maxFollowSpeed = settings.maxFollowSpeed;
-            deadZoneRadius = settings.deadZoneRadius;
-            lookAheadDistance = settings.lookAheadDistance;
-            lookAheadSmoothTime = settings.lookAheadSmoothTime;
+            followSmoothTime = source.followSmoothTime;
+            maxFollowSpeed = source.maxFollowSpeed;
+            deadZoneRadius = source.deadZoneRadius;
+            lookAheadDistance = source.lookAheadDistance;
+            lookAheadSmoothTime = source.lookAheadSmoothTime;
 
-            overviewSmoothTime = settings.overviewSmoothTime;
-            overviewPadding = settings.overviewPadding;
-            minOverviewOrthographicSize = settings.minOverviewOrthographicSize;
-            maxOverviewOrthographicSize = settings.maxOverviewOrthographicSize;
+            overviewSmoothTime = source.overviewSmoothTime;
+            overviewPadding = source.overviewPadding;
+            minOverviewOrthographicSize = source.minOverviewOrthographicSize;
+            maxOverviewOrthographicSize = source.maxOverviewOrthographicSize;
 
-            defaultTransitionDuration = settings.defaultTransitionDuration;
-            if (settings.transitionCurve != null && settings.transitionCurve.length > 0)
-                transitionCurve = settings.transitionCurve;
+            defaultTransitionDuration = source.defaultTransitionDuration;
+            if (source.transitionCurve != null && source.transitionCurve.length > 0)
+                transitionCurve = source.transitionCurve;
         }
 
         public void BeginBlendFrom(Camera sourceCamera, float duration)

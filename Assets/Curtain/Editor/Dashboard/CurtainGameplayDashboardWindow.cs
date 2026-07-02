@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using Curtain.Editor;
 using Curtain.Settings;
 using DuoCurtain.RuntimeTileMesh;
 using DuoCurtain.Vision;
@@ -58,7 +59,9 @@ namespace Curtain.Editor.Dashboard
             Economy,
             Accessibility,
             Localization,
-            Debug
+            Debug,
+            Tools,
+            Builds
         }
 
         private const string SettingsFolder = "Assets/Curtain/Settings";
@@ -73,6 +76,7 @@ namespace Curtain.Editor.Dashboard
         private const string LocalizationAssetPath = SettingsFolder + "/LocalizationSettings.asset";
         private const string AccessibilityAssetPath = SettingsFolder + "/AccessibilitySettings.asset";
         private const string DebugAssetPath = SettingsFolder + "/DebugSettings.asset";
+        private const string BuildArchiveAssetPath = SettingsFolder + "/BuildArchiveSettings.asset";
 
         private Page currentPage = Page.Enemy;
         private Vector2 leftScroll;
@@ -101,6 +105,7 @@ namespace Curtain.Editor.Dashboard
         private LocalizationSettings localizationSettings;
         private AccessibilitySettings accessibilitySettings;
         private DebugSettings debugSettings;
+        private BuildArchiveSettings buildArchiveSettings;
 
         [MenuItem("Tools/Curtain/Gameplay Dashboard")]
         private static void Open()
@@ -114,6 +119,9 @@ namespace Curtain.Editor.Dashboard
         {
             EnsureSettingsFolder();
             LoadOrCreateAllAssets();
+#if UNITY_EDITOR
+            CurtainSettingsBundleInstaller.EnsureBundle();
+#endif
         }
 
         private void OnGUI()
@@ -149,6 +157,9 @@ namespace Curtain.Editor.Dashboard
                     DrawNavButton(Page.Accessibility, "Accessibility");
                     DrawNavButton(Page.Localization, "Localization");
                     DrawNavButton(Page.Debug, "Debug");
+                    GUILayout.Space(8f);
+                    DrawNavButton(Page.Tools, "Tools");
+                    DrawNavButton(Page.Builds, "Builds");
                 }
             }
 
@@ -209,8 +220,11 @@ namespace Curtain.Editor.Dashboard
                     GUILayout.Label(currentPage.ToString(), pageTitle);
                     GUILayout.Space(12f);
 
-                    DrawRelatedAssetsSection();
-                    GUILayout.Space(6f);
+                    if (currentPage != Page.Tools && currentPage != Page.Builds)
+                    {
+                        DrawRelatedAssetsSection();
+                        GUILayout.Space(6f);
+                    }
 
                     switch (currentPage)
                     {
@@ -243,6 +257,12 @@ namespace Curtain.Editor.Dashboard
                             break;
                         case Page.Debug:
                             DrawDebugPage();
+                            break;
+                        case Page.Tools:
+                            CurtainDashboardDuoCurtainTools.DrawToolsPage();
+                            break;
+                        case Page.Builds:
+                            CurtainDashboardBuildsPage.DrawBuildsPage(buildArchiveSettings);
                             break;
                         default:
                             EditorGUILayout.HelpBox("Page not implemented.", MessageType.Info);
@@ -721,6 +741,7 @@ namespace Curtain.Editor.Dashboard
             localizationSettings = LoadOrCreateAsset<LocalizationSettings>(LocalizationAssetPath);
             accessibilitySettings = LoadOrCreateAsset<AccessibilitySettings>(AccessibilityAssetPath);
             debugSettings = LoadOrCreateAsset<DebugSettings>(DebugAssetPath);
+            buildArchiveSettings = LoadOrCreateAsset<BuildArchiveSettings>(BuildArchiveAssetPath);
         }
 
         private static T LoadOrCreateAsset<T>(string assetPath) where T : ScriptableObject

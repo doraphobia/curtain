@@ -269,25 +269,23 @@ public class PlayerControl : MonoBehaviour
     void Update()
     {
         DeveloperModeState.TryHandleHotkey();
-        if (PauseManager.IsGamePaused)
+
+        ResolveReferences();
+
+        bool isPaused = PauseManager.IsGamePaused;
+        lastPointerOverUI = IsPointerOverUI();
+        float deltaTime = useUnscaledTime ? Time.unscaledDeltaTime : Time.deltaTime;
+
+        if (headingPointInputEnabled && (hasWorldPosition || isPaused))
+            UpdateHeadingPoint();
+        else
+            hasHeadingWorldPosition = false;
+
+        if (isPaused)
         {
             currentCursorSpeed = 0f;
             stepTriggeredThisFrame = false;
             return;
-        }
-
-        ResolveReferences();
-
-        lastPointerOverUI = IsPointerOverUI();
-        float deltaTime = useUnscaledTime ? Time.unscaledDeltaTime : Time.deltaTime;
-
-        if (headingPointInputEnabled && hasWorldPosition)
-        {
-            UpdateHeadingPoint();
-        }
-        else
-        {
-            hasHeadingWorldPosition = false;
         }
 
         float movedDistance = 0f;
@@ -310,11 +308,11 @@ public class PlayerControl : MonoBehaviour
 
     void LateUpdate()
     {
-        if (PauseManager.IsGamePaused)
-            return;
-
         ResolveReferences();
-        UpdatePlayerVisual(lastPointerOverUI);
+
+        if (!PauseManager.IsGamePaused)
+            UpdatePlayerVisual(lastPointerOverUI);
+
         UpdateHeadingPointVisual();
     }
 

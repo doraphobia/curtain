@@ -1312,10 +1312,10 @@ MonoBehaviour:
   drawDebugTiles: 1
   drawDebugBoundaryEdges: 1
   drawDebugLoopPoints: 1
-  enableBuildDebugLogging: 0
   debugTileColor: {r: 0.2, g: 0.8, b: 1, a: 0.25}
   debugBoundaryColor: {r: 1, g: 0.82, b: 0.1, a: 1}
   debugLoopPointColor: {r: 0.3, g: 1, b: 0.35, a: 1}
+  enableBuildDebugLogging: 0
 --- !u!4 &161029926
 Transform:
   m_ObjectHideFlags: 0
@@ -1551,6 +1551,7 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+  settings: {fileID: 0}
 --- !u!114 &186715665
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3921,10 +3922,10 @@ MonoBehaviour:
   drawDebugTiles: 1
   drawDebugBoundaryEdges: 1
   drawDebugLoopPoints: 1
-  enableBuildDebugLogging: 0
   debugTileColor: {r: 0.2, g: 0.8, b: 1, a: 0.25}
   debugBoundaryColor: {r: 1, g: 0.82, b: 0.1, a: 1}
   debugLoopPointColor: {r: 0.3, g: 1, b: 0.35, a: 1}
+  enableBuildDebugLogging: 0
 --- !u!4 &764287765
 Transform:
   m_ObjectHideFlags: 0
@@ -6671,6 +6672,7 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+  settings: {fileID: 0}
 --- !u!20 &1518932443
 Camera:
   m_ObjectHideFlags: 0
@@ -6873,10 +6875,10 @@ MonoBehaviour:
   drawDebugTiles: 1
   drawDebugBoundaryEdges: 1
   drawDebugLoopPoints: 1
-  enableBuildDebugLogging: 0
   debugTileColor: {r: 0.2, g: 0.8, b: 1, a: 0.25}
   debugBoundaryColor: {r: 1, g: 0.82, b: 0.1, a: 1}
   debugLoopPointColor: {r: 0.3, g: 1, b: 0.35, a: 1}
+  enableBuildDebugLogging: 0
 --- !u!4 &1538139790
 Transform:
   m_ObjectHideFlags: 0
@@ -8302,10 +8304,10 @@ MonoBehaviour:
   drawDebugTiles: 1
   drawDebugBoundaryEdges: 1
   drawDebugLoopPoints: 1
-  enableBuildDebugLogging: 0
   debugTileColor: {r: 0.2, g: 0.8, b: 1, a: 0.25}
   debugBoundaryColor: {r: 1, g: 0.82, b: 0.1, a: 1}
   debugLoopPointColor: {r: 0.3, g: 1, b: 0.35, a: 1}
+  enableBuildDebugLogging: 0
 --- !u!4 &1873750851
 Transform:
   m_ObjectHideFlags: 0
@@ -8444,6 +8446,7 @@ MonoBehaviour:
   enemyNormalFootstepPitchMultiplier: 0.96
   enemyUrgentFootstepPitchMultiplier: 1.04
   logSpawns: 0
+  debugSettings: {fileID: 0}
 --- !u!114 &2147483001
 MonoBehaviour:
   m_ObjectHideFlags: 0

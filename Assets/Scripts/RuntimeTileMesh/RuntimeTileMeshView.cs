@@ -40,12 +40,10 @@ namespace DuoCurtain.RuntimeTileMesh
         public bool drawDebugTiles = true;
         public bool drawDebugBoundaryEdges = true;
         public bool drawDebugLoopPoints = true;
-#if UNITY_EDITOR
-        public bool enableBuildDebugLogging = false;
-#endif
         public Color debugTileColor = new Color(0.2f, 0.8f, 1f, 0.25f);
         public Color debugBoundaryColor = new Color(1f, 0.82f, 0.1f, 1f);
         public Color debugLoopPointColor = new Color(0.3f, 1f, 0.35f, 1f);
+        public bool enableBuildDebugLogging = false;
 
         private RuntimeTileMeshBuildResult lastBuildResult;
         private Material runtimeFallbackMaterial;

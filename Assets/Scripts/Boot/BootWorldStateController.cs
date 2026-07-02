@@ -6,6 +6,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.Events;
 using UnityEngine.SceneManagement;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 public enum BootWorldState
@@ -43,6 +44,7 @@ public sealed class BootWorldStateController : MonoBehaviour
     [SerializeField] private CanvasGroup titleCanvasGroup;
     [SerializeField] private GameObject[] titleUiObjects;
     [SerializeField] private bool autoCreateTemporaryTitleUi = true;
+    [FormerlySerializedAs("temporaryLogoText")]
     [SerializeField] private string temporaryLogoTextChinese = "CURTAIN";
     [SerializeField] private string temporaryLogoTextEnglish = "CURTAIN";
     [SerializeField] private string temporaryPressAnyKeyText = "PRESS ANY KEY";
@@ -142,6 +144,9 @@ public sealed class BootWorldStateController : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (settingsPanel != null)
+            settingsPanel.VisibilityChanged -= HandleSettingsPanelVisibilityChanged;
+
         foreach (Material material in temporaryTitleInvertMaterials.Values)
             DestroyRuntimeObject(material);
 
@@ -564,6 +569,10 @@ public sealed class BootWorldStateController : MonoBehaviour
 
         Image image = buttonObject.GetComponent<Image>();
         image.color = new Color(0f, 0f, 0f, 0.32f);
+        HeadingPointUiHoverEffect.Ensure(
+            image,
+            image.color,
+            new Color(1f, 1f, 1f, 0.24f));
 
         Button button = buttonObject.GetComponent<Button>();
         button.onClick.AddListener(callback);
@@ -597,24 +606,39 @@ public sealed class BootWorldStateController : MonoBehaviour
 
         bool nextVisible = !settingsPanel.IsVisible;
         settingsPanel.Show(nextVisible);
+    }
 
-        if (titleCanvasGroup != null)
-        {
-            titleCanvasGroup.interactable = !nextVisible;
-            titleCanvasGroup.blocksRaycasts = !nextVisible;
-        }
+    private void HandleSettingsPanelVisibilityChanged(bool settingsVisible)
+    {
+        ApplySettingsOverlayState(settingsVisible);
+    }
+
+    private void ApplySettingsOverlayState(bool settingsVisible)
+    {
+        if (titleCanvasGroup == null)
+            return;
+
+        bool titleInteractive = !settingsVisible;
+        titleCanvasGroup.interactable = titleInteractive;
+        titleCanvasGroup.blocksRaycasts = titleInteractive;
     }
 
     private void EnsureSettingsPanel()
     {
         if (settingsPanel != null)
+        {
+            settingsPanel.VisibilityChanged -= HandleSettingsPanelVisibilityChanged;
+            settingsPanel.VisibilityChanged += HandleSettingsPanelVisibilityChanged;
             return;
+        }
 
         BootWorldSettingsPanel existing = FindFirstObjectByType<BootWorldSettingsPanel>();
         if (existing != null)
         {
             settingsPanel = existing;
             settingsPanel.Initialize();
+            settingsPanel.VisibilityChanged -= HandleSettingsPanelVisibilityChanged;
+            settingsPanel.VisibilityChanged += HandleSettingsPanelVisibilityChanged;
             settingsPanel.Show(false);
             return;
         }
@@ -623,6 +647,7 @@ public sealed class BootWorldStateController : MonoBehaviour
         go.transform.SetParent(transform, false);
         settingsPanel = go.AddComponent<BootWorldSettingsPanel>();
         settingsPanel.Initialize();
+        settingsPanel.VisibilityChanged += HandleSettingsPanelVisibilityChanged;
         settingsPanel.Show(false);
     }
 

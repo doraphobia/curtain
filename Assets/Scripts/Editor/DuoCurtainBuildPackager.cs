@@ -3,21 +3,24 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Curtain.Editor;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
+using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace DuoCurtain.Editor
 {
     public sealed class DuoCurtainBuildPackager : EditorWindow
     {
         private const string WindowTitle = "Duo Curtain Build Packager";
-        private const string OutputRootFolder = "Builds";
-        private const string StagingFolderName = ".BuildStaging";
-        private const string ArchiveFolderName = "Archive";
+        private const string OutputRootFolder = DuoCurtainBuildArchiveService.OutputRootFolder;
+        private const string StagingFolderName = DuoCurtainBuildArchiveService.StagingFolderName;
         private const string AppName = "Curtain";
         private const string CommandLinePlatformsArg = "-duoCurtainPlatforms";
         private const string CommandLineDevelopmentArg = "-duoCurtainDevelopment";
+        private const BuildOptions ReliabilityBuildOptions = BuildOptions.CleanBuildCache;
 
         private bool buildMac = true;
         private bool buildWindows;
@@ -75,7 +78,8 @@ namespace DuoCurtain.Editor
         {
             EditorGUILayout.LabelField("Output", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Builds are staged first, then copied into Builds/Curtain_Mac, Builds/Curtain_Windows, and Builds/Curtain_Web. Existing package contents are moved to Archive/yyyyMMdd_HHmmss before the new build is published.",
+                "Builds are staged first, then copied into Builds/Curtain_Mac, Builds/Curtain_Windows, and Builds/Curtain_Web. " +
+                "Existing package contents are archived with git metadata, then trimmed to the retention limit configured in Curtain Dashboard → Builds.",
                 MessageType.Info);
 
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
@@ -159,6 +163,9 @@ namespace DuoCurtain.Editor
             string stagingRoot = Path.Combine(outputRoot, StagingFolderName);
             Directory.CreateDirectory(outputRoot);
 
+            options = NormalizeBuildOptions(options);
+            EnsureReadyForBuild();
+
             try
             {
                 for (int i = 0; i < specs.Count; i++)
@@ -179,6 +186,61 @@ namespace DuoCurtain.Editor
                     FileUtil.DeleteFileOrDirectory(stagingRoot);
                 AssetDatabase.Refresh();
             }
+        }
+
+        private static void EnsureReadyForBuild()
+        {
+            AssetDatabase.Refresh();
+            CurtainSettingsBundleInstaller.EnsureBundle();
+            WaitForCompilationToFinish();
+
+            if (EditorUtility.scriptCompilationFailed)
+                throw new InvalidOperationException("Fix script compilation errors before building.");
+
+            SaveEnabledBuildScenes();
+        }
+
+        private static void SaveEnabledBuildScenes()
+        {
+            string[] scenes = GetEnabledScenes();
+            if (scenes.Length == 0)
+                return;
+
+            SceneSetup[] previousSetup = EditorSceneManager.GetSceneManagerSetup();
+            try
+            {
+                for (int i = 0; i < scenes.Length; i++)
+                {
+                    string scenePath = scenes[i];
+                    if (string.IsNullOrEmpty(scenePath) || !File.Exists(scenePath))
+                        continue;
+
+                    Scene scene = EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
+                    if (!scene.IsValid())
+                        continue;
+
+                    EditorSceneManager.MarkSceneDirty(scene);
+                    if (!EditorSceneManager.SaveScene(scene))
+                        throw new InvalidOperationException("Failed to save scene before build: " + scenePath);
+
+                    LogInfo("[DuoCurtainBuildPackager] Saved build scene: " + ToProjectRelativePath(scenePath));
+                }
+            }
+            finally
+            {
+                if (previousSetup != null && previousSetup.Length > 0)
+                    EditorSceneManager.RestoreSceneManagerSetup(previousSetup);
+            }
+        }
+
+        private static void WaitForCompilationToFinish()
+        {
+            const int maxAttempts = 300;
+            for (int attempt = 0; attempt < maxAttempts && EditorApplication.isCompiling; attempt++)
+                System.Threading.Thread.Sleep(100);
+
+            if (EditorApplication.isCompiling)
+                throw new InvalidOperationException("Script compilation did not finish before build.");
         }
 
         private static void BuildSinglePlatform(
@@ -225,63 +287,66 @@ namespace DuoCurtain.Editor
             }
 
             string platformOutputRoot = Path.Combine(outputRoot, spec.folderName);
-            ArchiveExistingBuild(platformOutputRoot);
-            PublishStagedBuild(platformStagingRoot, platformOutputRoot);
+            DuoCurtainBuildArchiveService.ArchiveExistingBuild(
+                platformOutputRoot,
+                spec.platform.ToString(),
+                spec.displayName);
+            int publishedCount = PublishStagedBuild(platformStagingRoot, platformOutputRoot);
+            ValidatePublishedBuild(spec, platformOutputRoot);
+
+            bool isDevelopmentBuild = (options & BuildOptions.Development) != 0;
+            DuoCurtainBuildArchiveService.WriteLatestManifest(
+                platformOutputRoot,
+                spec.platform.ToString(),
+                spec.displayName,
+                isDevelopmentBuild);
 
             LogInfo(
                 "[DuoCurtainBuildPackager] Published " + spec.displayName +
-                " build to " + ToProjectRelativePath(platformOutputRoot) + ".");
+                " build to " + ToProjectRelativePath(platformOutputRoot) +
+                " with " + publishedCount + " shipping artifact(s).");
         }
 
-        private static void ArchiveExistingBuild(string platformOutputRoot)
-        {
-            if (!Directory.Exists(platformOutputRoot))
-            {
-                Directory.CreateDirectory(platformOutputRoot);
-                return;
-            }
-
-            string[] entries = Directory.GetFileSystemEntries(platformOutputRoot)
-                .Where(path =>
-                {
-                    string name = Path.GetFileName(path);
-                    return !string.Equals(name, ArchiveFolderName, StringComparison.OrdinalIgnoreCase) &&
-                           !string.Equals(name, ".DS_Store", StringComparison.OrdinalIgnoreCase);
-                })
-                .ToArray();
-            if (entries.Length == 0)
-                return;
-
-            string archiveRoot = Path.Combine(platformOutputRoot, ArchiveFolderName);
-            Directory.CreateDirectory(archiveRoot);
-
-            string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-            string archiveFolder = GetUniquePath(Path.Combine(archiveRoot, timestamp));
-            Directory.CreateDirectory(archiveFolder);
-
-            for (int i = 0; i < entries.Length; i++)
-            {
-                string destination = GetUniquePath(Path.Combine(archiveFolder, Path.GetFileName(entries[i])));
-                FileUtil.MoveFileOrDirectory(entries[i], destination);
-            }
-
-            LogInfo("[DuoCurtainBuildPackager] Archived previous build to " + ToProjectRelativePath(archiveFolder) + ".");
-        }
-
-        private static void PublishStagedBuild(string platformStagingRoot, string platformOutputRoot)
+        private static int PublishStagedBuild(string platformStagingRoot, string platformOutputRoot)
         {
             Directory.CreateDirectory(platformOutputRoot);
             string[] stagedEntries = Directory.GetFileSystemEntries(platformStagingRoot);
             if (stagedEntries.Length == 0)
                 throw new InvalidOperationException("Build staging folder is empty: " + platformStagingRoot);
 
+            int publishedCount = 0;
             for (int i = 0; i < stagedEntries.Length; i++)
             {
-                string destination = Path.Combine(platformOutputRoot, Path.GetFileName(stagedEntries[i]));
+                string entryName = Path.GetFileName(stagedEntries[i]);
+                if (ShouldSkipPublishedEntry(entryName))
+                {
+                    LogInfo("[DuoCurtainBuildPackager] Skipping non-shipping artifact: " + entryName);
+                    continue;
+                }
+
+                string destination = Path.Combine(platformOutputRoot, entryName);
                 if (File.Exists(destination) || Directory.Exists(destination))
                     FileUtil.DeleteFileOrDirectory(destination);
                 FileUtil.MoveFileOrDirectory(stagedEntries[i], destination);
+                publishedCount++;
             }
+
+            if (publishedCount == 0)
+            {
+                throw new InvalidOperationException(
+                    "No shipping build artifacts were published from staging: " + platformStagingRoot);
+            }
+
+            return publishedCount;
+        }
+
+        private static bool ShouldSkipPublishedEntry(string entryName)
+        {
+            if (string.IsNullOrEmpty(entryName))
+                return true;
+
+            return entryName.Contains("DoNotShip", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(entryName, ".DS_Store", StringComparison.OrdinalIgnoreCase);
         }
 
         private static string[] GetEnabledScenes()
@@ -324,6 +389,77 @@ namespace DuoCurtain.Editor
         private BuildOptions GetBuildOptions()
         {
             return developmentBuild ? BuildOptions.Development : BuildOptions.None;
+        }
+
+        private static BuildOptions NormalizeBuildOptions(BuildOptions options)
+        {
+            BuildOptions normalized = options | ReliabilityBuildOptions;
+            if ((normalized & BuildOptions.CleanBuildCache) != 0)
+                LogInfo("[DuoCurtainBuildPackager] Clean build cache is enabled for packaged builds.");
+            return normalized;
+        }
+
+        private static void ValidatePublishedBuild(PlatformSpec spec, string platformOutputRoot)
+        {
+            switch (spec.platform)
+            {
+                case PackagedPlatform.Mac:
+                    ValidatePublishedMacBuild(platformOutputRoot);
+                    break;
+                case PackagedPlatform.Windows:
+                    ValidateRequiredFile(
+                        Path.Combine(platformOutputRoot, AppName + "_Windows.exe"),
+                        1024,
+                        "Windows executable");
+                    ValidateRequiredDirectory(
+                        Path.Combine(platformOutputRoot, AppName + "_Windows_Data"),
+                        "Windows Data folder");
+                    break;
+                case PackagedPlatform.WebGL:
+                    ValidateRequiredFile(
+                        Path.Combine(platformOutputRoot, "index.html"),
+                        1,
+                        "WebGL index.html");
+                    ValidateRequiredDirectory(
+                        Path.Combine(platformOutputRoot, "Build"),
+                        "WebGL Build folder");
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(spec.platform), spec.platform, null);
+            }
+        }
+
+        private static void ValidatePublishedMacBuild(string platformOutputRoot)
+        {
+            string appRoot = Path.Combine(platformOutputRoot, AppName + "_Mac.app");
+            ValidateRequiredDirectory(appRoot, "Mac app bundle");
+
+            string dataRoot = Path.Combine(appRoot, "Contents", "Resources", "Data");
+            ValidateRequiredDirectory(dataRoot, "Mac player Data folder");
+            ValidateRequiredFile(Path.Combine(dataRoot, "globalgamemanagers"), 1024, "Mac globalgamemanagers");
+            ValidateRequiredFile(Path.Combine(dataRoot, "globalgamemanagers.assets"), 1024, "Mac globalgamemanagers.assets");
+            ValidateRequiredFile(Path.Combine(dataRoot, "level0"), 1024, "Mac level0");
+            ValidateRequiredFile(Path.Combine(dataRoot, "resources.assets"), 1024, "Mac resources.assets");
+            ValidateRequiredFile(Path.Combine(dataRoot, "sharedassets0.assets"), 1024, "Mac sharedassets0.assets");
+        }
+
+        private static void ValidateRequiredDirectory(string path, string label)
+        {
+            if (!Directory.Exists(path))
+                throw new InvalidOperationException(label + " is missing after publish: " + path);
+        }
+
+        private static void ValidateRequiredFile(string path, long minimumBytes, string label)
+        {
+            if (!File.Exists(path))
+                throw new InvalidOperationException(label + " is missing after publish: " + path);
+
+            FileInfo fileInfo = new FileInfo(path);
+            if (fileInfo.Length < minimumBytes)
+            {
+                throw new InvalidOperationException(
+                    label + " is too small after publish (" + fileInfo.Length + " bytes): " + path);
+            }
         }
 
         private static bool TryParsePlatform(string value, out PackagedPlatform platform)
@@ -384,24 +520,6 @@ namespace DuoCurtain.Editor
                 default:
                     throw new ArgumentOutOfRangeException(nameof(platform), platform, null);
             }
-        }
-
-        private static string GetUniquePath(string path)
-        {
-            if (!File.Exists(path) && !Directory.Exists(path))
-                return path;
-
-            string directory = Path.GetDirectoryName(path);
-            string fileName = Path.GetFileNameWithoutExtension(path);
-            string extension = Path.GetExtension(path);
-            for (int i = 1; i < 1000; i++)
-            {
-                string candidate = Path.Combine(directory, fileName + "_" + i + extension);
-                if (!File.Exists(candidate) && !Directory.Exists(candidate))
-                    return candidate;
-            }
-
-            throw new IOException("Unable to create a unique path for " + path + ".");
         }
 
         private static string ToProjectRelativePath(string fullPath)

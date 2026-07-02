@@ -3,6 +3,7 @@ using TMPro;
 using Curtain.Settings;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 namespace DuoCurtain.RuntimeTileMesh
@@ -21,8 +22,6 @@ namespace DuoCurtain.RuntimeTileMesh
         public FusionGameModeController gameModeController;
         public TimeCounterUI currencySource;
         public Camera blurSourceCamera;
-        [Tooltip("Optional. If assigned, this controller reads tuning values from the Dashboard settings asset.")]
-        public SanitySettings settings;
 
         [Header("Sanity")]
         [Min(1f)]
@@ -91,6 +90,11 @@ namespace DuoCurtain.RuntimeTileMesh
         public int deathBlurRadius = 6;
         [Range(1, 4)]
         public int deathBlurIterations = 2;
+
+        [Header("Dashboard Settings")]
+        [Tooltip("Optional. If assigned, this controller reads tuning values from the Dashboard settings asset.")]
+        [FormerlySerializedAs("settings")]
+        public SanitySettings settings;
 
         private float currentSanity;
         private bool initialized;
@@ -181,24 +185,25 @@ namespace DuoCurtain.RuntimeTileMesh
 
         private void ApplySettingsIfPresent()
         {
-            if (settings == null)
+            SanitySettings source = CurtainSettingsLocator.Resolve(settings);
+            if (source == null)
                 return;
 
-            maxSanity = settings.maxSanity;
-            startSanity = settings.startSanity;
-            nightOutdoorDrainPerSecond = settings.nightOutdoorDrainPerSecond;
-            nightIndoorRecoveryPerSecond = settings.nightIndoorRecoveryPerSecond;
-            dayIndoorRecoveryPerSecond = settings.dayIndoorRecoveryPerSecond;
-            dayOutdoorRecoveryPerSecond = settings.dayOutdoorRecoveryPerSecond;
-            enemyTouchDamage = settings.enemyTouchDamage;
-            windowDetectionDamage = settings.windowDetectionDamage;
+            maxSanity = source.maxSanity;
+            startSanity = source.startSanity;
+            nightOutdoorDrainPerSecond = source.nightOutdoorDrainPerSecond;
+            nightIndoorRecoveryPerSecond = source.nightIndoorRecoveryPerSecond;
+            dayIndoorRecoveryPerSecond = source.dayIndoorRecoveryPerSecond;
+            dayOutdoorRecoveryPerSecond = source.dayOutdoorRecoveryPerSecond;
+            enemyTouchDamage = source.enemyTouchDamage;
+            windowDetectionDamage = source.windowDetectionDamage;
 
-            freezeOnDeath = settings.freezeOnDeath;
-            deathTint = settings.deathTint;
-            deathFadeDuration = settings.deathFadeDuration;
-            deathBlurDownsample = settings.deathBlurDownsample;
-            deathBlurRadius = settings.deathBlurRadius;
-            deathBlurIterations = settings.deathBlurIterations;
+            freezeOnDeath = source.freezeOnDeath;
+            deathTint = source.deathTint;
+            deathFadeDuration = source.deathFadeDuration;
+            deathBlurDownsample = source.deathBlurDownsample;
+            deathBlurRadius = source.deathBlurRadius;
+            deathBlurIterations = source.deathBlurIterations;
         }
 
         public void DrainSanity(float amount)
