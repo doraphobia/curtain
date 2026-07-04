@@ -569,6 +569,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                     expectedDoorCenter: Vector2.zero);
 
                 failures += ExpectDoorWallSpanExtendsAfterLaterMerge(sandbox, cleanup);
+                failures += ExpectDoorWallSpanIgnoresExteriorBoundaryExtension(sandbox, cleanup);
             }
             finally
             {
@@ -652,6 +653,82 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
                 if (!sandbox.TryBlockDoorMovement(new Vector3(20.75f, 3.5f, 0f), new Vector3(21.25f, 3.5f, 0f), 0.05f))
                 {
                     Debug.LogError("[RuntimeTileMeshSelfTest] Door span extension expected the extended upper wall segment to block movement.");
+                    failures++;
+                }
+            }
+
+            return failures;
+        }
+
+        private static int ExpectDoorWallSpanIgnoresExteriorBoundaryExtension(
+            RuntimeTileMeshFusionSandbox sandbox,
+            List<GameObject> cleanup)
+        {
+            RuntimeTileMeshDraggableBlock survivor = CreateSelfTestBlock(
+                "Door Span Exterior Boundary Survivor",
+                new[]
+                {
+                    CreateBlockSpec(new Vector2Int(30, 0)),
+                    CreateBlockSpec(new Vector2Int(30, 1)),
+                    CreateBlockSpec(new Vector2Int(30, 2))
+                },
+                cleanup);
+            RuntimeTileMeshDraggableBlock candidate = CreateSelfTestBlock(
+                "Door Span Exterior Boundary Candidate",
+                new[]
+                {
+                    CreateBlockSpec(new Vector2Int(31, 0)),
+                    CreateBlockSpec(new Vector2Int(31, 1)),
+                    CreateBlockSpec(new Vector2Int(31, 2)),
+                    CreateBlockSpec(new Vector2Int(32, 0)),
+                    CreateBlockSpec(new Vector2Int(32, 1)),
+                    CreateBlockSpec(new Vector2Int(32, 2))
+                },
+                cleanup);
+
+            List<RuntimeTileMeshDraggableBlock> blocks = new List<RuntimeTileMeshDraggableBlock> { survivor, candidate };
+            sandbox.MergeConnectedBlocks(survivor, blocks);
+
+            RuntimeTileMeshFusionDoor[] doors = survivor.GetComponentsInChildren<RuntimeTileMeshFusionDoor>(true);
+            if (doors.Length != 1)
+            {
+                Debug.LogError("[RuntimeTileMeshSelfTest] Door exterior-boundary filtering expected one initial door, got " + doors.Length + ".");
+                return 1;
+            }
+
+            RuntimeTileMeshDraggableBlock exteriorOnlyExtension = CreateSelfTestBlock(
+                "Door Span Exterior Boundary Later Merge",
+                new[]
+                {
+                    CreateBlockSpec(new Vector2Int(30, 3))
+                },
+                cleanup);
+
+            blocks = new List<RuntimeTileMeshDraggableBlock> { survivor, exteriorOnlyExtension };
+            sandbox.MergeConnectedBlocks(survivor, blocks);
+            doors = survivor.GetComponentsInChildren<RuntimeTileMeshFusionDoor>(true);
+
+            int failures = 0;
+            if (doors.Length != 1)
+            {
+                Debug.LogError("[RuntimeTileMeshSelfTest] Door exterior-boundary filtering should preserve the original door count, got " + doors.Length + ".");
+                failures++;
+            }
+
+            if (doors.Length > 0)
+            {
+                RuntimeTileMeshFusionDoor door = doors[0];
+                if (door.wallVariableStart != 0 || door.wallCellLength != 3 || door.doorVariableOffset != 1)
+                {
+                    Debug.LogError(
+                        "[RuntimeTileMeshSelfTest] Door exterior-boundary filtering expected wall start 0, length 3, door offset 1; got start " +
+                        door.wallVariableStart + ", length " + door.wallCellLength + ", offset " + door.doorVariableOffset + ".");
+                    failures++;
+                }
+
+                if (sandbox.TryBlockDoorMovement(new Vector3(30.75f, 3.5f, 0f), new Vector3(31.25f, 3.5f, 0f), 0.05f))
+                {
+                    Debug.LogError("[RuntimeTileMeshSelfTest] Door exterior-boundary filtering expected the one-sided exterior edge not to become an interior wall blocker.");
                     failures++;
                 }
             }

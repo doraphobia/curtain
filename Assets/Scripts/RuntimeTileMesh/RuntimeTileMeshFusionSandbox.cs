@@ -93,6 +93,10 @@ namespace DuoCurtain.RuntimeTileMesh
         public Vector2Int sceneGridHalfExtents = new Vector2Int(12, 7);
         public Color sceneGridColor = new Color(0.45f, 0.45f, 0.5f, 0.35f);
 
+        [Header("Exterior Boundary Debug")]
+        public bool drawExteriorBoundaryGizmos;
+        public Color exteriorBoundaryGizmoColor = new Color(0.22f, 0.7f, 1f, 0.85f);
+
         [Header("Runtime Grid Overlay")]
         public bool renderRuntimeGridInGame = true;
         public bool disableLegacyRuntimeGridOverlay = true;
@@ -2385,30 +2389,89 @@ namespace DuoCurtain.RuntimeTileMesh
 
         void OnDrawGizmos()
         {
-            if (!drawSceneGrid)
+            float safeGridSize = Mathf.Max(0.0001f, Mathf.Abs(gridSize));
+            if (drawSceneGrid)
+            {
+                Gizmos.color = sceneGridColor;
+
+                int minX = -Mathf.Abs(sceneGridHalfExtents.x);
+                int maxX = Mathf.Abs(sceneGridHalfExtents.x);
+                int minY = -Mathf.Abs(sceneGridHalfExtents.y);
+                int maxY = Mathf.Abs(sceneGridHalfExtents.y);
+
+                for (int x = minX; x <= maxX; x++)
+                {
+                    Vector3 a = new Vector3(gridOrigin.x + x * safeGridSize, gridOrigin.y + minY * safeGridSize, 0f);
+                    Vector3 b = new Vector3(gridOrigin.x + x * safeGridSize, gridOrigin.y + maxY * safeGridSize, 0f);
+                    Gizmos.DrawLine(a, b);
+                }
+
+                for (int y = minY; y <= maxY; y++)
+                {
+                    Vector3 a = new Vector3(gridOrigin.x + minX * safeGridSize, gridOrigin.y + y * safeGridSize, 0f);
+                    Vector3 b = new Vector3(gridOrigin.x + maxX * safeGridSize, gridOrigin.y + y * safeGridSize, 0f);
+                    Gizmos.DrawLine(a, b);
+                }
+            }
+
+            if (drawExteriorBoundaryGizmos)
+                DrawExteriorBoundaryGizmos(safeGridSize);
+        }
+
+        private void DrawExteriorBoundaryGizmos(float safeGridSize)
+        {
+            RuntimeTileMeshDraggableBlock[] foundBlocks =
+                FindObjectsByType<RuntimeTileMeshDraggableBlock>(FindObjectsSortMode.None);
+            if (foundBlocks == null || foundBlocks.Length == 0)
                 return;
 
-            float safeGridSize = Mathf.Max(0.0001f, Mathf.Abs(gridSize));
-            Gizmos.color = sceneGridColor;
-
-            int minX = -Mathf.Abs(sceneGridHalfExtents.x);
-            int maxX = Mathf.Abs(sceneGridHalfExtents.x);
-            int minY = -Mathf.Abs(sceneGridHalfExtents.y);
-            int maxY = Mathf.Abs(sceneGridHalfExtents.y);
-
-            for (int x = minX; x <= maxX; x++)
+            Gizmos.color = exteriorBoundaryGizmoColor;
+            for (int i = 0; i < foundBlocks.Length; i++)
             {
-                Vector3 a = new Vector3(gridOrigin.x + x * safeGridSize, gridOrigin.y + minY * safeGridSize, 0f);
-                Vector3 b = new Vector3(gridOrigin.x + x * safeGridSize, gridOrigin.y + maxY * safeGridSize, 0f);
-                Gizmos.DrawLine(a, b);
+                RuntimeTileMeshDraggableBlock block = foundBlocks[i];
+                if (block == null || !block.isActiveAndEnabled)
+                    continue;
+
+                HashSet<Vector2Int> blockCells = block.GetWorldCells(safeGridSize, gridOrigin);
+                foreach (Vector2Int cell in blockCells)
+                {
+                    DrawExteriorBoundaryGizmoIfExterior(blockCells, cell, Vector2Int.right, safeGridSize);
+                    DrawExteriorBoundaryGizmoIfExterior(blockCells, cell, Vector2Int.left, safeGridSize);
+                    DrawExteriorBoundaryGizmoIfExterior(blockCells, cell, Vector2Int.up, safeGridSize);
+                    DrawExteriorBoundaryGizmoIfExterior(blockCells, cell, Vector2Int.down, safeGridSize);
+                }
+            }
+        }
+
+        private void DrawExteriorBoundaryGizmoIfExterior(
+            HashSet<Vector2Int> blockCells,
+            Vector2Int cell,
+            Vector2Int neighborOffset,
+            float safeGridSize)
+        {
+            if (blockCells == null || blockCells.Contains(cell + neighborOffset))
+                return;
+
+            Vector3 start;
+            Vector3 end;
+            if (neighborOffset.x != 0)
+            {
+                int edgeX = neighborOffset.x > 0 ? cell.x + 1 : cell.x;
+                float x = gridOrigin.x + edgeX * safeGridSize;
+                float y = gridOrigin.y + cell.y * safeGridSize;
+                start = new Vector3(x, y, 0f);
+                end = new Vector3(x, y + safeGridSize, 0f);
+            }
+            else
+            {
+                int edgeY = neighborOffset.y > 0 ? cell.y + 1 : cell.y;
+                float x = gridOrigin.x + cell.x * safeGridSize;
+                float y = gridOrigin.y + edgeY * safeGridSize;
+                start = new Vector3(x, y, 0f);
+                end = new Vector3(x + safeGridSize, y, 0f);
             }
 
-            for (int y = minY; y <= maxY; y++)
-            {
-                Vector3 a = new Vector3(gridOrigin.x + minX * safeGridSize, gridOrigin.y + y * safeGridSize, 0f);
-                Vector3 b = new Vector3(gridOrigin.x + maxX * safeGridSize, gridOrigin.y + y * safeGridSize, 0f);
-                Gizmos.DrawLine(a, b);
-            }
+            Gizmos.DrawLine(start, end);
         }
 
         private struct SharedEdgeSegment

@@ -27,6 +27,12 @@ namespace DuoCurtain.RuntimeTileMesh
             Positive
         }
 
+        public enum DoorWallSupportMode
+        {
+            InteriorMergedEdge,
+            ExteriorBoundaryAttachment
+        }
+
         [Header("Door")]
         public DoorAxis axis = DoorAxis.Vertical;
         public Vector2 seamCenter = Vector2.zero;
@@ -71,6 +77,7 @@ namespace DuoCurtain.RuntimeTileMesh
         [Min(0.01f)] public float combatProgressSmoothSpeed = 8f;
 
         [Header("Wall Edge")]
+        public DoorWallSupportMode wallSupportMode = DoorWallSupportMode.InteriorMergedEdge;
         public int wallEdgeCoordinate;
         public int wallVariableStart;
         [Min(1)]
@@ -130,6 +137,7 @@ namespace DuoCurtain.RuntimeTileMesh
         private bool isWobbling;
         private readonly HashSet<int> supportedWallVariables = new HashSet<int>();
         private readonly Dictionary<int, Vector2> wallVisualOffsetsByVariable = new Dictionary<int, Vector2>();
+        private bool wallSupportInitialized;
 
         public bool IsOpen => isOpen;
         public bool IsDestroyed => isDestroyed || (combatHealth != null && combatHealth.IsDestroyed);
@@ -145,7 +153,7 @@ namespace DuoCurtain.RuntimeTileMesh
         void Awake()
         {
             ApplySettingsIfPresent();
-            if (supportedWallVariables.Count == 0)
+            if (!wallSupportInitialized)
                 CacheDefaultWallSupport();
 
             currentOpenAmount = isOpen ? 1f : 0f;
@@ -245,7 +253,7 @@ namespace DuoCurtain.RuntimeTileMesh
 
             if (Application.isPlaying && panelTransform != null)
             {
-                if (supportedWallVariables.Count == 0)
+                if (!wallSupportInitialized)
                     CacheDefaultWallSupport();
 
                 if (!isAnimating && !isWobbling)
@@ -310,6 +318,7 @@ namespace DuoCurtain.RuntimeTileMesh
             wallVariableStart = variableStart;
             wallCellLength = Mathf.Max(1, edgeCellLength);
             doorVariableOffset = Mathf.Clamp(wallCellLength / 2, 0, wallCellLength - 1);
+            wallSupportMode = DoorWallSupportMode.InteriorMergedEdge;
             wallVisualPrefab = customWallVisualPrefab;
             wallColor = debugWallColor;
             wallLineWidth = Mathf.Max(0.005f, debugWallLineWidth);
@@ -332,6 +341,7 @@ namespace DuoCurtain.RuntimeTileMesh
 
         public void ConfigureExteriorSwing(Vector2 outwardNormal)
         {
+            wallSupportMode = DoorWallSupportMode.ExteriorBoundaryAttachment;
             Vector2 inward = outwardNormal.sqrMagnitude > 0.0001f
                 ? -outwardNormal.normalized
                 : Vector2.zero;
@@ -387,8 +397,12 @@ namespace DuoCurtain.RuntimeTileMesh
 
         public void RefreshWallSpanFromCells(ICollection<Vector2Int> blockCells)
         {
-            if (!includeWallVisual)
+            if (wallSupportMode != DoorWallSupportMode.InteriorMergedEdge)
+            {
+                if (!wallSupportInitialized)
+                    CacheDefaultWallSupport();
                 return;
+            }
 
             if (blockCells == null || blockCells.Count == 0)
                 return;
@@ -397,19 +411,31 @@ namespace DuoCurtain.RuntimeTileMesh
             if (!TryGetExpandedWallSpan(
                     blockCells,
                     doorVariable,
+                    requireInteriorEdge: true,
                     out int expandedStart,
                     out int expandedLength,
                     out Dictionary<int, Vector2> visualOffsets))
             {
+                ClearWallSupportAndRefresh();
                 return;
             }
 
             int expandedOffset = doorVariable - expandedStart;
             if (expandedOffset < 0 || expandedOffset >= expandedLength)
+            {
+                ClearWallSupportAndRefresh();
                 return;
+            }
+
+            if (visualOffsets.Count == 0)
+            {
+                ClearWallSupportAndRefresh();
+                return;
+            }
 
             supportedWallVariables.Clear();
             wallVisualOffsetsByVariable.Clear();
+            wallSupportInitialized = true;
             foreach (KeyValuePair<int, Vector2> pair in visualOffsets)
             {
                 supportedWallVariables.Add(pair.Key);
@@ -620,7 +646,7 @@ namespace DuoCurtain.RuntimeTileMesh
             for (int i = 0; i < wallCellLength; i++)
             {
                 int variable = wallVariableStart + i;
-                if (supportedWallVariables.Count > 0 && !supportedWallVariables.Contains(variable))
+                if (!IsWallVariableSupported(variable))
                     continue;
 
                 Vector2 start;
@@ -651,7 +677,7 @@ namespace DuoCurtain.RuntimeTileMesh
                 return;
 
             int variable = wallVariableStart + doorVariableOffset;
-            if (supportedWallVariables.Count > 0 && !supportedWallVariables.Contains(variable))
+            if (!IsWallVariableSupported(variable))
                 return;
 
             float safeGridSize = Mathf.Max(0.0001f, Mathf.Abs(gridSize));
@@ -992,8 +1018,7 @@ namespace DuoCurtain.RuntimeTileMesh
             }
 
             segmentIndex = Mathf.Clamp(Mathf.FloorToInt(local / safeGridSize), 0, wallCellLength - 1);
-            if (supportedWallVariables.Count > 0 &&
-                !supportedWallVariables.Contains(wallVariableStart + segmentIndex))
+            if (!IsWallVariableSupported(wallVariableStart + segmentIndex))
             {
                 segmentIndex = -1;
                 return false;
@@ -1523,6 +1548,7 @@ namespace DuoCurtain.RuntimeTileMesh
         {
             supportedWallVariables.Clear();
             wallVisualOffsetsByVariable.Clear();
+            wallSupportInitialized = true;
             for (int i = 0; i < wallCellLength; i++)
             {
                 int variable = wallVariableStart + i;
@@ -1531,23 +1557,41 @@ namespace DuoCurtain.RuntimeTileMesh
             }
         }
 
+        private void ClearWallSupportAndRefresh()
+        {
+            supportedWallVariables.Clear();
+            wallVisualOffsetsByVariable.Clear();
+            wallSupportInitialized = true;
+            RebuildWallVisual();
+            ApplyVisualState();
+            MarkVisibilityDirty();
+        }
+
+        private bool IsWallVariableSupported(int variable)
+        {
+            if (!wallSupportInitialized)
+                return variable >= wallVariableStart &&
+                       variable < wallVariableStart + wallCellLength;
+
+            return supportedWallVariables.Contains(variable);
+        }
+
         private bool TryGetWallVisualOffset(int variable, out Vector2 visualOffset)
         {
             if (wallVisualOffsetsByVariable.TryGetValue(variable, out visualOffset))
                 return true;
 
-            if (supportedWallVariables.Count > 0 && !supportedWallVariables.Contains(variable))
+            if (!IsWallVariableSupported(variable))
                 return false;
 
             visualOffset = Vector2.zero;
-            return supportedWallVariables.Count == 0 ||
-                   variable >= wallVariableStart &&
-                   variable < wallVariableStart + wallCellLength;
+            return true;
         }
 
         private bool TryGetExpandedWallSpan(
             ICollection<Vector2Int> blockCells,
             int doorVariable,
+            bool requireInteriorEdge,
             out int start,
             out int length,
             out Dictionary<int, Vector2> visualOffsets)
@@ -1557,20 +1601,20 @@ namespace DuoCurtain.RuntimeTileMesh
             visualOffsets = new Dictionary<int, Vector2>();
 
             HashSet<Vector2Int> cellLookup = blockCells as HashSet<Vector2Int> ?? new HashSet<Vector2Int>(blockCells);
-            if (!TryGetWallLineSegmentSupport(cellLookup, doorVariable, out _))
+            if (!TryGetWallLineSegmentSupport(cellLookup, doorVariable, requireInteriorEdge, out _))
                 return false;
 
             int expandedStart = doorVariable;
-            while (TryGetWallLineSegmentSupport(cellLookup, expandedStart - 1, out _))
+            while (TryGetWallLineSegmentSupport(cellLookup, expandedStart - 1, requireInteriorEdge, out _))
                 expandedStart--;
 
             int expandedEnd = doorVariable + 1;
-            while (TryGetWallLineSegmentSupport(cellLookup, expandedEnd, out _))
+            while (TryGetWallLineSegmentSupport(cellLookup, expandedEnd, requireInteriorEdge, out _))
                 expandedEnd++;
 
             for (int variable = expandedStart; variable < expandedEnd; variable++)
             {
-                if (TryGetWallLineSegmentSupport(cellLookup, variable, out Vector2 visualOffset))
+                if (TryGetWallLineSegmentSupport(cellLookup, variable, requireInteriorEdge, out Vector2 visualOffset))
                     visualOffsets[variable] = visualOffset;
             }
 
@@ -1582,6 +1626,7 @@ namespace DuoCurtain.RuntimeTileMesh
         private bool TryGetWallLineSegmentSupport(
             HashSet<Vector2Int> cellLookup,
             int variable,
+            bool requireInteriorEdge,
             out Vector2 visualOffset)
         {
             visualOffset = Vector2.zero;
@@ -1595,6 +1640,8 @@ namespace DuoCurtain.RuntimeTileMesh
                 bool rightCovered = cellLookup.Contains(new Vector2Int(wallEdgeCoordinate, variable));
                 if (!leftCovered && !rightCovered)
                     return false;
+                if (requireInteriorEdge && leftCovered != rightCovered)
+                    return false;
 
                 if (leftCovered != rightCovered)
                     visualOffset = new Vector2(leftCovered ? -inset : inset, 0f);
@@ -1604,6 +1651,8 @@ namespace DuoCurtain.RuntimeTileMesh
             bool lowerCovered = cellLookup.Contains(new Vector2Int(variable, wallEdgeCoordinate - 1));
             bool upperCovered = cellLookup.Contains(new Vector2Int(variable, wallEdgeCoordinate));
             if (!lowerCovered && !upperCovered)
+                return false;
+            if (requireInteriorEdge && lowerCovered != upperCovered)
                 return false;
 
             if (lowerCovered != upperCovered)
