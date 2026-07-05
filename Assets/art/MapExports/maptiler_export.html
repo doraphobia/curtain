@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MapTiler Export – Pasadena</title>
+  <script src="https://cdn.maptiler.com/maptiler-sdk-js/v3.8.0/maptiler-sdk.umd.min.js"></script>
+  <link href="https://cdn.maptiler.com/maptiler-sdk-js/v3.8.0/maptiler-sdk.css" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #111; color: #eee; }
+    #toolbar {
+      display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+      padding: 12px 16px; background: #1a1a1a; border-bottom: 1px solid #333;
+    }
+    #toolbar label { font-size: 13px; opacity: 0.85; }
+    #toolbar input, #toolbar select, #toolbar button {
+      font: inherit; padding: 6px 10px; border-radius: 6px; border: 1px solid #444; background: #222; color: #fff;
+    }
+    #toolbar button { cursor: pointer; background: #2d6cdf; border-color: #2d6cdf; }
+    #toolbar button:hover { filter: brightness(1.08); }
+    #map { width: 100vw; height: calc(100vh - 56px); }
+    #status { font-size: 12px; opacity: 0.7; margin-left: auto; }
+  </style>
+</head>
+<body>
+  <div id="toolbar">
+    <label>Zoom <input id="zoom" type="number" step="0.01" value="12.74" style="width:72px" /></label>
+    <label>Lon <input id="lon" type="number" step="0.00001" value="-118.15298" style="width:110px" /></label>
+    <label>Lat <input id="lat" type="number" step="0.00001" value="34.15369" style="width:100px" /></label>
+    <label>Export W <input id="width" type="number" value="2400" style="width:80px" /></label>
+    <label>H <input id="height" type="number" value="1600" style="width:80px" /></label>
+    <button id="recenter">Recenter</button>
+    <button id="exportPng">Export PNG</button>
+    <span id="status">Loading map…</span>
+  </div>
+  <div id="map"></div>
+  <script>
+    const API_KEY = "EQSvfoDfiw9AQzbw4ICK";
+    const MAP_ID = "019f32d6-3cfb-7ba2-9719-a6ad7a50035b";
+
+    maptilersdk.config.apiKey = API_KEY;
+
+    const map = new maptilersdk.Map({
+      container: "map",
+      style: `https://api.maptiler.com/maps/${MAP_ID}/style.json?key=${API_KEY}`,
+      center: [-118.15298, 34.15369],
+      zoom: 12.74,
+      preserveDrawingBuffer: true
+    });
+
+    const statusEl = document.getElementById("status");
+
+    map.on("load", () => { statusEl.textContent = "Ready"; });
+    map.on("error", (e) => { statusEl.textContent = "Error: " + (e && e.error ? e.error.message : "unknown"); });
+
+    document.getElementById("recenter").onclick = () => {
+      map.jumpTo({
+        center: [parseFloat(document.getElementById("lon").value), parseFloat(document.getElementById("lat").value)],
+        zoom: parseFloat(document.getElementById("zoom").value)
+      });
+    };
+
+    document.getElementById("exportPng").onclick = async () => {
+      statusEl.textContent = "Exporting…";
+      const exportWidth = Math.min(4096, Math.max(256, parseInt(document.getElementById("width").value, 10) || 2400));
+      const exportHeight = Math.min(4096, Math.max(256, parseInt(document.getElementById("height").value, 10) || 1600));
+      const center = [parseFloat(document.getElementById("lon").value), parseFloat(document.getElementById("lat").value)];
+      const zoom = parseFloat(document.getElementById("zoom").value);
+
+      const offscreen = document.createElement("div");
+      offscreen.style.width = exportWidth + "px";
+      offscreen.style.height = exportHeight + "px";
+      offscreen.style.position = "fixed";
+      offscreen.style.left = "-10000px";
+      document.body.appendChild(offscreen);
+
+      const exportMap = new maptilersdk.Map({
+        container: offscreen,
+        style: `https://api.maptiler.com/maps/${MAP_ID}/style.json?key=${API_KEY}`,
+        center,
+        zoom,
+        preserveDrawingBuffer: true,
+        interactive: false,
+        attributionControl: false
+      });
+
+      exportMap.on("load", () => {
+        exportMap.once("idle", () => {
+          try {
+            const dataUrl = exportMap.getCanvas().toDataURL("image/png");
+            const link = document.createElement("a");
+            link.download = `maptiler_${MAP_ID}_${zoom}.png`;
+            link.href = dataUrl;
+            link.click();
+            statusEl.textContent = `Exported ${exportWidth}x${exportHeight} PNG`;
+          } catch (err) {
+            statusEl.textContent = "Export failed: " + err.message;
+          } finally {
+            exportMap.remove();
+            offscreen.remove();
+          }
+        });
+      });
+    };
+  </script>
+</body>
+</html>

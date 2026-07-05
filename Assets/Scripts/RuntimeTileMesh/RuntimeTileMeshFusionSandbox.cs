@@ -97,6 +97,10 @@ namespace DuoCurtain.RuntimeTileMesh
         public bool drawExteriorBoundaryGizmos;
         public Color exteriorBoundaryGizmoColor = new Color(0.22f, 0.7f, 1f, 0.85f);
 
+        [Header("Exterior Boundary Visual")]
+        public bool renderExteriorBoundaryInGame = true;
+        public ExteriorBoundaryRevealRenderer exteriorBoundaryRenderer;
+
         [Header("Runtime Grid Overlay")]
         public bool renderRuntimeGridInGame = true;
         public bool disableLegacyRuntimeGridOverlay = true;
@@ -167,6 +171,8 @@ namespace DuoCurtain.RuntimeTileMesh
                 MergeAllConnectedBlocks();
 
             MarkVisibilityDirty();
+            EnsureExteriorBoundaryRenderer();
+            RefreshExteriorBoundaryVisual();
         }
 
         void OnEnable()
@@ -341,6 +347,47 @@ namespace DuoCurtain.RuntimeTileMesh
                 if (foundBlocks[i] != null)
                     blocks.Add(foundBlocks[i]);
             }
+        }
+
+        public IReadOnlyList<RuntimeTileMeshDraggableBlock> GetActiveBlocksForBoundaryVisual()
+        {
+            return blocks;
+        }
+
+        public void RefreshExteriorBoundaryVisual()
+        {
+            if (!renderExteriorBoundaryInGame)
+            {
+                if (exteriorBoundaryRenderer != null)
+                    exteriorBoundaryRenderer.ShowInGameView = false;
+                return;
+            }
+
+            EnsureExteriorBoundaryRenderer();
+            if (exteriorBoundaryRenderer == null)
+                return;
+
+            exteriorBoundaryRenderer.ShowInGameView = true;
+            RefreshBlocks();
+            exteriorBoundaryRenderer.Rebuild(blocks);
+        }
+
+        private void EnsureExteriorBoundaryRenderer()
+        {
+            if (exteriorBoundaryRenderer == null)
+                exteriorBoundaryRenderer = GetComponentInChildren<ExteriorBoundaryRevealRenderer>(true);
+
+            if (exteriorBoundaryRenderer == null)
+            {
+                GameObject rendererObject = new GameObject("Exterior Boundary Reveal");
+                rendererObject.transform.SetParent(transform, false);
+                exteriorBoundaryRenderer = rendererObject.AddComponent<ExteriorBoundaryRevealRenderer>();
+            }
+
+            exteriorBoundaryRenderer.BindSandbox(this);
+            ResolvePlayerControl();
+            if (playerControl != null)
+                exteriorBoundaryRenderer.BindPlayer(playerControl.transform);
         }
 
         public void SetManagementInputEnabled(bool enabled)
@@ -578,6 +625,7 @@ namespace DuoCurtain.RuntimeTileMesh
 
             MarkVisibilityDirty();
             BlockPlaced?.Invoke(placed);
+            RefreshExteriorBoundaryVisual();
         }
 
         private void BindPlayerToSelectedBlock(bool allowPlayerCarry)
@@ -701,7 +749,10 @@ namespace DuoCurtain.RuntimeTileMesh
             blocks.Clear();
             blocks.AddRange(activeBlocks);
             if (absorbedTotal > 0)
+            {
                 MarkVisibilityDirty();
+                RefreshExteriorBoundaryVisual();
+            }
             return absorbedTotal;
         }
 
@@ -720,6 +771,7 @@ namespace DuoCurtain.RuntimeTileMesh
                 blocks.Add(placed);
 
             MarkVisibilityDirty();
+            RefreshExteriorBoundaryVisual();
             return absorbed;
         }
 
@@ -841,6 +893,7 @@ namespace DuoCurtain.RuntimeTileMesh
                 Debug.Log("[RuntimeTileMeshFusionSandbox] Merged " + (absorbed + 1) + " block(s) into " + seed.name + " with " + mergedCells.Count + " occupied cell(s).", seed);
 
             MarkVisibilityDirty();
+            RefreshExteriorBoundaryVisual();
             return absorbed;
         }
 
@@ -2425,53 +2478,17 @@ namespace DuoCurtain.RuntimeTileMesh
             if (foundBlocks == null || foundBlocks.Length == 0)
                 return;
 
+            List<ExteriorBoundarySegment> gizmoSegments = new List<ExteriorBoundarySegment>();
+            ExteriorBoundaryExtractor.ExtractFromActiveBlocks(foundBlocks, gridOrigin, safeGridSize, gizmoSegments);
+
             Gizmos.color = exteriorBoundaryGizmoColor;
-            for (int i = 0; i < foundBlocks.Length; i++)
+            for (int i = 0; i < gizmoSegments.Count; i++)
             {
-                RuntimeTileMeshDraggableBlock block = foundBlocks[i];
-                if (block == null || !block.isActiveAndEnabled)
-                    continue;
-
-                HashSet<Vector2Int> blockCells = block.GetWorldCells(safeGridSize, gridOrigin);
-                foreach (Vector2Int cell in blockCells)
-                {
-                    DrawExteriorBoundaryGizmoIfExterior(blockCells, cell, Vector2Int.right, safeGridSize);
-                    DrawExteriorBoundaryGizmoIfExterior(blockCells, cell, Vector2Int.left, safeGridSize);
-                    DrawExteriorBoundaryGizmoIfExterior(blockCells, cell, Vector2Int.up, safeGridSize);
-                    DrawExteriorBoundaryGizmoIfExterior(blockCells, cell, Vector2Int.down, safeGridSize);
-                }
+                ExteriorBoundarySegment segment = gizmoSegments[i];
+                Gizmos.DrawLine(
+                    new Vector3(segment.start.x, segment.start.y, 0f),
+                    new Vector3(segment.end.x, segment.end.y, 0f));
             }
-        }
-
-        private void DrawExteriorBoundaryGizmoIfExterior(
-            HashSet<Vector2Int> blockCells,
-            Vector2Int cell,
-            Vector2Int neighborOffset,
-            float safeGridSize)
-        {
-            if (blockCells == null || blockCells.Contains(cell + neighborOffset))
-                return;
-
-            Vector3 start;
-            Vector3 end;
-            if (neighborOffset.x != 0)
-            {
-                int edgeX = neighborOffset.x > 0 ? cell.x + 1 : cell.x;
-                float x = gridOrigin.x + edgeX * safeGridSize;
-                float y = gridOrigin.y + cell.y * safeGridSize;
-                start = new Vector3(x, y, 0f);
-                end = new Vector3(x, y + safeGridSize, 0f);
-            }
-            else
-            {
-                int edgeY = neighborOffset.y > 0 ? cell.y + 1 : cell.y;
-                float x = gridOrigin.x + cell.x * safeGridSize;
-                float y = gridOrigin.y + edgeY * safeGridSize;
-                start = new Vector3(x, y, 0f);
-                end = new Vector3(x + safeGridSize, y, 0f);
-            }
-
-            Gizmos.DrawLine(start, end);
         }
 
         private struct SharedEdgeSegment
