@@ -2,6 +2,7 @@
 using System;
 using System.IO;
 using System.Text.RegularExpressions;
+using DuoCurtain.Editor;
 using TMPro;
 using UnityEditor;
 using UnityEngine;
@@ -186,7 +187,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             {
                 Debug.LogError(
                     "[CjkUiFontAssetBuilder] No CJK system font found. " +
-                    "Place Hiragino Sans GB.ttc or another CJK font at " + SourceFontPath + ".");
+                    "Place a CJK font at " + SourceFontPath + " or install one in the system font library.");
                 return false;
             }
 
@@ -202,33 +203,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
 
         private static string FindSystemCjkFontPath()
         {
-            string[] candidates =
-            {
-                "Hiragino Sans GB.ttc",
-                "STHeiti Medium.ttc",
-                "PingFang.ttc",
-                "Arial Unicode.ttf"
-            };
-
-            string[] searchRoots =
-            {
-                "/System/Library/Fonts",
-                "/System/Library/Fonts/Supplemental",
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Library/Fonts"),
-                "/Library/Fonts"
-            };
-
-            for (int i = 0; i < candidates.Length; i++)
-            {
-                for (int j = 0; j < searchRoots.Length; j++)
-                {
-                    string path = Path.Combine(searchRoots[j], candidates[i]);
-                    if (File.Exists(path))
-                        return path;
-                }
-            }
-
-            return null;
+            return CrossPlatformEditorUtility.FindSystemCjkFontPath();
         }
 
         private static string preservedFontAssetGuid;

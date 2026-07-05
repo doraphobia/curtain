@@ -425,6 +425,7 @@ namespace DuoCurtain.Editor
                     ValidateRequiredDirectory(
                         Path.Combine(platformOutputRoot, AppName + "_Windows_Data"),
                         "Windows Data folder");
+                    ValidatePublishedWindowsBuild(platformOutputRoot);
                     break;
                 case PackagedPlatform.WebGL:
                     ValidateRequiredFile(
@@ -452,12 +453,27 @@ namespace DuoCurtain.Editor
             ValidateRequiredFile(Path.Combine(dataRoot, "level0"), 1024, "Mac level0");
             ValidateRequiredFile(Path.Combine(dataRoot, "resources.assets"), 1024, "Mac resources.assets");
             ValidateRequiredFile(Path.Combine(dataRoot, "sharedassets0.assets"), 1024, "Mac sharedassets0.assets");
-            SmokeTestMacPlayerBuild(appRoot);
+            if (CrossPlatformEditorUtility.CanRunMacPlayerSmokeTest)
+                SmokeTestMacPlayerBuild(appRoot);
         }
 
-#if UNITY_EDITOR_OSX
+        private static void ValidatePublishedWindowsBuild(string platformOutputRoot)
+        {
+            string executablePath = Path.Combine(platformOutputRoot, AppName + "_Windows.exe");
+            string dataRoot = Path.Combine(platformOutputRoot, AppName + "_Windows_Data");
+            ValidateRequiredFile(Path.Combine(dataRoot, "globalgamemanagers"), 1024, "Windows globalgamemanagers");
+            ValidateRequiredFile(Path.Combine(dataRoot, "globalgamemanagers.assets"), 1024, "Windows globalgamemanagers.assets");
+            ValidateRequiredFile(Path.Combine(dataRoot, "level0"), 1024, "Windows level0");
+            ValidateRequiredFile(Path.Combine(dataRoot, "resources.assets"), 1024, "Windows resources.assets");
+            ValidateRequiredFile(Path.Combine(dataRoot, "sharedassets0.assets"), 1024, "Windows sharedassets0.assets");
+            if (CrossPlatformEditorUtility.CanRunWindowsPlayerSmokeTest)
+                SmokeTestWindowsPlayerBuild(executablePath);
+        }
+
         private static void SmokeTestMacPlayerBuild(string appRoot)
         {
+            if (!CrossPlatformEditorUtility.CanRunMacPlayerSmokeTest)
+                return;
             string playerBinary = Path.Combine(appRoot, "Contents", "MacOS", AppName.ToLowerInvariant());
             if (!File.Exists(playerBinary))
                 throw new InvalidOperationException("Mac player binary is missing after publish: " + playerBinary);
@@ -535,6 +551,83 @@ namespace DuoCurtain.Editor
             LogInfo("[DuoCurtainBuildPackager] Mac player smoke test passed.");
         }
 
+        private static void SmokeTestWindowsPlayerBuild(string executablePath)
+        {
+            if (!CrossPlatformEditorUtility.CanRunWindowsPlayerSmokeTest)
+                return;
+
+            if (!File.Exists(executablePath))
+                throw new InvalidOperationException("Windows player executable is missing after publish: " + executablePath);
+
+            string logPath = Path.Combine(Path.GetTempPath(), "duocurtain_windows_smoke.log");
+            if (File.Exists(logPath))
+                File.Delete(logPath);
+
+            System.Diagnostics.ProcessStartInfo startInfo = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = executablePath,
+                Arguments = "-batchmode -nographics -quit -logFile \"" + logPath + "\"",
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using System.Diagnostics.Process process = System.Diagnostics.Process.Start(startInfo);
+            if (process == null)
+                throw new InvalidOperationException("Failed to launch Windows player smoke test.");
+
+            bool startupValidated = false;
+            DateTime deadline = DateTime.UtcNow.AddSeconds(15);
+            while (DateTime.UtcNow < deadline)
+            {
+                if (process.HasExited)
+                    break;
+
+                if (TryReadSmokeLog(logPath, out string liveLog))
+                {
+                    ThrowIfSmokeLogContainsCorruption(liveLog, logPath);
+                    if (liveLog.IndexOf("UnloadTime:", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        startupValidated = true;
+                        break;
+                    }
+                }
+
+                System.Threading.Thread.Sleep(250);
+            }
+
+            if (startupValidated && !process.HasExited)
+                TryKill(process);
+
+            if (!startupValidated && !process.HasExited)
+            {
+                TryKill(process);
+                throw new InvalidOperationException("Windows player smoke test timed out before player data finished loading.");
+            }
+
+            if (startupValidated)
+            {
+                if (TryReadSmokeLog(logPath, out string validatedLog))
+                    ThrowIfSmokeLogContainsCorruption(validatedLog, logPath);
+
+                LogInfo("[DuoCurtainBuildPackager] Windows player smoke test passed.");
+                return;
+            }
+
+            if (process.ExitCode != 0)
+            {
+                string logTail = ReadTail(logPath, 40);
+                throw new InvalidOperationException(
+                    "Windows player smoke test failed with exit code " + process.ExitCode + ".\n" + logTail);
+            }
+
+            if (!File.Exists(logPath))
+                return;
+
+            string logText = File.ReadAllText(logPath);
+            ThrowIfSmokeLogContainsCorruption(logText, logPath);
+            LogInfo("[DuoCurtainBuildPackager] Windows player smoke test passed.");
+        }
+
         private static bool TryReadSmokeLog(string logPath, out string logText)
         {
             logText = string.Empty;
@@ -560,7 +653,7 @@ namespace DuoCurtain.Editor
                 return;
 
             throw new InvalidOperationException(
-                "Mac player smoke test detected corrupt player data. Re-save RedScene and rebuild.\n" +
+                "Player smoke test detected corrupt player data. Re-save RedScene and rebuild.\n" +
                 ReadTail(logPath, 40));
         }
 
@@ -591,7 +684,6 @@ namespace DuoCurtain.Editor
 
             return builder.ToString();
         }
-#endif
 
         private static void ValidateRequiredDirectory(string path, string label)
         {

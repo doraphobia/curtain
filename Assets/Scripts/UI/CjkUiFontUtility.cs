@@ -20,7 +20,7 @@ public static class CjkUiFontUtility
         "PingFang SC",
         "STHeiti",
         "Heiti SC",
-#elif UNITY_STANDALONE_WIN
+#elif UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
         "Microsoft YaHei",
         "Microsoft YaHei UI",
         "SimHei",

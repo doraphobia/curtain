@@ -21,3 +21,41 @@ Before blocks: 0 | After blocks: 1
 [FusionIntegrity] ManualAudit OK | tiles=8 | Play Session End Audit
 Frame: t=0.000 f=0
 Before blocks: 0 | After blocks: 1
+
+[FusionIntegrity] Play session started at t=0.000 scene=RedScene
+[FusionIntegrity] MergeGroup OK | tiles=8 | MergeGroup -> 1x3 Block (2 blocks, 8 cells)
+Frame: t=25.456 f=6066
+Before blocks: 2 | After blocks: 1
+Tile Accounting:
+  trigger=1x3 Block (3)
+  existingGroupBlocks=1 existingGroupTileSumRaw=5
+  overlapWithinGroup=0
+  expectedUnion=8 actualMerged=8
+  extra=0 missing=0
+  sandboxBefore=23 sandboxAfter=23 outsideGroupBefore=15
+  triggerTiles=[(-6,-1), (-5,-1), (-4,-1)]
+  existingGroupTiles=[(-6,0), (-5,0), (-4,0), (-6,1), (-6,2)]
+  expectedUnionTiles=[(-6,-1), (-5,-1), (-4,-1), (-6,0), (-5,0), (-4,0), (-6,1), (-6,2)]
+
+[FusionIntegrity] MergeGroup OK | tiles=10 | MergeGroup -> Z Block (2 blocks, 10 cells)
+Frame: t=56.857 f=12459
+Before blocks: 2 | After blocks: 1
+Tile Accounting:
+  trigger=Z Block (5)
+  existingGroupBlocks=1 existingGroupTileSumRaw=5
+  overlapWithinGroup=0
+  expectedUnion=10 actualMerged=10
+  extra=0 missing=0
+  sandboxBefore=28 sandboxAfter=28 outsideGroupBefore=18
+  triggerTiles=[(2,-3), (3,-3), (2,-2), (1,-1), (2,-1)]
+  existingGroupTiles=[(-1,-2), (0,-2), (1,-2), (-1,-1), (-1,0)]
+  expectedUnionTiles=[(2,-3), (3,-3), (-1,-2), (0,-2), (1,-2), (2,-2), (-1,-1), (1,-1), (2,-1), (-1,0)]
+
+[FusionIntegrity] ManualAudit OK | tiles=13 | Play Session End Audit
+Frame: t=75.594 f=19504
+Before blocks: 0 | After blocks: 2
+
+[FusionIntegrity] Play session ended at t=75.594 | activeBlocks=2 | worldTiles=13
+[FusionIntegrity] ManualAudit OK | tiles=13 | Play Session End Audit
+Frame: t=75.594 f=19504
+Before blocks: 0 | After blocks: 2

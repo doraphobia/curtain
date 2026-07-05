@@ -1,7 +1,6 @@
 #if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using Curtain.Settings;
@@ -343,56 +342,12 @@ namespace DuoCurtain.Editor
         private static GitSnapshot CaptureGitSnapshot()
         {
             GitSnapshot snapshot = new GitSnapshot();
-            snapshot.commitHash = RunGit("rev-parse HEAD");
-            snapshot.commitShort = RunGit("rev-parse --short HEAD");
-            snapshot.branch = RunGit("rev-parse --abbrev-ref HEAD");
-            string dirtyOutput = RunGit("status --porcelain");
+            snapshot.commitHash = CrossPlatformEditorUtility.RunGit("rev-parse HEAD");
+            snapshot.commitShort = CrossPlatformEditorUtility.RunGit("rev-parse --short HEAD");
+            snapshot.branch = CrossPlatformEditorUtility.RunGit("rev-parse --abbrev-ref HEAD");
+            string dirtyOutput = CrossPlatformEditorUtility.RunGit("status --porcelain");
             snapshot.dirty = !string.IsNullOrEmpty(dirtyOutput);
             return snapshot;
-        }
-
-        private static string RunGit(string arguments)
-        {
-            try
-            {
-                ProcessStartInfo startInfo = new ProcessStartInfo
-                {
-                    FileName = "git",
-                    Arguments = arguments,
-                    WorkingDirectory = Directory.GetCurrentDirectory(),
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-
-                using Process process = Process.Start(startInfo);
-                if (process == null)
-                    return string.Empty;
-
-                if (!process.WaitForExit(4000))
-                {
-                    try
-                    {
-                        process.Kill();
-                    }
-                    catch
-                    {
-                        // ignored
-                    }
-
-                    return string.Empty;
-                }
-
-                if (process.ExitCode != 0)
-                    return string.Empty;
-
-                return process.StandardOutput.ReadToEnd().Trim();
-            }
-            catch
-            {
-                return string.Empty;
-            }
         }
 
         private static string GetUniquePath(string path)

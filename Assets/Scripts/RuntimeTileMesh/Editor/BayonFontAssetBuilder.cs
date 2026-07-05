@@ -2,6 +2,7 @@
 using System;
 using System.IO;
 using System.Text.RegularExpressions;
+using DuoCurtain.Editor;
 using TMPro;
 using UnityEditor;
 using UnityEngine;
@@ -166,7 +167,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
             {
                 Debug.LogError(
                     "[BayonFontAssetBuilder] Bayon-Regular.ttf is missing. " +
-                    "Install Bayon on macOS or place Bayon-Regular.ttf at " + SourceFontPath + ".");
+                    "Place Bayon-Regular.ttf at " + SourceFontPath + " or install Bayon in the system font library.");
                 return false;
             }
 
@@ -182,40 +183,7 @@ namespace DuoCurtain.RuntimeTileMesh.Editor
 
         private static string FindSystemBayonFontPath()
         {
-            string[] searchRoots =
-            {
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Library/Fonts"),
-                "/Library/Fonts",
-                "/System/Library/Fonts",
-                "/System/Library/Fonts/Supplemental"
-            };
-
-            foreach (string root in searchRoots)
-            {
-                if (!Directory.Exists(root))
-                    continue;
-
-                try
-                {
-                    foreach (string path in Directory.EnumerateFiles(root, "*bayon*", SearchOption.AllDirectories))
-                    {
-                        string extension = Path.GetExtension(path);
-                        if (string.Equals(extension, ".ttf", StringComparison.OrdinalIgnoreCase) ||
-                            string.Equals(extension, ".otf", StringComparison.OrdinalIgnoreCase))
-                        {
-                            return path;
-                        }
-                    }
-                }
-                catch (IOException)
-                {
-                }
-                catch (UnauthorizedAccessException)
-                {
-                }
-            }
-
-            return null;
+            return CrossPlatformEditorUtility.FindSystemFontByNamePattern("*bayon*");
         }
 
         public static bool IsFontAssetUsable(TMP_FontAsset fontAsset)
